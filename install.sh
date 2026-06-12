@@ -113,9 +113,7 @@ fi
 # --- Options Menu Data ---
 OPTIONS=(
   "Core Utilities & libfuse2 (Git, curl, unzip, etc.)"
-  "Docker & Docker Compose"
   "Node.js v15.14.0 (via NVM)"
-  "Python 3 & Pip"
   "Google Chrome"
   "Visual Studio Code"
   "MySQL Workbench"
@@ -129,7 +127,7 @@ OPTIONS=(
 )
 
 # Selections array: 1 = Selected for install, 0 = Deselected. Default to all selected.
-SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1 1 1)
+SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1)
 
 # --- Installer Functions ---
 
@@ -154,23 +152,7 @@ install_core_utilities() {
     log_success "Core CLI utilities & libfuse2 installed."
 }
 
-install_docker() {
-    log_info "Installing Docker Engine & Docker Compose..."
-    sudo apt-get remove -y docker docker-engine docker.io containerd runc || true
-    sudo mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg --yes
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-      $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    sudo apt-get update -y
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-    
-    if ! getent group docker >/dev/null; then
-        sudo groupadd docker
-    fi
-    sudo usermod -aG docker "$USER"
-    log_success "Docker installed. Group permissions configured."
-}
+# (Docker installation removed as requested)
 
 install_node() {
     log_info "Installing NVM and Node.js v15.14.0..."
@@ -192,11 +174,7 @@ install_node() {
     fi
 }
 
-install_python() {
-    log_info "Installing Python 3 & pip..."
-    sudo apt-get install -y python3 python3-pip python3-venv
-    log_success "Python environment installed."
-}
+# (Python installation removed as requested)
 
 install_chrome() {
     log_info "Installing Google Chrome..."
@@ -352,7 +330,6 @@ show_status_results() {
     echo "========================================================${NC}"
     
     check_status "Core Utilities & libfuse2" "command -v curl && command -v git && command -v unzip && dpkg -s libfuse2"
-    check_status "Docker Engine" "command -v docker" "docker"
     
     # Load NVM for check context
     export NVM_DIR="$HOME/.nvm"
@@ -361,7 +338,6 @@ show_status_results() {
     fi
     check_status "Node.js (v15.14.0 via NVM)" "command -v node && node -v | grep -q 'v15.14.0'"
     
-    check_status "Python 3 & Pip" "command -v python3 && command -v pip3"
     check_status "Google Chrome" "command -v google-chrome"
     check_status "Visual Studio Code" "command -v code"
     check_status "MySQL Workbench" "command -v mysql-workbench"
@@ -394,19 +370,17 @@ run_installation() {
             set +e
             case $i in
                 0) install_core_utilities ;;
-                1) install_docker ;;
-                2) install_node ;;
-                3) install_python ;;
-                4) install_chrome ;;
-                5) install_vscode ;;
-                6) install_mysql_workbench ;;
-                7) install_dbeaver ;;
-                8) install_postman ;;
-                9) install_redisinsight ;;
-                10) install_mongodb_compass ;;
-                11) install_tailscale ;;
-                12) install_gnome_tools ;;
-                13) install_clamav ;;
+                1) install_node ;;
+                2) install_chrome ;;
+                3) install_vscode ;;
+                4) install_mysql_workbench ;;
+                5) install_dbeaver ;;
+                6) install_postman ;;
+                7) install_redisinsight ;;
+                8) install_mongodb_compass ;;
+                9) install_tailscale ;;
+                10) install_gnome_tools ;;
+                11) install_clamav ;;
             esac
             set -e
         fi
