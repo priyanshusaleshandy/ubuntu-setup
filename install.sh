@@ -156,23 +156,18 @@ install_node() {
 # --- Uninstallation Functions ---
 
 uninstall_core_utilities() {
-    log_info "Uninstalling core CLI utilities & libfuse2..."
+    log_info "Uninstalling core developer tools & libfuse2..."
+    # Only remove non-critical developer utilities we added.
+    # We must NEVER remove curl, wget, git, or system metadata packages (ca-certificates, gnupg, lsb-release, software-properties-common)
+    # as doing so breaks the package graph and causes apt to autoremove ubuntu-desktop (Software Store, default browsers, etc.).
     sudo apt-get remove --purge -y \
-        curl \
-        git \
-        wget \
         build-essential \
         htop \
         tmux \
         unzip \
-        software-properties-common \
-        apt-transport-https \
-        ca-certificates \
-        gnupg \
-        lsb-release \
         libfuse2 || true
     sudo apt-get autoremove -y
-    log_success "Core CLI utilities & libfuse2 uninstalled."
+    log_success "Core developer tools & libfuse2 uninstalled."
 }
 
 uninstall_node() {
