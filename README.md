@@ -13,10 +13,8 @@ An interactive post-install configuration script to automate the setup of new la
 Open your terminal in Ubuntu and run the following command to download and run the script:
 
 ```bash
-wget -O install.sh https://raw.githubusercontent.com/<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME>/main/install.sh && chmod +x install.sh && ./install.sh
+wget -O install.sh https://raw.githubusercontent.com/priyanshusaleshandy/ubuntu-setup/master/install.sh && chmod +x install.sh && ./install.sh
 ```
-
-*(Replace `<YOUR_GITHUB_USERNAME>` and `<YOUR_REPO_NAME>` with your GitHub details once pushed!)*
 
 ## Software Included
 
