@@ -230,9 +230,9 @@ install_mongodb_compass() {
 }
 
 install_tailscale() {
-    log_info "Installing Tailscale..."
-    curl -fsSL https://tailscale.com/install.sh | sh
-    log_success "Tailscale installed."
+    log_info "Installing Tailscale from Snap Store..."
+    sudo snap install tailscale
+    log_success "Tailscale installed from Snap Store."
 }
 
 install_gnome_tools() {
@@ -258,6 +258,109 @@ install_clamav() {
     sudo systemctl start clamav-daemon
     
     log_success "ClamAV daemon configured and running."
+}
+
+# --- Uninstallation Functions ---
+
+uninstall_core_utilities() {
+    log_info "Uninstalling core CLI utilities & libfuse2..."
+    sudo apt-get remove --purge -y \
+        curl \
+        git \
+        wget \
+        build-essential \
+        htop \
+        tmux \
+        unzip \
+        software-properties-common \
+        apt-transport-https \
+        ca-certificates \
+        gnupg \
+        lsb-release \
+        libfuse2 || true
+    sudo apt-get autoremove -y
+    log_success "Core CLI utilities & libfuse2 uninstalled."
+}
+
+uninstall_node() {
+    log_info "Removing NVM and Node.js..."
+    rm -rf "$HOME/.nvm" "$HOME/.npm" "$HOME/.bower" || true
+    sed -i '/NVM_DIR/d' "$HOME/.bashrc" "$HOME/.profile" 2>/dev/null || true
+    log_success "Node.js (NVM) removed."
+}
+
+uninstall_chrome() {
+    log_info "Uninstalling Google Chrome..."
+    sudo apt-get remove --purge -y google-chrome-stable || true
+    sudo apt-get autoremove -y
+    log_success "Google Chrome uninstalled."
+}
+
+uninstall_vscode() {
+    log_info "Uninstalling Visual Studio Code..."
+    sudo apt-get remove --purge -y code || true
+    sudo rm -f /etc/apt/sources.list.d/vscode.list
+    sudo apt-get autoremove -y
+    log_success "VS Code uninstalled."
+}
+
+uninstall_mysql_workbench() {
+    log_info "Uninstalling MySQL Workbench..."
+    sudo apt-get remove --purge -y mysql-workbench || true
+    sudo apt-get autoremove -y
+    log_success "MySQL Workbench uninstalled."
+}
+
+uninstall_dbeaver() {
+    log_info "Uninstalling DBeaver Community Edition..."
+    sudo apt-get remove --purge -y dbeaver-ce || true
+    sudo apt-get autoremove -y
+    log_success "DBeaver uninstalled."
+}
+
+uninstall_postman() {
+    log_info "Uninstalling Postman (Snap)..."
+    sudo snap remove postman || true
+    log_success "Postman uninstalled."
+}
+
+uninstall_redisinsight() {
+    log_info "Uninstalling Redis Insight (Snap)..."
+    sudo snap remove redisinsight || true
+    log_success "Redis Insight uninstalled."
+}
+
+uninstall_mongodb_compass() {
+    log_info "Uninstalling MongoDB Compass..."
+    sudo apt-get remove --purge -y mongodb-compass || true
+    sudo apt-get autoremove -y
+    log_success "MongoDB Compass uninstalled."
+}
+
+uninstall_tailscale() {
+    log_info "Uninstalling Tailscale..."
+    sudo snap remove tailscale || true
+    sudo apt-get remove --purge -y tailscale || true
+    sudo rm -f /etc/apt/sources.list.d/tailscale.list
+    sudo apt-get autoremove -y
+    log_success "Tailscale uninstalled."
+}
+
+uninstall_gnome_tools() {
+    log_info "Uninstalling GNOME Tweaks & Extension Manager..."
+    sudo apt-get remove --purge -y gnome-tweaks gnome-shell-extension-manager || true
+    sudo apt-get autoremove -y
+    log_success "GNOME tools uninstalled."
+}
+
+uninstall_clamav() {
+    log_info "Stopping and disabling ClamAV services..."
+    sudo systemctl stop clamav-freshclam clamav-daemon 2>/dev/null || true
+    sudo systemctl disable clamav-freshclam clamav-daemon 2>/dev/null || true
+    log_info "Uninstalling ClamAV..."
+    sudo apt-get remove --purge -y clamav clamav-daemon clamav-freshclam || true
+    sudo apt-get autoremove -y
+    log_success "ClamAV uninstalled."
 }
 
 # --- System Configuration Setup ---
@@ -345,12 +448,64 @@ show_status_results() {
     check_status "Postman (Snap)" "command -v postman"
     check_status "Redis Insight (Snap)" "command -v redisinsight"
     check_status "MongoDB Compass" "command -v mongodb-compass"
-    check_status "Tailscale VPN" "command -v tailscale" "tailscaled"
+    check_status "Tailscale VPN" "command -v tailscale" "snap.tailscale.tailscaled"
     check_status "GNOME Tweaks & Extension Manager" "dpkg -s gnome-tweaks && dpkg -s gnome-shell-extension-manager"
     check_status "ClamAV Antivirus Daemon" "command -v clamscan" "clamav-daemon"
     check_status "ClamAV Freshclam Updates" "command -v freshclam" "clamav-freshclam"
     
     echo -e "========================================================\n"
+}
+
+# --- Uninstallation Controller ---
+
+uninstall_component() {
+    local index=$1
+    case $index in
+        0) uninstall_core_utilities ;;
+        1) uninstall_node ;;
+        2) uninstall_chrome ;;
+        3) uninstall_vscode ;;
+        4) uninstall_mysql_workbench ;;
+        5) uninstall_dbeaver ;;
+        6) uninstall_postman ;;
+        7) uninstall_redisinsight ;;
+        8) uninstall_mongodb_compass ;;
+        9) uninstall_tailscale ;;
+        10) uninstall_gnome_tools ;;
+        11) uninstall_clamav ;;
+    esac
+}
+
+run_uninstallation() {
+    local scope=$1 # "selected" or "all"
+    
+    echo -e "\n${RED}${BOLD}========================================================"
+    if [ "$scope" = "all" ]; then
+        echo " UNINSTALLING ALL COMPONENTS"
+    else
+        echo " UNINSTALLING SELECTED COMPONENTS"
+    fi
+    echo "========================================================${NC}"
+    
+    read -r -p "Are you sure you want to proceed with uninstallation? (y/N): " confirm_uninstall
+    if [[ ! "$confirm_uninstall" =~ ^[Yy]$ ]]; then
+        log_info "Uninstallation cancelled."
+        return
+    fi
+    
+    # Run the uninstallation logic
+    for i in "${!OPTIONS[@]}"; do
+        if [ "$scope" = "all" ] || [ "${SELECTIONS[$i]}" -eq 1 ]; then
+            echo -e "\n${YELLOW}${BOLD}Removing: ${OPTIONS[$i]}...${NC}"
+            set +e
+            uninstall_component "$i"
+            set -e
+        fi
+    done
+    
+    echo -e "\n${GREEN}${BOLD}Uninstallation process completed!${NC}"
+    show_status_results
+    read -r -p "Press Enter to return to menu..."
 }
 
 # --- Execution Controller ---
@@ -408,8 +563,9 @@ while true; do
     echo -e "${MAGENTA}${BOLD}========================================================"
     echo "          UBUNTU SYSTEM SETUP DASHBOARD                 "
     echo "========================================================${NC}"
-    echo -e "Toggle installation items by entering their number."
-    echo -e "Type ${GREEN}'i'${NC} to start installation, ${CYAN}'s'${NC} to test status, or ${RED}'q'${NC} to quit:\n"
+    echo -e "Toggle items by entering their number."
+    echo -e "Type ${GREEN}'i'${NC} to install, ${YELLOW}'u'${NC} to uninstall selected, ${RED}'a'${NC} to uninstall all,"
+    echo -e "or type ${CYAN}'s'${NC} to test status, ${RED}'q'${NC} to quit:\n"
     
     for i in "${!OPTIONS[@]}"; do
         if [ "${SELECTIONS[$i]}" -eq 1 ]; then
@@ -425,6 +581,8 @@ while true; do
     
     echo -e "--------------------------------------------------------"
     echo -e "  ${BOLD}i)${NC} ${GREEN}Start Installation${NC}"
+    echo -e "  ${BOLD}u)${NC} ${YELLOW}Uninstall Selected Components${NC}"
+    echo -e "  ${BOLD}a)${NC} ${RED}Uninstall ALL Components${NC}"
     echo -e "  ${BOLD}s)${NC} ${CYAN}Check Current System Status / Diagnostics${NC}"
     echo -e "  ${BOLD}q)${NC} ${RED}Quit Setup${NC}"
     echo -e "========================================================"
@@ -436,6 +594,10 @@ while true; do
     elif [[ "$choice" =~ ^[Ii]$ ]]; then
         run_installation
         exit 0
+    elif [[ "$choice" =~ ^[Uu]$ ]]; then
+        run_uninstallation "selected"
+    elif [[ "$choice" =~ ^[Aa]$ ]]; then
+        run_uninstallation "all"
     elif [[ "$choice" =~ ^[Ss]$ ]]; then
         show_status_results
         read -r -p "Press Enter to return to menu..."
