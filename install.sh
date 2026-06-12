@@ -133,27 +133,6 @@ SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1)
 
 # (System updates function removed as requested)
 
-install_core_utilities() {
-    log_info "Installing core CLI utilities & libfuse2..."
-    sudo apt-get install -y \
-        curl \
-        git \
-        wget \
-        build-essential \
-        htop \
-        tmux \
-        unzip \
-        software-properties-common \
-        apt-transport-https \
-        ca-certificates \
-        gnupg \
-        lsb-release \
-        libfuse2
-    log_success "Core CLI utilities & libfuse2 installed."
-}
-
-# (Docker installation removed as requested)
-
 install_node() {
     log_info "Installing NVM and Node.js v15.14.0..."
     if [ ! -d "$HOME/.nvm" ]; then
@@ -172,92 +151,6 @@ install_node() {
     else
         log_error "NVM load failed. Node.js install skipped."
     fi
-}
-
-# (Python installation removed as requested)
-
-install_chrome() {
-    log_info "Installing Google Chrome..."
-    wget -q -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-    sudo apt-get install -y /tmp/google-chrome-stable_current_amd64.deb
-    rm /tmp/google-chrome-stable_current_amd64.deb
-    log_success "Google Chrome installed."
-}
-
-install_vscode() {
-    log_info "Installing Visual Studio Code..."
-    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /tmp/packages.microsoft.gpg
-    sudo install -D -o root -g root -m 644 /tmp/packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
-    sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
-    rm -f /tmp/packages.microsoft.gpg
-    sudo apt-get update -y
-    sudo apt-get install -y code
-    log_success "VS Code installed."
-}
-
-install_mysql_workbench() {
-    log_info "Installing MySQL Workbench..."
-    sudo apt-get install -y mysql-workbench
-    log_success "MySQL Workbench installed."
-}
-
-install_dbeaver() {
-    log_info "Installing DBeaver Community Edition (.deb)..."
-    wget -q -O /tmp/dbeaver-ce_amd64.deb https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb
-    sudo apt-get install -y /tmp/dbeaver-ce_amd64.deb
-    rm /tmp/dbeaver-ce_amd64.deb
-    log_success "DBeaver installed."
-}
-
-install_postman() {
-    log_info "Installing Postman (Snap)..."
-    sudo snap install postman
-    log_success "Postman installed."
-}
-
-install_redisinsight() {
-    log_info "Installing Redis Insight (Snap)..."
-    sudo snap install redisinsight
-    log_success "Redis Insight installed."
-}
-
-install_mongodb_compass() {
-    log_info "Installing MongoDB Compass (.deb)..."
-    wget -q -O /tmp/mongodb-compass_amd64.deb https://downloads.mongodb.com/compass/mongodb-compass_1.43.0_amd64.deb
-    sudo apt-get install -y /tmp/mongodb-compass_amd64.deb
-    rm /tmp/mongodb-compass_amd64.deb
-    log_success "MongoDB Compass installed."
-}
-
-install_tailscale() {
-    log_info "Installing Tailscale from Snap Store..."
-    sudo snap install tailscale
-    log_success "Tailscale installed from Snap Store."
-}
-
-install_gnome_tools() {
-    log_info "Installing GNOME Tweaks & Extension Manager..."
-    sudo apt-get install -y gnome-tweaks gnome-shell-extension-manager
-    log_success "GNOME configurations ready."
-}
-
-install_clamav() {
-    log_info "Installing ClamAV (Antivirus) and configuring Daemon to start automatically..."
-    sudo apt-get install -y clamav clamav-daemon clamav-freshclam
-    
-    log_info "Stopping freshclam service to run manual update..."
-    sudo systemctl stop clamav-freshclam || true
-    
-    log_info "Updating ClamAV virus signatures (freshclam)..."
-    sudo freshclam || true # Ignore signature errors if mirrors are rate-limiting
-    
-    log_info "Starting and enabling ClamAV systemd services (Always run on restart)..."
-    sudo systemctl enable clamav-freshclam
-    sudo systemctl start clamav-freshclam
-    sudo systemctl enable clamav-daemon
-    sudo systemctl start clamav-daemon
-    
-    log_success "ClamAV daemon configured and running."
 }
 
 # --- Uninstallation Functions ---
@@ -514,34 +407,169 @@ run_installation() {
     # Request credentials/host configuration first
     configure_system_settings
     
-    # Dispatch functions matching selections
-    for i in "${!OPTIONS[@]}"; do
-        if [ "${SELECTIONS[$i]}" -eq 1 ]; then
-            echo -e "\n${MAGENTA}${BOLD}========================================================"
-            echo " Installing: ${OPTIONS[$i]}"
-            echo "========================================================${NC}"
-            
-            # Disable set -e for installers so one failure doesn't halt the entire run
-            set +e
-            case $i in
-                0) install_core_utilities ;;
-                1) install_node ;;
-                2) install_chrome ;;
-                3) install_vscode ;;
-                4) install_mysql_workbench ;;
-                5) install_dbeaver ;;
-                6) install_postman ;;
-                7) install_redisinsight ;;
-                8) install_mongodb_compass ;;
-                9) install_tailscale ;;
-                10) install_gnome_tools ;;
-                11) install_clamav ;;
-            esac
-            set -e
+    local APT_PACKAGES=()
+    local SNAP_PACKAGES=()
+    local INSTALL_NODE=0
+    local INSTALL_CLAMAV=0
+    local DOWNLOAD_PIDS=()
+
+    echo -e "\n${MAGENTA}${BOLD}========================================================"
+    echo " Preparing Installation & Spawning Parallel Downloads..."
+    echo "========================================================${NC}"
+
+    # 1. Spawn background downloads for selected external .deb packages
+    # Google Chrome (Index 2)
+    if [ "${SELECTIONS[2]}" -eq 1 ]; then
+        log_info "Starting Google Chrome download in background..."
+        (wget -q -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb || touch /tmp/chrome_fail) &
+        DOWNLOAD_PIDS+=($!)
+        APT_PACKAGES+=("/tmp/google-chrome-stable_current_amd64.deb")
+    fi
+
+    # DBeaver Community Edition (Index 5)
+    if [ "${SELECTIONS[5]}" -eq 1 ]; then
+        log_info "Starting DBeaver download in background..."
+        (wget -q -O /tmp/dbeaver-ce_amd64.deb https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb || touch /tmp/dbeaver_fail) &
+        DOWNLOAD_PIDS+=($!)
+        APT_PACKAGES+=("/tmp/dbeaver-ce_amd64.deb")
+    fi
+
+    # MongoDB Compass (Index 8)
+    if [ "${SELECTIONS[8]}" -eq 1 ]; then
+        log_info "Starting MongoDB Compass download in background..."
+        (wget -q -O /tmp/mongodb-compass_amd64.deb https://downloads.mongodb.com/compass/mongodb-compass_1.43.0_amd64.deb || touch /tmp/mongodb_fail) &
+        DOWNLOAD_PIDS+=($!)
+        APT_PACKAGES+=("/tmp/mongodb-compass_amd64.deb")
+    fi
+
+    # Remove potential failure flag files from prior runs
+    rm -f /tmp/chrome_fail /tmp/dbeaver_fail /tmp/mongodb_fail
+
+    # 2. Add repo configurations synchronously (fast operations)
+    # Visual Studio Code (Index 3)
+    if [ "${SELECTIONS[3]}" -eq 1 ]; then
+        log_info "Adding VS Code repository GPG key and source list..."
+        wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/packages.microsoft.gpg >/dev/null
+        sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
+        APT_PACKAGES+=("code")
+    fi
+
+    # 3. Assemble packages from the rest of the options
+    # Core Utilities (Index 0)
+    if [ "${SELECTIONS[0]}" -eq 1 ]; then
+        APT_PACKAGES+=("curl" "git" "wget" "build-essential" "htop" "tmux" "unzip" "software-properties-common" "apt-transport-https" "ca-certificates" "gnupg" "lsb-release" "libfuse2")
+    fi
+
+    # Node.js (Index 1)
+    if [ "${SELECTIONS[1]}" -eq 1 ]; then
+        INSTALL_NODE=1
+    fi
+
+    # MySQL Workbench (Index 4)
+    if [ "${SELECTIONS[4]}" -eq 1 ]; then
+        APT_PACKAGES+=("mysql-workbench")
+    fi
+
+    # Postman (Index 6)
+    if [ "${SELECTIONS[6]}" -eq 1 ]; then
+        SNAP_PACKAGES+=("postman")
+    fi
+
+    # Redis Insight (Index 7)
+    if [ "${SELECTIONS[7]}" -eq 1 ]; then
+        SNAP_PACKAGES+=("redisinsight")
+    fi
+
+    # Tailscale VPN (Index 9)
+    if [ "${SELECTIONS[9]}" -eq 1 ]; then
+        SNAP_PACKAGES+=("tailscale")
+    fi
+
+    # GNOME Tweaks & Extension Manager (Index 10)
+    if [ "${SELECTIONS[10]}" -eq 1 ]; then
+        APT_PACKAGES+=("gnome-tweaks" "gnome-shell-extension-manager")
+    fi
+
+    # ClamAV (Index 11)
+    if [ "${SELECTIONS[11]}" -eq 1 ]; then
+        INSTALL_CLAMAV=1
+        APT_PACKAGES+=("clamav" "clamav-daemon" "clamav-freshclam")
+    fi
+
+    # 4. Wait for background downloads to complete
+    if [ "${#DOWNLOAD_PIDS[@]}" -gt 0 ]; then
+        log_info "Waiting for all background downloads to finish..."
+        for pid in "${DOWNLOAD_PIDS[@]}"; do
+            wait "$pid"
+        done
+        
+        # Check download failure flags
+        if [ -f /tmp/chrome_fail ] || [ -f /tmp/dbeaver_fail ] || [ -f /tmp/mongodb_fail ]; then
+            log_warning "Some downloads failed. Script will attempt to continue but installation of failed packages might skip."
         fi
-    done
-    
-    echo -e "\n${GREEN}${BOLD}Selected setup routines completed!${NC}"
+    fi
+
+    # 5. Run CONSOLIDATED APT Installation
+    if [ "${#APT_PACKAGES[@]}" -gt 0 ]; then
+        echo -e "\n${CYAN}${BOLD}========================================================"
+        echo " Executing Consolidated APT Package Installation..."
+        echo "========================================================${NC}"
+        
+        log_info "Running apt update..."
+        sudo apt-get update -y
+        
+        log_info "Installing packages: ${APT_PACKAGES[*]}..."
+        set +e
+        sudo apt-get install -y "${APT_PACKAGES[@]}"
+        set -e
+    fi
+
+    # 6. Run SNAP installations
+    if [ "${#SNAP_PACKAGES[@]}" -gt 0 ]; then
+        echo -e "\n${CYAN}${BOLD}========================================================"
+        echo " Executing Snap Package Installations..."
+        echo "========================================================${NC}"
+        
+        for snap_pkg in "${SNAP_PACKAGES[@]}"; do
+            log_info "Installing snap package: $snap_pkg..."
+            set +e
+            sudo snap install "$snap_pkg"
+            set -e
+        done
+    fi
+
+    # 7. Run Node.js / NVM Setup
+    if [ "$INSTALL_NODE" -eq 1 ]; then
+        echo -e "\n${CYAN}${BOLD}========================================================"
+        echo " Configuring Node.js via NVM..."
+        echo "========================================================${NC}"
+        set +e
+        install_node
+        set -e
+    fi
+
+    # 8. Run ClamAV Post-Install configurations
+    if [ "$INSTALL_CLAMAV" -eq 1 ]; then
+        echo -e "\n${CYAN}${BOLD}========================================================"
+        echo " Configuring ClamAV Antivirus Daemon..."
+        echo "========================================================${NC}"
+        set +e
+        log_info "Stopping freshclam service to run manual update..."
+        sudo systemctl stop clamav-freshclam || true
+        
+        log_info "Updating ClamAV virus signatures (freshclam)..."
+        sudo freshclam || true # Ignore signature errors if mirrors are rate-limiting
+        
+        log_info "Starting and enabling ClamAV systemd services..."
+        sudo systemctl enable clamav-freshclam
+        sudo systemctl start clamav-freshclam
+        sudo systemctl enable clamav-daemon
+        sudo systemctl start clamav-daemon
+        set -e
+        log_success "ClamAV daemon configured."
+    fi
+
+    echo -e "\n${GREEN}${BOLD}Setup completed successfully!${NC}"
     
     # Run status check
     show_status_results
