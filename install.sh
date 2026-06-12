@@ -52,6 +52,64 @@ sudo -v
 # Keep-alive: update existing sudo time stamp if set, otherwise do nothing
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
+# --- Initial User Setup (First-time run) ---
+# Check if the 'Admin' user exists. If not, perform initial system user setup.
+if ! id -u Admin >/dev/null 2>&1; then
+    echo -e "${YELLOW}==============================================================================${NC}"
+    echo -e "${YELLOW}                     INITIAL USER & SYSTEM SETUP                              ${NC}"
+    echo -e "${YELLOW}==============================================================================${NC}"
+    echo -e "Fresh Ubuntu installation detected ('Admin' user not found)."
+    read -p "Would you like to set up the system administrators (Admin & personal user)? (y/N): " setup_users
+    if [[ "$setup_users" =~ ^[Yy]$ ]]; then
+        # 1. Create 'Admin' user
+        log_info "Creating 'Admin' user..."
+        sudo useradd -m -s /bin/bash Admin
+        echo "Admin:Admin@ikigai" | sudo chpasswd
+        sudo usermod -aG sudo Admin
+        log_success "Created user 'Admin' with password 'Admin@ikigai' and added to sudo group."
+
+        # 2. Ask for second user details
+        echo ""
+        read -p "Enter username for the secondary administrator (your personal account): " SECOND_USER
+        while [[ -z "$SECOND_USER" ]]; do
+            read -p "Username cannot be empty. Please enter a username: " SECOND_USER
+        done
+
+        log_info "Creating '$SECOND_USER' user..."
+        sudo useradd -m -s /bin/bash "$SECOND_USER"
+        echo "$SECOND_USER:123456" | sudo chpasswd
+        sudo usermod -aG sudo "$SECOND_USER"
+        log_success "Created user '$SECOND_USER' with password '123456' and added to sudo group."
+
+        # 3. Optional Hostname Change
+        echo ""
+        read -p "Enter new hostname for this machine (or press Enter to keep current '$(hostname)'): " NEW_HOSTNAME
+        if [[ -n "$NEW_HOSTNAME" ]]; then
+            log_info "Setting hostname to '$NEW_HOSTNAME'..."
+            sudo hostnamectl set-hostname "$NEW_HOSTNAME"
+            # Update /etc/hosts to prevent sudo warnings
+            sudo sed -i "s/127.0.1.1.*/127.0.1.1\t$NEW_HOSTNAME/g" /etc/hosts
+            log_success "Hostname updated to '$NEW_HOSTNAME'."
+        fi
+
+        # 4. Copy install.sh to the new user's home directory so they can run it
+        SCRIPT_PATH=$(readlink -f "$0")
+        log_info "Copying setup script to /home/$SECOND_USER/install.sh..."
+        sudo cp "$SCRIPT_PATH" "/home/$SECOND_USER/install.sh"
+        sudo chown "$SECOND_USER:$SECOND_USER" "/home/$SECOND_USER/install.sh"
+        sudo chmod +x "/home/$SECOND_USER/install.sh"
+
+        echo -e "\n${GREEN}[SUCCESS] Initial setup complete!${NC}"
+        echo -e "We will now switch session to user '${BOLD}$SECOND_USER${NC}' to continue installing software."
+        echo -e "Please enter the password for ${BOLD}$SECOND_USER${NC} (which is ${BOLD}123456${NC}) if prompted."
+        echo -e "${YELLOW}------------------------------------------------------------------------------${NC}"
+        
+        # Switch user and execute the copied script
+        exec sudo -i -u "$SECOND_USER" bash -c "cd ~ && ./install.sh"
+    fi
+fi
+
+
 # --- Options Menu Data ---
 OPTIONS=(
   "System Updates (apt update && upgrade)"
