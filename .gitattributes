@@ -1,0 +1,4 @@
+# Force Git to always check out files with Linux line endings (LF)
+* text eol=lf
+install.sh text eol=lf
+README.md text eol=lf
