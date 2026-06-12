@@ -407,41 +407,38 @@ run_installation() {
     local INSTALL_NODE=0
     local INSTALL_CLAMAV=0
     local DOWNLOAD_PIDS=()
+    local TEMP_DIR="$HOME/.ubuntu_setup_tmp"
+
+    if ! command -v gpg >/dev/null 2>&1; then
+        log_info "Installing gnupg for repository key management..."
+        sudo apt-get update -y && sudo apt-get install -y gnupg
+    fi
+
+    mkdir -p "$TEMP_DIR"
+    rm -f "$TEMP_DIR"/*_fail
 
     echo -e "\n${MAGENTA}${BOLD}========================================================"
     echo " Preparing Installation & Spawning Parallel Downloads..."
     echo "========================================================${NC}"
 
-    # 1. Spawn background downloads for selected external .deb packages
-    # Google Chrome (Index 2)
     if [ "${SELECTIONS[2]}" -eq 1 ]; then
         log_info "Starting Google Chrome download in background..."
-        (wget -q -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb || touch /tmp/chrome_fail) &
+        (wget -q -O "$TEMP_DIR/google-chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb || touch "$TEMP_DIR/chrome_fail") &
         DOWNLOAD_PIDS+=($!)
-        APT_PACKAGES+=("/tmp/google-chrome-stable_current_amd64.deb")
     fi
 
-    # DBeaver Community Edition (Index 5)
     if [ "${SELECTIONS[5]}" -eq 1 ]; then
         log_info "Starting DBeaver download in background..."
-        (wget -q -O /tmp/dbeaver-ce_amd64.deb https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb || touch /tmp/dbeaver_fail) &
+        (wget -q -O "$TEMP_DIR/dbeaver.deb" https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb || touch "$TEMP_DIR/dbeaver_fail") &
         DOWNLOAD_PIDS+=($!)
-        APT_PACKAGES+=("/tmp/dbeaver-ce_amd64.deb")
     fi
 
-    # MongoDB Compass (Index 8)
     if [ "${SELECTIONS[8]}" -eq 1 ]; then
         log_info "Starting MongoDB Compass download in background..."
-        (wget -q -O /tmp/mongodb-compass_amd64.deb https://downloads.mongodb.com/compass/mongodb-compass_1.43.0_amd64.deb || touch /tmp/mongodb_fail) &
+        (wget -q -O "$TEMP_DIR/mongodb-compass.deb" https://downloads.mongodb.com/compass/mongodb-compass_1.43.0_amd64.deb || touch "$TEMP_DIR/mongodb_fail") &
         DOWNLOAD_PIDS+=($!)
-        APT_PACKAGES+=("/tmp/mongodb-compass_amd64.deb")
     fi
 
-    # Remove potential failure flag files from prior runs
-    rm -f /tmp/chrome_fail /tmp/dbeaver_fail /tmp/mongodb_fail
-
-    # 2. Add repo configurations synchronously (fast operations)
-    # Visual Studio Code (Index 3)
     if [ "${SELECTIONS[3]}" -eq 1 ]; then
         log_info "Adding VS Code repository GPG key and source list..."
         wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/packages.microsoft.gpg >/dev/null
@@ -449,62 +446,70 @@ run_installation() {
         APT_PACKAGES+=("code")
     fi
 
-    # 3. Assemble packages from the rest of the options
-    # Core Utilities (Index 0)
     if [ "${SELECTIONS[0]}" -eq 1 ]; then
         APT_PACKAGES+=("curl" "git" "wget" "build-essential" "htop" "tmux" "unzip" "software-properties-common" "apt-transport-https" "ca-certificates" "gnupg" "lsb-release" "libfuse2")
     fi
 
-    # Node.js (Index 1)
     if [ "${SELECTIONS[1]}" -eq 1 ]; then
         INSTALL_NODE=1
     fi
 
-    # MySQL Workbench (Index 4)
     if [ "${SELECTIONS[4]}" -eq 1 ]; then
         APT_PACKAGES+=("mysql-workbench")
     fi
 
-    # Postman (Index 6)
     if [ "${SELECTIONS[6]}" -eq 1 ]; then
         SNAP_PACKAGES+=("postman")
     fi
 
-    # Redis Insight (Index 7)
     if [ "${SELECTIONS[7]}" -eq 1 ]; then
         SNAP_PACKAGES+=("redisinsight")
     fi
 
-    # Tailscale VPN (Index 9)
     if [ "${SELECTIONS[9]}" -eq 1 ]; then
         SNAP_PACKAGES+=("tailscale")
     fi
 
-    # GNOME Tweaks & Extension Manager (Index 10)
     if [ "${SELECTIONS[10]}" -eq 1 ]; then
         APT_PACKAGES+=("gnome-tweaks" "gnome-shell-extension-manager")
     fi
 
-    # ClamAV (Index 11)
     if [ "${SELECTIONS[11]}" -eq 1 ]; then
         INSTALL_CLAMAV=1
         APT_PACKAGES+=("clamav" "clamav-daemon" "clamav-freshclam")
     fi
 
-    # 4. Wait for background downloads to complete
     if [ "${#DOWNLOAD_PIDS[@]}" -gt 0 ]; then
         log_info "Waiting for all background downloads to finish..."
         for pid in "${DOWNLOAD_PIDS[@]}"; do
             wait "$pid"
         done
         
-        # Check download failure flags
-        if [ -f /tmp/chrome_fail ] || [ -f /tmp/dbeaver_fail ] || [ -f /tmp/mongodb_fail ]; then
-            log_warning "Some downloads failed. Script will attempt to continue but installation of failed packages might skip."
+        if [ "${SELECTIONS[2]}" -eq 1 ]; then
+            if [ -f "$TEMP_DIR/chrome_fail" ] || [ ! -f "$TEMP_DIR/google-chrome.deb" ] || [ ! -s "$TEMP_DIR/google-chrome.deb" ]; then
+                log_error "Google Chrome download failed."
+            else
+                APT_PACKAGES+=("$TEMP_DIR/google-chrome.deb")
+            fi
+        fi
+
+        if [ "${SELECTIONS[5]}" -eq 1 ]; then
+            if [ -f "$TEMP_DIR/dbeaver_fail" ] || [ ! -f "$TEMP_DIR/dbeaver.deb" ] || [ ! -s "$TEMP_DIR/dbeaver.deb" ]; then
+                log_error "DBeaver download failed."
+            else
+                APT_PACKAGES+=("$TEMP_DIR/dbeaver.deb")
+            fi
+        fi
+
+        if [ "${SELECTIONS[8]}" -eq 1 ]; then
+            if [ -f "$TEMP_DIR/mongodb_fail" ] || [ ! -f "$TEMP_DIR/mongodb-compass.deb" ] || [ ! -s "$TEMP_DIR/mongodb-compass.deb" ]; then
+                log_error "MongoDB Compass download failed."
+            else
+                APT_PACKAGES+=("$TEMP_DIR/mongodb-compass.deb")
+            fi
         fi
     fi
 
-    # 5. Run CONSOLIDATED APT Installation
     if [ "${#APT_PACKAGES[@]}" -gt 0 ]; then
         echo -e "\n${CYAN}${BOLD}========================================================"
         echo " Executing Consolidated APT Package Installation..."
@@ -519,7 +524,8 @@ run_installation() {
         set -e
     fi
 
-    # 6. Run SNAP installations
+    rm -rf "$TEMP_DIR"
+
     if [ "${#SNAP_PACKAGES[@]}" -gt 0 ]; then
         echo -e "\n${CYAN}${BOLD}========================================================"
         echo " Executing Snap Package Installations..."
