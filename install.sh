@@ -112,7 +112,6 @@ fi
 
 # --- Options Menu Data ---
 OPTIONS=(
-  "System Updates (apt update && upgrade)"
   "Core Utilities & libfuse2 (Git, curl, unzip, etc.)"
   "Docker & Docker Compose"
   "Node.js v15.14.0 (via NVM)"
@@ -130,16 +129,11 @@ OPTIONS=(
 )
 
 # Selections array: 1 = Selected for install, 0 = Deselected. Default to all selected.
-SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)
+SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1 1 1)
 
 # --- Installer Functions ---
 
-run_system_updates() {
-    log_info "Running system updates..."
-    sudo apt-get update -y
-    sudo apt-get upgrade -y
-    log_success "System updates completed."
-}
+# (System updates function removed as requested)
 
 install_core_utilities() {
     log_info "Installing core CLI utilities & libfuse2..."
@@ -399,21 +393,20 @@ run_installation() {
             # Disable set -e for installers so one failure doesn't halt the entire run
             set +e
             case $i in
-                0) run_system_updates ;;
-                1) install_core_utilities ;;
-                2) install_docker ;;
-                3) install_node ;;
-                4) install_python ;;
-                5) install_chrome ;;
-                6) install_vscode ;;
-                7) install_mysql_workbench ;;
-                8) install_dbeaver ;;
-                9) install_postman ;;
-                10) install_redisinsight ;;
-                11) install_mongodb_compass ;;
-                12) install_tailscale ;;
-                13) install_gnome_tools ;;
-                14) install_clamav ;;
+                0) install_core_utilities ;;
+                1) install_docker ;;
+                2) install_node ;;
+                3) install_python ;;
+                4) install_chrome ;;
+                5) install_vscode ;;
+                6) install_mysql_workbench ;;
+                7) install_dbeaver ;;
+                8) install_postman ;;
+                9) install_redisinsight ;;
+                10) install_mongodb_compass ;;
+                11) install_tailscale ;;
+                12) install_gnome_tools ;;
+                13) install_clamav ;;
             esac
             set -e
         fi
