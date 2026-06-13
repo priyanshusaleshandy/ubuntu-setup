@@ -526,6 +526,57 @@ show_status_results() {
 
 # --- Installation Helper Routing and Error Prompting ---
 
+is_component_installed() {
+    local index=$1
+    case $index in
+        0)
+            command -v curl >/dev/null 2>&1 && command -v git >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1 && dpkg -s libfuse2 >/dev/null 2>&1
+            ;;
+        1)
+            local NVM_DIR="$HOME/.nvm"
+            if [ -s "$NVM_DIR/nvm.sh" ]; then
+                \. "$NVM_DIR/nvm.sh"
+                command -v node >/dev/null 2>&1 && node -v | grep -q 'v15.14.0'
+            else
+                return 1
+            fi
+            ;;
+        2)
+            command -v google-chrome >/dev/null 2>&1
+            ;;
+        3)
+            command -v code >/dev/null 2>&1
+            ;;
+        4)
+            command -v mysql-workbench >/dev/null 2>&1 || command -v mysql-workbench-community >/dev/null 2>&1
+            ;;
+        5)
+            command -v dbeaver >/dev/null 2>&1
+            ;;
+        6)
+            command -v postman >/dev/null 2>&1
+            ;;
+        7)
+            command -v redisinsight >/dev/null 2>&1
+            ;;
+        8)
+            command -v mongodb-compass >/dev/null 2>&1
+            ;;
+        9)
+            command -v tailscale >/dev/null 2>&1
+            ;;
+        10)
+            dpkg -s gnome-tweaks >/dev/null 2>&1 && dpkg -s gnome-shell-extension-manager >/dev/null 2>&1
+            ;;
+        11)
+            command -v clamscan >/dev/null 2>&1 && command -v freshclam >/dev/null 2>&1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 install_component() {
     local index=$1
     case $index in
@@ -547,6 +598,13 @@ install_component() {
 install_component_with_retry() {
     local index=$1
     local name="${OPTIONS[$index]}"
+    
+    # Check if component is already installed
+    if is_component_installed "$index"; then
+        log_info "$name is already installed. Skipping..."
+        return 0
+    fi
+    
     while true; do
         echo -e "\n${CYAN}${BOLD}========================================================"
         echo " Installing: $name"
