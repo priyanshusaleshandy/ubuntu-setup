@@ -295,11 +295,15 @@ install_mongodb_compass() {
 }
 
 install_tailscale() {
-    log_info "Installing Tailscale VPN (Snap)..."
-    if ! sudo snap install tailscale; then
-        log_error "Failed to install Tailscale via Snap."
+    log_info "Installing Tailscale VPN (Official)..."
+    if ! curl -fsSL https://tailscale.com/install.sh | sh; then
+        log_error "Failed to install Tailscale."
         return 1
     fi
+    log_info "Enabling and starting tailscaled service..."
+    sudo systemctl enable --now tailscaled
+    log_info "Bringing Tailscale up..."
+    sudo tailscale up || true
 }
 
 install_gnome_tools() {
@@ -516,7 +520,7 @@ show_status_results() {
     check_status "Postman (Snap)" "command -v postman"
     check_status "Redis Insight (Snap)" "command -v redisinsight"
     check_status "MongoDB Compass" "command -v mongodb-compass"
-    check_status "Tailscale VPN" "command -v tailscale" "snap.tailscale.tailscaled"
+    check_status "Tailscale VPN" "command -v tailscale" "tailscaled"
     check_status "GNOME Tweaks & Extension Manager" "dpkg -s gnome-tweaks && dpkg -s gnome-shell-extension-manager"
     check_status "ClamAV Antivirus Daemon" "command -v clamscan" "clamav-daemon"
     check_status "ClamAV Freshclam Updates" "command -v freshclam" "clamav-freshclam"
