@@ -133,10 +133,22 @@ SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1)
 
 # (System updates function removed as requested)
 
+install_core_utilities() {
+    log_info "Installing core developer tools & libfuse2..."
+    sudo apt-get update -y
+    if ! sudo apt-get install -y curl git wget build-essential htop tmux unzip software-properties-common apt-transport-https ca-certificates gnupg lsb-release libfuse2; then
+        log_error "Core utilities installation failed."
+        return 1
+    fi
+}
+
 install_node() {
     log_info "Installing NVM and Node.js v15.14.0..."
     if [ ! -d "$HOME/.nvm" ]; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+        if ! curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash; then
+            log_error "Failed to download/install NVM."
+            return 1
+        fi
     fi
     
     # Load NVM for current context
@@ -144,13 +156,168 @@ install_node() {
     if [ -s "$NVM_DIR/nvm.sh" ]; then
         \. "$NVM_DIR/nvm.sh"
         log_info "Installing Node.js v15.14.0..."
-        nvm install 15.14.0
+        if ! nvm install 15.14.0; then
+            log_error "Failed to install Node.js v15.14.0."
+            return 1
+        fi
         nvm use 15.14.0
         nvm alias default 15.14.0
         log_success "Node.js $(node -v) and npm $(npm -v) configured."
     else
         log_error "NVM load failed. Node.js install skipped."
+        return 1
     fi
+}
+
+install_chrome() {
+    log_info "Installing Google Chrome..."
+    local TEMP_DIR="$HOME/.ubuntu_setup_tmp"
+    mkdir -p "$TEMP_DIR"
+    local DEB_FILE="$TEMP_DIR/google-chrome.deb"
+    rm -f "$DEB_FILE"
+    
+    log_info "Downloading Google Chrome .deb package..."
+    if ! wget -O "$DEB_FILE" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb; then
+        log_error "Failed to download Google Chrome."
+        return 1
+    fi
+    
+    log_info "Installing Google Chrome..."
+    if ! sudo apt-get install -y "$DEB_FILE"; then
+        log_error "Failed to install Google Chrome deb package."
+        rm -f "$DEB_FILE"
+        return 1
+    fi
+    rm -f "$DEB_FILE"
+}
+
+install_vscode() {
+    log_info "Installing Visual Studio Code..."
+    if ! command -v gpg >/dev/null 2>&1; then
+        log_info "Installing gnupg for repository key management..."
+        sudo apt-get update -y && sudo apt-get install -y gnupg
+    fi
+    log_info "Adding VS Code repository GPG key and source list..."
+    if ! wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/packages.microsoft.gpg >/dev/null; then
+        log_error "Failed to import VS Code repository GPG key."
+        return 1
+    fi
+    if ! sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'; then
+        log_error "Failed to write VS Code source list."
+        return 1
+    fi
+    sudo apt-get update -y
+    if ! sudo apt-get install -y code; then
+        log_error "Failed to install Visual Studio Code."
+        return 1
+    fi
+}
+
+install_mysql_workbench() {
+    log_info "Installing MySQL Workbench..."
+    sudo apt-get update -y
+    if ! sudo apt-get install -y mysql-workbench; then
+        log_error "Failed to install MySQL Workbench."
+        return 1
+    fi
+}
+
+install_dbeaver() {
+    log_info "Installing DBeaver Community Edition..."
+    local TEMP_DIR="$HOME/.ubuntu_setup_tmp"
+    mkdir -p "$TEMP_DIR"
+    local DEB_FILE="$TEMP_DIR/dbeaver.deb"
+    rm -f "$DEB_FILE"
+    
+    log_info "Downloading DBeaver CE .deb package..."
+    if ! wget -O "$DEB_FILE" https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb; then
+        log_error "Failed to download DBeaver."
+        return 1
+    fi
+    
+    log_info "Installing DBeaver using apt..."
+    if ! sudo apt-get install -y "$DEB_FILE"; then
+        log_error "Failed to install DBeaver."
+        rm -f "$DEB_FILE"
+        return 1
+    fi
+    rm -f "$DEB_FILE"
+}
+
+install_postman() {
+    log_info "Installing Postman (Snap)..."
+    if ! sudo snap install postman; then
+        log_error "Failed to install Postman via Snap."
+        return 1
+    fi
+}
+
+install_redisinsight() {
+    log_info "Installing Redis Insight (Snap)..."
+    if ! sudo snap install redisinsight; then
+        log_error "Failed to install Redis Insight via Snap."
+        return 1
+    fi
+}
+
+install_mongodb_compass() {
+    log_info "Installing MongoDB Compass..."
+    local TEMP_DIR="$HOME/.ubuntu_setup_tmp"
+    mkdir -p "$TEMP_DIR"
+    local DEB_FILE="$TEMP_DIR/mongodb-compass.deb"
+    rm -f "$DEB_FILE"
+    
+    log_info "Downloading MongoDB Compass .deb package..."
+    if ! wget -O "$DEB_FILE" https://downloads.mongodb.com/compass/mongodb-compass_1.43.0_amd64.deb; then
+        log_error "Failed to download MongoDB Compass."
+        return 1
+    fi
+    
+    log_info "Installing MongoDB Compass using apt..."
+    if ! sudo apt-get install -y "$DEB_FILE"; then
+        log_error "Failed to install MongoDB Compass."
+        rm -f "$DEB_FILE"
+        return 1
+    fi
+    rm -f "$DEB_FILE"
+}
+
+install_tailscale() {
+    log_info "Installing Tailscale VPN (Snap)..."
+    if ! sudo snap install tailscale; then
+        log_error "Failed to install Tailscale via Snap."
+        return 1
+    fi
+}
+
+install_gnome_tools() {
+    log_info "Installing GNOME Tweaks & Extension Manager..."
+    sudo apt-get update -y
+    if ! sudo apt-get install -y gnome-tweaks gnome-shell-extension-manager; then
+        log_error "Failed to install GNOME Tweaks & Extension Manager."
+        return 1
+    fi
+}
+
+install_clamav() {
+    log_info "Installing ClamAV Antivirus..."
+    sudo apt-get update -y
+    if ! sudo apt-get install -y clamav clamav-daemon clamav-freshclam; then
+        log_error "Failed to install ClamAV."
+        return 1
+    fi
+    
+    log_info "Stopping freshclam service to run manual update..."
+    sudo systemctl stop clamav-freshclam || true
+    
+    log_info "Updating ClamAV virus signatures (freshclam)..."
+    sudo freshclam || true # Ignore signature errors if mirrors are rate-limiting
+    
+    log_info "Starting and enabling ClamAV systemd services..."
+    sudo systemctl enable clamav-freshclam
+    sudo systemctl start clamav-freshclam
+    sudo systemctl enable clamav-daemon
+    sudo systemctl start clamav-daemon
 }
 
 # --- Uninstallation Functions ---
@@ -344,6 +511,72 @@ show_status_results() {
     echo -e "========================================================\n"
 }
 
+# --- Installation Helper Routing and Error Prompting ---
+
+install_component() {
+    local index=$1
+    case $index in
+        0) install_core_utilities ;;
+        1) install_node ;;
+        2) install_chrome ;;
+        3) install_vscode ;;
+        4) install_mysql_workbench ;;
+        5) install_dbeaver ;;
+        6) install_postman ;;
+        7) install_redisinsight ;;
+        8) install_mongodb_compass ;;
+        9) install_tailscale ;;
+        10) install_gnome_tools ;;
+        11) install_clamav ;;
+    esac
+}
+
+install_component_with_retry() {
+    local index=$1
+    local name="${OPTIONS[$index]}"
+    while true; do
+        echo -e "\n${CYAN}${BOLD}========================================================"
+        echo " Installing: $name"
+        echo "========================================================${NC}"
+        
+        # Turn off set -e temporarily so that we can check the exit status of the install function
+        set +e
+        install_component "$index"
+        local exit_status=$?
+        set -e
+        
+        if [ $exit_status -eq 0 ]; then
+            log_success "$name installation completed."
+            break
+        else
+            log_error "Installation of $name failed."
+            echo -e "${YELLOW}What would you like to do?${NC}"
+            echo -e "  ${BOLD}r)${NC} Retry installation of $name"
+            echo -e "  ${BOLD}s)${NC} Skip this application and continue"
+            echo -e "  ${BOLD}a)${NC} Abort entire installation"
+            read -r -p "Choose option [r/s/a]: " choice
+            case "$choice" in
+                [Rr]*)
+                    log_info "Retrying $name installation..."
+                    continue
+                    ;;
+                [Ss]*)
+                    log_warning "Skipping $name."
+                    break
+                    ;;
+                [Aa]*)
+                    log_error "Installation aborted by user."
+                    exit 1
+                    ;;
+                *)
+                    log_warning "Invalid option. Retrying by default..."
+                    continue
+                    ;;
+            esac
+        fi
+    done
+}
+
 # --- Uninstallation Controller ---
 
 uninstall_component() {
@@ -402,203 +635,12 @@ run_installation() {
     # Request credentials/host configuration first
     configure_system_settings
     
-    local APT_PACKAGES=()
-    local SNAP_PACKAGES=()
-    local INSTALL_NODE=0
-    local INSTALL_CLAMAV=0
-    local DOWNLOAD_PIDS=()
-    local TEMP_DIR="$HOME/.ubuntu_setup_tmp"
-
-    if ! command -v gpg >/dev/null 2>&1; then
-        log_info "Installing gnupg for repository key management..."
-        sudo apt-get update -y && sudo apt-get install -y gnupg
-    fi
-
-    mkdir -p "$TEMP_DIR"
-    rm -f "$TEMP_DIR"/*_fail
-
-    echo -e "\n${MAGENTA}${BOLD}========================================================"
-    echo " Preparing Installation & Spawning Parallel Downloads..."
-    echo "========================================================${NC}"
-
-    if [ "${SELECTIONS[2]}" -eq 1 ]; then
-        log_info "Starting Google Chrome download in background..."
-        (wget -q -O "$TEMP_DIR/google-chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb || touch "$TEMP_DIR/chrome_fail") &
-        DOWNLOAD_PIDS+=($!)
-    fi
-
-    if [ "${SELECTIONS[5]}" -eq 1 ]; then
-        log_info "Starting DBeaver download in background..."
-        (wget -q -O "$TEMP_DIR/dbeaver.deb" https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb || touch "$TEMP_DIR/dbeaver_fail") &
-        DOWNLOAD_PIDS+=($!)
-    fi
-
-    if [ "${SELECTIONS[8]}" -eq 1 ]; then
-        log_info "Starting MongoDB Compass download in background..."
-        (wget -q -O "$TEMP_DIR/mongodb-compass.deb" https://downloads.mongodb.com/compass/mongodb-compass_1.43.0_amd64.deb || touch "$TEMP_DIR/mongodb_fail") &
-        DOWNLOAD_PIDS+=($!)
-    fi
-
-    # Helper function to check if a package is available in the apt cache
-    is_pkg_available() {
-        apt-cache show "$1" >/dev/null 2>&1
-    }
-
-    local REPO_PKGS=()
-
-    # 2. Add repo configurations synchronously (fast operations)
-    # Visual Studio Code (Index 3)
-    if [ "${SELECTIONS[3]}" -eq 1 ]; then
-        log_info "Adding VS Code repository GPG key and source list..."
-        wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/packages.microsoft.gpg >/dev/null
-        sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
-        REPO_PKGS+=("code")
-    fi
-
-    # 3. Assemble repository packages from options
-    # Core Utilities (Index 0)
-    if [ "${SELECTIONS[0]}" -eq 1 ]; then
-        REPO_PKGS+=("curl" "git" "wget" "build-essential" "htop" "tmux" "unzip" "software-properties-common" "apt-transport-https" "ca-certificates" "gnupg" "lsb-release" "libfuse2")
-    fi
-
-    # Node.js (Index 1)
-    if [ "${SELECTIONS[1]}" -eq 1 ]; then
-        INSTALL_NODE=1
-    fi
-
-    # MySQL Workbench (Index 4)
-    if [ "${SELECTIONS[4]}" -eq 1 ]; then
-        REPO_PKGS+=("mysql-workbench")
-    fi
-
-    # Postman (Index 6)
-    if [ "${SELECTIONS[6]}" -eq 1 ]; then
-        SNAP_PACKAGES+=("postman")
-    fi
-
-    # Redis Insight (Index 7)
-    if [ "${SELECTIONS[7]}" -eq 1 ]; then
-        SNAP_PACKAGES+=("redisinsight")
-    fi
-
-    # Tailscale VPN (Index 9)
-    if [ "${SELECTIONS[9]}" -eq 1 ]; then
-        SNAP_PACKAGES+=("tailscale")
-    fi
-
-    # GNOME Tweaks & Extension Manager (Index 10)
-    if [ "${SELECTIONS[10]}" -eq 1 ]; then
-        REPO_PKGS+=("gnome-tweaks" "gnome-shell-extension-manager")
-    fi
-
-    # ClamAV (Index 11)
-    if [ "${SELECTIONS[11]}" -eq 1 ]; then
-        INSTALL_CLAMAV=1
-        REPO_PKGS+=("clamav" "clamav-daemon" "clamav-freshclam")
-    fi
-
-    # Run apt update to ensure latest cache (including newly added VS Code repo)
-    log_info "Running apt update to refresh package lists..."
-    sudo apt-get update -y
-
-    # Filter repository packages and add only if they are available
-    for pkg in "${REPO_PKGS[@]}"; do
-        if is_pkg_available "$pkg"; then
-            APT_PACKAGES+=("$pkg")
-        else
-            log_warning "Package '$pkg' is not available in your system's repositories. Skipping."
+    # Run setup for each selected component one by one
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${SELECTIONS[$i]}" -eq 1 ]; then
+            install_component_with_retry "$i"
         fi
     done
-
-    # 4. Wait for background downloads to complete
-    if [ "${#DOWNLOAD_PIDS[@]}" -gt 0 ]; then
-        log_info "Waiting for all background downloads to finish..."
-        for pid in "${DOWNLOAD_PIDS[@]}"; do
-            wait "$pid"
-        done
-        
-        if [ "${SELECTIONS[2]}" -eq 1 ]; then
-            if [ -f "$TEMP_DIR/chrome_fail" ] || [ ! -f "$TEMP_DIR/google-chrome.deb" ] || [ ! -s "$TEMP_DIR/google-chrome.deb" ]; then
-                log_error "Google Chrome download failed."
-            else
-                APT_PACKAGES+=("$TEMP_DIR/google-chrome.deb")
-            fi
-        fi
-
-        if [ "${SELECTIONS[5]}" -eq 1 ]; then
-            if [ -f "$TEMP_DIR/dbeaver_fail" ] || [ ! -f "$TEMP_DIR/dbeaver.deb" ] || [ ! -s "$TEMP_DIR/dbeaver.deb" ]; then
-                log_error "DBeaver download failed."
-            else
-                APT_PACKAGES+=("$TEMP_DIR/dbeaver.deb")
-            fi
-        fi
-
-        if [ "${SELECTIONS[8]}" -eq 1 ]; then
-            if [ -f "$TEMP_DIR/mongodb_fail" ] || [ ! -f "$TEMP_DIR/mongodb-compass.deb" ] || [ ! -s "$TEMP_DIR/mongodb-compass.deb" ]; then
-                log_error "MongoDB Compass download failed."
-            else
-                APT_PACKAGES+=("$TEMP_DIR/mongodb-compass.deb")
-            fi
-        fi
-    fi
-
-    # 5. Run CONSOLIDATED APT Installation
-    if [ "${#APT_PACKAGES[@]}" -gt 0 ]; then
-        echo -e "\n${CYAN}${BOLD}========================================================"
-        echo " Executing Consolidated APT Package Installation..."
-        echo "========================================================${NC}"
-        
-        log_info "Installing packages: ${APT_PACKAGES[*]}..."
-        set +e
-        sudo apt-get install -y "${APT_PACKAGES[@]}"
-        set -e
-    fi
-
-    rm -rf "$TEMP_DIR"
-
-    if [ "${#SNAP_PACKAGES[@]}" -gt 0 ]; then
-        echo -e "\n${CYAN}${BOLD}========================================================"
-        echo " Executing Snap Package Installations..."
-        echo "========================================================${NC}"
-        
-        for snap_pkg in "${SNAP_PACKAGES[@]}"; do
-            log_info "Installing snap package: $snap_pkg..."
-            set +e
-            sudo snap install "$snap_pkg"
-            set -e
-        done
-    fi
-
-    # 7. Run Node.js / NVM Setup
-    if [ "$INSTALL_NODE" -eq 1 ]; then
-        echo -e "\n${CYAN}${BOLD}========================================================"
-        echo " Configuring Node.js via NVM..."
-        echo "========================================================${NC}"
-        set +e
-        install_node
-        set -e
-    fi
-
-    # 8. Run ClamAV Post-Install configurations
-    if [ "$INSTALL_CLAMAV" -eq 1 ]; then
-        echo -e "\n${CYAN}${BOLD}========================================================"
-        echo " Configuring ClamAV Antivirus Daemon..."
-        echo "========================================================${NC}"
-        set +e
-        log_info "Stopping freshclam service to run manual update..."
-        sudo systemctl stop clamav-freshclam || true
-        
-        log_info "Updating ClamAV virus signatures (freshclam)..."
-        sudo freshclam || true # Ignore signature errors if mirrors are rate-limiting
-        
-        log_info "Starting and enabling ClamAV systemd services..."
-        sudo systemctl enable clamav-freshclam
-        sudo systemctl start clamav-freshclam
-        sudo systemctl enable clamav-daemon
-        sudo systemctl start clamav-daemon
-        set -e
-        log_success "ClamAV daemon configured."
-    fi
 
     echo -e "\n${GREEN}${BOLD}Setup completed successfully!${NC}"
     
@@ -624,7 +666,8 @@ while true; do
     echo "========================================================${NC}"
     echo -e "Toggle items by entering their number."
     echo -e "Type ${GREEN}'i'${NC} to install, ${YELLOW}'u'${NC} to uninstall selected, ${RED}'a'${NC} to uninstall all,"
-    echo -e "or type ${CYAN}'s'${NC} to test status, ${RED}'q'${NC} to quit:\n"
+    echo -e "or type ${CYAN}'s'${NC} to test status, ${RED}'q'${NC} to quit."
+    echo -e "Use ${YELLOW}'c'${NC} to clear all selections, ${GREEN}'e'${NC} to select all selections:\n"
     
     for i in "${!OPTIONS[@]}"; do
         if [ "${SELECTIONS[$i]}" -eq 1 ]; then
@@ -643,6 +686,8 @@ while true; do
     echo -e "  ${BOLD}u)${NC} ${YELLOW}Uninstall Selected Components${NC}"
     echo -e "  ${BOLD}a)${NC} ${RED}Uninstall ALL Components${NC}"
     echo -e "  ${BOLD}s)${NC} ${CYAN}Check Current System Status / Diagnostics${NC}"
+    echo -e "  ${BOLD}c)${NC} ${YELLOW}Clear/Deselect All Selections${NC}"
+    echo -e "  ${BOLD}e)${NC} ${GREEN}Select/Enable All Selections${NC}"
     echo -e "  ${BOLD}q)${NC} ${RED}Quit Setup${NC}"
     echo -e "========================================================"
     read -r -p "Choose command or index: " choice
@@ -660,6 +705,14 @@ while true; do
     elif [[ "$choice" =~ ^[Ss]$ ]]; then
         show_status_results
         read -r -p "Press Enter to return to menu..."
+    elif [[ "$choice" =~ ^[Cc]$ ]]; then
+        for idx in "${!SELECTIONS[@]}"; do
+            SELECTIONS[$idx]=0
+        done
+    elif [[ "$choice" =~ ^[Ee]$ ]]; then
+        for idx in "${!SELECTIONS[@]}"; do
+            SELECTIONS[$idx]=1
+        done
     elif [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#OPTIONS[@]}" ]; then
         idx=$((choice-1))
         # Toggle selection
