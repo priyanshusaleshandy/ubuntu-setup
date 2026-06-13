@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In-House AI Cluster Architecture (Mac Mini Cluster)</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #334155;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #ffffff;
+        }
+
+
+        h1 {
+            color: #0f172a;
+            font-size: 28px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        h2 {
+            color: #1e293b;
+            font-size: 22px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 6px;
+            margin-top: 30px;
+        }
+
+        h3 {
+            color: #334155;
+            font-size: 18px;
+            margin-top: 20px;
+        }
+
+        h4 {
+            color: #475569;
+            font-size: 15px;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+
+        p {
+            margin: 10px 0;
+        }
+
+        ul, ol {
+            margin: 10px 0 10px 20px;
+            padding-left: 0;
+        }
+
+        li {
+            margin-bottom: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 15px;
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: #0f172a;
+            font-weight: bold;
+            text-align: left;
+            border: 1px solid #cbd5e1;
+            padding: 10px;
+        }
+
+        td {
+            border: 1px solid #cbd5e1;
+            padding: 10px;
+            vertical-align: top;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        pre {
+            background-color: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: Consolas, Monaco, "Courier New", Courier, monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #0f172a;
+            margin: 15px 0;
+        }
+
+        code {
+            font-family: Consolas, Monaco, "Courier New", Courier, monospace;
+            background-color: #f1f5f9;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 14px;
+            color: #0f172a;
+        }
+
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            border-radius: 0;
+            font-size: inherit;
+        }
+
+        .alert-box {
+            background-color: #fefcbf;
+            border-left: 4px solid #ecc94b;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .alert-box strong {
+            color: #744210;
+        }
+
+        .alert-box p {
+            margin: 5px 0 0 0;
+            color: #744210;
+        }
+
+        .diagram-container {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background-color: #f8fafc;
+        }
+
+        .diagram-container img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid #cbd5e1;
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+
+
+    <h1>In-House AI Cluster Architecture (Mac Mini Cluster)</h1>
+    <p>This guide outlines how to leverage your 4-5 Mac Minis to build a private, high-performance, in-house AI platform for 100+ users. By self-hosting LLMs, you will reduce external API token usage to zero for standard tasks, keep your company data secure, and provide a unified chat interface.</p>
+
+    <hr>
+
+    <h2>1. High-Level Architecture Diagram</h2>
+    <p>Here is how your in-house AI cluster will function. A central load-balancer and gateway (LiteLLM) will distribute incoming requests from your users across the 4-5 Mac Minis running Ollama.</p>
+
+    <div class="diagram-container">
+        <!-- Rendered Mermaid SVG via mermaid.ink with base64 encoded diagram -->
+        <img src="https://mermaid.ink/svg/Z3JhcGggVEQKICAgIHN1YmdyYXBoIFVzZXJzIFsiVXNlciBMYXllciAoMTAwKyBVc2VycykiXQogICAgICAgIFUxW0Jyb3dzZXIgLyBBUEkgQ2xpZW50XQogICAgICAgIFUyW1NsYWNrIC8gVGVhbXMgQm90XQogICAgICAgIFUzW0ludGVybmFsIFRvb2xzXQogICAgZW5kCgogICAgc3ViZ3JhcGggQ29udHJvbGxlciBbIkNlbnRyYWwgQ29udHJvbCBOb2RlIChNYWMgTWluaSAjMSBvciBMb2NhbCBWTSkiXQogICAgICAgIFdlYlVJWyJPcGVuIFdlYlVJIChVc2VyIEludGVyZmFjZSwgQXV0aCwgUkFHKSJdCiAgICAgICAgR2F0ZXdheVsiTGl0ZUxMTSBHYXRld2F5IChMb2FkIEJhbGFuY2VyLCBBUEkgS2V5cywgUmF0ZSBMaW1pdHMpIl0KICAgIGVuZAoKICAgIHN1YmdyYXBoIFdvcmtlcnMgWyJJbmZlcmVuY2UgV29ya2VyIE5vZGVzICg0LTV4IE1hYyBNaW5pcykiXQogICAgICAgIE1hYzFbIk1hYyBNaW5pICMxIChPbGxhbWEgRW5naW5lKSJdCiAgICAgICAgTWFjMlsiTWFjIE1pbmkgIzIgKE9sbGFtYSBFbmdpbmUpIl0KICAgICAgICBNYWMzWyJNYWMgTWluaSAjMyAoT2xsYW1hIEVuZ2luZSkiXQogICAgICAgIE1hYzRbIk1hYyBNaW5pIC00IChPbGxhbWEgRW5naW5lKSJdCiAgICAgICAgTWFjNVsiTWFjIE1pbmkgIzUgKE9sbGFtYSBFbmdpbmUpIl0KICAgIGVuZAoKICAgIFVzZXJzIC0tPnxIVFRQUyBSZXF1ZXN0c3wgV2ViVUkKICAgIFdlYlVJIC0tPnxPcGVuQUktY29tcGF0aWJsZSBBUEl8IEdhdGV3YXkKICAgIAogICAgR2F0ZXdheVsiTGl0ZUxMTSBHYXRld2F5Il0gLS0+fFJvdW5kLVJvYmluIC8gTGVhc3QtQ29ubnMgTG9hZCBCYWxhbmNpbmd8IE1hYzEKICAgIEdhdGV3YXlbIkxpdGVMTE0gR2F0ZXdheSJdIC0tPnxSb3VuZC1Sb2JpbiAvIExlYXN0LUNvbm5zIExvYWQgQmFsYW5jaW5nfCBNYWMyCiAgICBHYXRld2F5WyJMaXRlTExNIEdhdGV3YXkiXSAtLT58Um91bmQtUm9iaW4gLyBMZWFzdC1Db25ucyBMb2FkIEJhbGFuY2luZ3wgTWFjMwogICAgR2F0ZXdheVsiTGl0ZUxMTSBHYXRld2F5Il0gLS0+fFJvdW5kLVJvYmluIC8gTGVhc3QtQ29ubnMgTG9hZCBCYWxhbmNpbmd8IE1hYzQKICAgIEdhdGV3YXlbIkxpdGVMTE0gR2F0ZXdheSJdIC0tPnxSb3VuZC1Sb2JpbiAvIExlYXN0LUNvbm5zIExvYWQgQmFsYW5jaW5nfCBNYWM1" alt="In-House AI Cluster Architecture Diagram">
+    </div>
+
+    <hr>
+
+    <h2>2. Core Technology Stack</h2>
+    <p>To build this setup, we recommend the following open-source, production-ready stack:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Component</th>
+                <th>Technology</th>
+                <th>Why We Use It</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>User Frontend</strong></td>
+                <td><a href="https://github.com/open-webui/open-webui">Open WebUI</a></td>
+                <td>Sleek, ChatGPT-like interface. Supports user authentication, custom system prompts, Retrieval-Augmented Generation (RAG) for documents, and playground modes.</td>
+            </tr>
+            <tr>
+                <td><strong>Gateway & Load Balancer</strong></td>
+                <td><a href="https://github.com/BerriAI/litellm">LiteLLM Proxy</a></td>
+                <td>Acts as a single OpenAI-compatible API gateway. Distributes loads across your Ollama workers, handles API keys/budgets for internal developers, and supports fallback to commercial APIs (e.g., Gemini, OpenAI) if local resources are saturated.</td>
+            </tr>
+            <tr>
+                <td><strong>Inference Engine</strong></td>
+                <td><a href="https://ollama.com/">Ollama</a></td>
+                <td>Easiest way to run LLMs on macOS. Uses Apple Silicon Metal acceleration automatically, handles model downloads, and provides a clean local API.</td>
+            </tr>
+            <tr>
+                <td><strong>Containerization</strong></td>
+                <td>Docker / Docker Compose</td>
+                <td>Simplifies deploying the central control services (LiteLLM, Open WebUI, Database) on your primary Mac Mini.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h2>3. Hardware Capability & Model Selection</h2>
+    <p>Apple Silicon Mac Minis utilize <strong>Unified Memory (RAM)</strong>, which is shared between the CPU and GPU. This is excellent for LLMs, as local inference speed is almost entirely limited by memory bandwidth.</p>
+
+    <p>Depending on the RAM configurations of your Mac Minis, here are the models you can run efficiently:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Mac Mini RAM</th>
+                <th>Recommended Quantized Models</th>
+                <th>Speed / Performance Profile</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>16 GB RAM</strong></td>
+                <td>Qwen 2.5 (7B), Llama 3.1 (8B), Mistral (7B)</td>
+                <td>Fast (~30-50 tokens/sec). Great for general summaries, brainstorming, and basic coding tasks.</td>
+            </tr>
+            <tr>
+                <td><strong>24 GB RAM</strong></td>
+                <td>Qwen 2.5 (14B), Gemma 2 (9B), Llama 3.1 (8B)</td>
+                <td>Balanced. Strong reasoning capabilities, fits comfortably with high context length.</td>
+            </tr>
+            <tr>
+                <td><strong>64 GB+ RAM</strong></td>
+                <td>Qwen 2.5 (32B), Command-R (35B), Llama 3.1 (70B Q4)</td>
+                <td>High reasoning, slower generation (~10-15 tokens/sec). Best for complex code generation, logical reasoning, and data synthesis.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="alert-box">
+        <strong>💡 Scaling to 100+ Users:</strong>
+        <p>Since you have 4-5 Mac Minis, you can load-balance the same model (e.g., <code>qwen2.5:7b</code> or <code>llama3.1:8b</code>) across all of them. This allows the cluster to handle <strong>10 to 15 concurrent users</strong> actively streaming responses at the same time without significant queueing.</p>
+    </div>
+
+    <hr>
+
+    <h2>4. Configuration Templates</h2>
+
+    <h3>A. Worker Nodes (Ollama Configuration)</h3>
+    <p>On each of your Mac Minis, install Ollama. By default, Ollama only listens on localhost. To allow your LiteLLM Gateway to reach them:</p>
+
+    <ol>
+        <li>Open your terminal on each Mac Mini and run:
+            <pre><code># Set environment variable to bind to all network interfaces
+launchctl setenv OLLAMA_HOST "0.0.0.0"</code></pre>
+        </li>
+        <li>Restart the Ollama application.</li>
+        <li>Download your chosen models on each Mac Mini (e.g., <code>ollama pull qwen2.5:7b</code>).</li>
+    </ol>
+
+    <h3>B. Controller Node (LiteLLM & Open WebUI)</h3>
+    <p>Choose one Mac Mini (or a separate server) to act as the Gateway. Create a directory (e.g., <code>~/ai-gateway</code>) and place the following two configuration files there.</p>
+
+    <h4>1. <code>config.yaml</code> (LiteLLM Configuration)</h4>
+    <p>This config file sets up load balancing across your worker Macs. Replace the IP addresses (<code>192.168.1.X</code>) with the actual local IP addresses of your Mac Minis.</p>
+
+    <pre><code>model_list:
+  - model_name: internal-llm
+    litellm_params:
+      model: ollama/qwen2.5:7b
+      api_base: http://192.168.1.101:11434
+  - model_name: internal-llm
+    litellm_params:
+      model: ollama/qwen2.5:7b
+      api_base: http://192.168.1.102:11434
+  - model_name: internal-llm
+    litellm_params:
+      model: ollama/qwen2.5:7b
+      api_base: http://192.168.1.103:11434
+  - model_name: internal-llm
+    litellm_params:
+      model: ollama/qwen2.5:7b
+      api_base: http://192.168.1.104:11434
+  - model_name: internal-llm
+    litellm_params:
+      model: ollama/qwen2.5:7b
+      api_base: http://192.168.1.105:11434
+
+router_settings:
+  routing_strategy: least-busy # Sends request to the Mac with the fewest current requests
+  failover_target: external-gemini # Optional: Fallback model if all local workers are down</code></pre>
+
+    <h4>2. <code>docker-compose.yml</code></h4>
+    <p>This script launches LiteLLM and Open WebUI in containers, making them available to your local office network.</p>
+
+    <pre><code>version: '3.8'
+
+services:
+  # LiteLLM Proxy / Load Balancer
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm-gateway
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    command: [ "--config", "/app/config.yaml", "--port", "4000" ]
+    restart: always
+
+  # Open WebUI (The User Interface)
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "8080:8080"
+    volumes:
+      - open-webui:/app/backend/data
+    environment:
+      - OPENAI_API_BASE_URL=http://litellm:4000/v1
+      - OPENAI_API_KEY=anything
+      - DEFAULT_MODELS=internal-llm
+    depends_on:
+      - litellm
+    restart: always
+
+volumes:
+  open-webui:</code></pre>
+
+    <p>Once configurations are set, run:</p>
+    <pre><code>docker-compose up -d</code></pre>
+    <p>Your users can now open <code>http://&lt;controller-mac-ip&gt;:8080</code> in their browsers, sign up, and start chatting!</p>
+
+    <hr>
+
+    <h2>5. Summary of Benefits & Best Practices</h2>
+    <ol>
+        <li><strong>Zero Token Costs:</strong> All compute happens locally on the Mac Minis. You only pay for electricity.</li>
+        <li><strong>Data Security & Privacy:</strong> Corporate data and documents processed via Open WebUI (including RAG) never leave your local area network (LAN).</li>
+        <li><strong>Smart Fallbacks:</strong> You can configure LiteLLM to route highly complex tasks (e.g., long-document analysis) to Gemini or OpenAI, while directing 90% of basic daily queries to your local Macs, reducing your API bills drastically.</li>
+        <li><strong>Active Resource Management:</strong> With LiteLLM, you can assign daily token budgets or rate limits to individual users/departments so that no single user monopolizes the local cluster.</li>
+    </ol>
+
+</body>
+</html>
