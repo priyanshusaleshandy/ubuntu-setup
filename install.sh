@@ -302,8 +302,6 @@ install_tailscale() {
     fi
     log_info "Enabling and starting tailscaled service..."
     sudo systemctl enable --now tailscaled
-    log_info "Bringing Tailscale up..."
-    sudo tailscale up || true
 }
 
 install_gnome_tools() {
