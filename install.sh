@@ -439,46 +439,78 @@ run_installation() {
         DOWNLOAD_PIDS+=($!)
     fi
 
+    # Helper function to check if a package is available in the apt cache
+    is_pkg_available() {
+        apt-cache show "$1" >/dev/null 2>&1
+    }
+
+    local REPO_PKGS=()
+
+    # 2. Add repo configurations synchronously (fast operations)
+    # Visual Studio Code (Index 3)
     if [ "${SELECTIONS[3]}" -eq 1 ]; then
         log_info "Adding VS Code repository GPG key and source list..."
         wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/packages.microsoft.gpg >/dev/null
         sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
-        APT_PACKAGES+=("code")
+        REPO_PKGS+=("code")
     fi
 
+    # 3. Assemble repository packages from options
+    # Core Utilities (Index 0)
     if [ "${SELECTIONS[0]}" -eq 1 ]; then
-        APT_PACKAGES+=("curl" "git" "wget" "build-essential" "htop" "tmux" "unzip" "software-properties-common" "apt-transport-https" "ca-certificates" "gnupg" "lsb-release" "libfuse2")
+        REPO_PKGS+=("curl" "git" "wget" "build-essential" "htop" "tmux" "unzip" "software-properties-common" "apt-transport-https" "ca-certificates" "gnupg" "lsb-release" "libfuse2")
     fi
 
+    # Node.js (Index 1)
     if [ "${SELECTIONS[1]}" -eq 1 ]; then
         INSTALL_NODE=1
     fi
 
+    # MySQL Workbench (Index 4)
     if [ "${SELECTIONS[4]}" -eq 1 ]; then
-        APT_PACKAGES+=("mysql-workbench")
+        REPO_PKGS+=("mysql-workbench")
     fi
 
+    # Postman (Index 6)
     if [ "${SELECTIONS[6]}" -eq 1 ]; then
         SNAP_PACKAGES+=("postman")
     fi
 
+    # Redis Insight (Index 7)
     if [ "${SELECTIONS[7]}" -eq 1 ]; then
         SNAP_PACKAGES+=("redisinsight")
     fi
 
+    # Tailscale VPN (Index 9)
     if [ "${SELECTIONS[9]}" -eq 1 ]; then
         SNAP_PACKAGES+=("tailscale")
     fi
 
+    # GNOME Tweaks & Extension Manager (Index 10)
     if [ "${SELECTIONS[10]}" -eq 1 ]; then
-        APT_PACKAGES+=("gnome-tweaks" "gnome-shell-extension-manager")
+        REPO_PKGS+=("gnome-tweaks" "gnome-shell-extension-manager")
     fi
 
+    # ClamAV (Index 11)
     if [ "${SELECTIONS[11]}" -eq 1 ]; then
         INSTALL_CLAMAV=1
-        APT_PACKAGES+=("clamav" "clamav-daemon" "clamav-freshclam")
+        REPO_PKGS+=("clamav" "clamav-daemon" "clamav-freshclam")
     fi
 
+    # Run apt update to ensure latest cache (including newly added VS Code repo)
+    log_info "Running apt update to refresh package lists..."
+    sudo apt-get update -y
+
+    # Filter repository packages and add only if they are available
+    for pkg in "${REPO_PKGS[@]}"; do
+        if is_pkg_available "$pkg"; then
+            APT_PACKAGES+=("$pkg")
+        else
+            log_warning "Package '$pkg' is not available in your system's repositories. Skipping."
+        fi
+    done
+
+    # 4. Wait for background downloads to complete
     if [ "${#DOWNLOAD_PIDS[@]}" -gt 0 ]; then
         log_info "Waiting for all background downloads to finish..."
         for pid in "${DOWNLOAD_PIDS[@]}"; do
@@ -510,13 +542,11 @@ run_installation() {
         fi
     fi
 
+    # 5. Run CONSOLIDATED APT Installation
     if [ "${#APT_PACKAGES[@]}" -gt 0 ]; then
         echo -e "\n${CYAN}${BOLD}========================================================"
         echo " Executing Consolidated APT Package Installation..."
         echo "========================================================${NC}"
-        
-        log_info "Running apt update..."
-        sudo apt-get update -y
         
         log_info "Installing packages: ${APT_PACKAGES[*]}..."
         set +e
