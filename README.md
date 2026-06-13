@@ -32,13 +32,19 @@ graph TD
     F --> G[Launch Dashboard Console]
     B -- Yes (Subsequent Run) --> G
     G --> H{Select Command}
-    H -- Install Selected --> I[Parallel Background Downloads of external .debs]
-    I --> J[Consolidated APT Package Installation]
-    J --> K[Snap Store Installations]
-    K --> L[NVM / Node & ClamAV Service Configs]
-    L --> M[Run Diagnostics & Show Status]
-    H -- Uninstall Selected/All --> N[Remove Selected Packages Safely]
-    N --> M
+    H -- Install Selected --> I[Loop Through Selected Components]
+    I --> J{Already Installed?}
+    J -- Yes --> K[Skip and proceed to next]
+    J -- No --> L[Download & Install synchronously]
+    L --> M{Installation Error?}
+    M -- Yes --> N[Pause & Prompt: Retry / Skip / Abort]
+    N -- Retry --> L
+    N -- Skip --> K
+    N -- Abort --> O[Exit Script]
+    M -- No --> K
+    K --> P[Run Diagnostics & Show Status]
+    H -- Uninstall Selected/All --> Q[Remove Selected Packages Safely]
+    Q --> P
 ```
 
 ---
@@ -51,10 +57,11 @@ On its very first run on a clean Ubuntu setup, the script automates the creation
 *   **Personal Administrator**: Prompts for your custom username (Password: `123456`).
 *   **Session Transition**: It copies the setup configurations to the new personal user's home directory and swaps active execution to that user (`exec sudo -i -u <new-user>`) to continue installing developer tools seamlessly in your personal context.
 
-### ⚡ 2. High-Speed Parallel Installation Engine
-Instead of installing packages sequentially, the script uses a high-performance installer logic:
-*   **Parallel Downloads**: Large third-party `.deb` packages (Google Chrome, DBeaver, MongoDB Compass) are downloaded **simultaneously in the background** to maximize network bandwidth.
-*   **Consolidated APT Command**: Combines all package repositories (like VS Code) and local `.deb` files into a single consolidated `apt-get install` execution. This bypasses repetitive database locking, catalog updates, and post-install triggers, making the install **3x to 5x faster**.
+### ⚡ 2. Sequential One-by-One Installation & Smart Error Recovery
+Instead of installing all tools in a single batch, the script installs each component sequentially to guarantee progress visibility and robust error handling:
+*   **Auto-Skip Already Installed**: Before attempting to install a tool, the script checks if it is already installed. If it is, the installation is skipped, saving network bandwidth and execution time.
+*   **Interactive Error Prompting**: If a download or installation fails, the script pauses and prompts you to **(r)etry** (e.g. after fixing a network issue or repository index), **(s)kip** the tool, or **(a)bort** the process.
+*   **Quick Selections**: Adds shortcuts to **Clear/Deselect All (`c`)** and **Select All (`e`)** selections so you can customize your installation with minimal keystrokes.
 
 ### 🗑️ 3. Safe Selective Uninstallation
 The script provides complete cleanup options directly from the terminal console:
@@ -77,12 +84,12 @@ The setup script allows you to selectively toggle and manage the following 12 co
 | **Runtimes** | Node.js v15.14.0 | NVM (Node Version Manager) | Automatically sets up NVM and installs target Node version. |
 | **Browsers** | Google Chrome | Official `.deb` Package | Standard Google Chrome browser for Ubuntu. |
 | **IDEs** | Visual Studio Code | Microsoft Repository APT | Standard development editor. |
-| **Databases** | MySQL Workbench | Canonical APT | GUI client for managing MySQL servers. |
+| **Databases** | MySQL Workbench | Canonical APT / Snap Fallback | GUI client for managing MySQL servers. Automatically falls back to Snap if the apt package is unavailable (e.g. on Ubuntu 24.04). |
 | **Databases** | DBeaver Community | DBeaver `.deb` Package | Multi-platform database manager. |
 | **Databases** | MongoDB Compass | MongoDB `.deb` Package | Graphical user interface for MongoDB. |
 | **API Testing** | Postman | Snap Store | Collaborative API development platform. |
 | **Redis** | Redis Insight | Snap Store | Database GUI for Redis clusters. |
-| **VPN** | Tailscale VPN | Snap Store | WireGuard-based mesh VPN (integrated with GNOME settings). |
+| **VPN** | Tailscale VPN | Official Install Script | WireGuard-based mesh VPN (integrated with GNOME settings and native desktop tools). |
 | **System Tools**| GNOME Tweaks / Ext. | Canonical APT | Tools to customize shells, extensions, and themes. |
 | **Security** | ClamAV Daemon | Canonical APT & freshclam | Antivirus configuration with persistent systemd daemons. |
 
