@@ -216,8 +216,20 @@ install_vscode() {
 install_mysql_workbench() {
     log_info "Installing MySQL Workbench..."
     sudo apt-get update -y
-    if ! sudo apt-get install -y mysql-workbench; then
-        log_error "Failed to install MySQL Workbench."
+    log_info "Attempting install via apt (mysql-workbench)..."
+    if sudo apt-get install -y mysql-workbench; then
+        log_success "MySQL Workbench installed via apt."
+        return 0
+    fi
+
+    log_warning "MySQL Workbench not found in apt repository or installation failed. Trying snap (mysql-workbench-community)..."
+    if sudo snap install mysql-workbench-community; then
+        log_success "MySQL Workbench installed via snap."
+        # Connect to system services to allow vault storage
+        sudo snap connect mysql-workbench-community:password-manager-service || true
+        return 0
+    else
+        log_error "Failed to install MySQL Workbench via snap."
         return 1
     fi
 }
@@ -362,6 +374,7 @@ uninstall_vscode() {
 uninstall_mysql_workbench() {
     log_info "Uninstalling MySQL Workbench..."
     sudo apt-get remove --purge -y mysql-workbench || true
+    sudo snap remove mysql-workbench-community || true
     sudo apt-get autoremove -y
     log_success "MySQL Workbench uninstalled."
 }
@@ -498,7 +511,7 @@ show_status_results() {
     
     check_status "Google Chrome" "command -v google-chrome"
     check_status "Visual Studio Code" "command -v code"
-    check_status "MySQL Workbench" "command -v mysql-workbench"
+    check_status "MySQL Workbench" "command -v mysql-workbench || command -v mysql-workbench-community"
     check_status "DBeaver Community Edition" "command -v dbeaver"
     check_status "Postman (Snap)" "command -v postman"
     check_status "Redis Insight (Snap)" "command -v redisinsight"
