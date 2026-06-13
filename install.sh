@@ -52,61 +52,58 @@ sudo -v
 # Keep-alive: update existing sudo time stamp if set, otherwise do nothing
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
-# --- Initial User Setup (First-time run) ---
-# Check if the 'Admin' user exists. If not, perform initial system user setup.
-if ! id -u Admin >/dev/null 2>&1; then
+# --- Initial User Setup (First-time run inside 'admin' account) ---
+if [ "$(whoami)" = "admin" ]; then
     echo -e "${YELLOW}==============================================================================${NC}"
-    echo -e "${YELLOW}                     INITIAL USER & SYSTEM SETUP                              ${NC}"
+    echo -e "${YELLOW}                     ONBOARDING USER PROVISIONING                             ${NC}"
     echo -e "${YELLOW}==============================================================================${NC}"
-    echo -e "Fresh Ubuntu installation detected ('Admin' user not found)."
-    read -p "Would you like to set up the system administrators (Admin & personal user)? (y/N): " setup_users
+    echo -e "Current session user is 'admin'. We will configure the new onboarding user."
+    
+    read -p "Would you like to set up a new onboarding user now? (y/N): " setup_users
     if [[ "$setup_users" =~ ^[Yy]$ ]]; then
-        # 1. Create 'Admin' user
-        log_info "Creating 'Admin' user..."
-        sudo useradd -m -s /bin/bash Admin
-        echo "Admin:Admin@ikigai" | sudo chpasswd
-        sudo usermod -aG sudo Admin
-        log_success "Created user 'Admin' with password 'Admin@ikigai' and added to sudo group."
-
-        # 2. Ask for second user details
-        echo ""
-        read -p "Enter username for the secondary administrator (your personal account): " SECOND_USER
-        while [[ -z "$SECOND_USER" ]]; do
-            read -p "Username cannot be empty. Please enter a username: " SECOND_USER
+        # 1. Ask for user details
+        read -p "Enter username for the new onboarding user: " NEW_USER
+        while [[ -z "$NEW_USER" ]]; do
+            read -p "Username cannot be empty. Please enter a username: " NEW_USER
         done
 
-        log_info "Creating '$SECOND_USER' user..."
-        sudo useradd -m -s /bin/bash "$SECOND_USER"
-        echo "$SECOND_USER:123456" | sudo chpasswd
-        sudo usermod -aG sudo "$SECOND_USER"
-        log_success "Created user '$SECOND_USER' with password '123456' and added to sudo group."
-
-        # 3. Optional Hostname Change
+        read -s -p "Enter password for the new onboarding user '$NEW_USER': " NEW_USER_PASS
         echo ""
-        read -p "Enter new hostname for this machine (or press Enter to keep current '$(hostname)'): " NEW_HOSTNAME
-        if [[ -n "$NEW_HOSTNAME" ]]; then
-            log_info "Setting hostname to '$NEW_HOSTNAME'..."
-            sudo hostnamectl set-hostname "$NEW_HOSTNAME"
-            # Update /etc/hosts to prevent sudo warnings
-            sudo sed -i "s/127.0.1.1.*/127.0.1.1\t$NEW_HOSTNAME/g" /etc/hosts
-            log_success "Hostname updated to '$NEW_HOSTNAME'."
+        while [[ -z "$NEW_USER_PASS" ]]; do
+            read -s -p "Password cannot be empty. Please enter a password: " NEW_USER_PASS
+            echo ""
+        done
+
+        read -p "Should this user be an administrator (with sudo privileges)? (y/N): " is_admin
+
+        # 2. Create the user
+        log_info "Creating user '$NEW_USER'..."
+        sudo useradd -m -s /bin/bash "$NEW_USER"
+        echo "$NEW_USER:$NEW_USER_PASS" | sudo chpasswd
+        
+        if [[ "$is_admin" =~ ^[Yy]$ ]]; then
+            sudo usermod -aG sudo "$NEW_USER"
+            log_success "Created user '$NEW_USER' and added to sudo group."
+        else
+            log_success "Created standard user '$NEW_USER' (no sudo privileges)."
         fi
 
-        # 4. Copy install.sh to the new user's home directory so they can run it
+        # 3. Copy install.sh to the new user's home directory so they can run it
         SCRIPT_PATH=$(readlink -f "$0")
-        log_info "Copying setup script to /home/$SECOND_USER/install.sh..."
-        sudo cp "$SCRIPT_PATH" "/home/$SECOND_USER/install.sh"
-        sudo chown "$SECOND_USER:$SECOND_USER" "/home/$SECOND_USER/install.sh"
-        sudo chmod +x "/home/$SECOND_USER/install.sh"
+        log_info "Copying setup script to /home/$NEW_USER/install.sh..."
+        sudo cp "$SCRIPT_PATH" "/home/$NEW_USER/install.sh"
+        sudo chown "$NEW_USER:$NEW_USER" "/home/$NEW_USER/install.sh"
+        sudo chmod +x "/home/$NEW_USER/install.sh"
 
-        echo -e "\n${GREEN}[SUCCESS] Initial setup complete!${NC}"
-        echo -e "We will now switch session to user '${BOLD}$SECOND_USER${NC}' to continue installing software."
-        echo -e "Please enter the password for ${BOLD}$SECOND_USER${NC} (which is ${BOLD}123456${NC}) if prompted."
+        echo -e "\n${GREEN}[SUCCESS] Onboarding user creation complete!${NC}"
+        echo -e "Next steps:"
+        echo -e "  1. Log out of the current 'admin' session."
+        echo -e "  2. (Optional) Select 'Ubuntu on Xorg' at the login screen."
+        echo -e "  3. Log in as user '${BOLD}$NEW_USER${NC}'."
+        echo -e "  4. Open terminal and run: ${BOLD}./install.sh${NC} to start installing applications."
         echo -e "${YELLOW}------------------------------------------------------------------------------${NC}"
-        
-        # Switch user and execute the copied script
-        exec sudo -i -u "$SECOND_USER" bash -c "cd ~ && ./install.sh"
     fi
+    exit 0
 fi
 
 
@@ -225,8 +222,11 @@ install_mysql_workbench() {
     log_warning "MySQL Workbench not found in apt repository or installation failed. Trying snap (mysql-workbench-community)..."
     if sudo snap install mysql-workbench-community; then
         log_success "MySQL Workbench installed via snap."
-        # Connect to system services to allow vault storage
-        sudo snap connect mysql-workbench-community:password-manager-service || true
+        log_info "Connecting MySQL Workbench to system password manager service..."
+        sudo snap connect mysql-workbench-community:password-manager-service :password-manager-service || true
+        log_info "Clearing font caches to prevent MySQL Workbench silent crash..."
+        rm -rf ~/.cache/fontconfig || true
+        rm -rf ~/snap/mysql-workbench-community/common/.cache/fontconfig || true
         return 0
     else
         log_error "Failed to install MySQL Workbench via snap."
