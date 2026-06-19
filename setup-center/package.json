@@ -1,0 +1,52 @@
+{
+  "name": "setup-center",
+  "version": "1.0.0",
+  "description": "Modern Workstation Setup and Automation Portal",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "vite build",
+    "dist": "vite build && electron-builder"
+  },
+  "keywords": [
+    "electron",
+    "setup",
+    "choco",
+    "winget",
+    "apt"
+  ],
+  "author": "Priyanshu Suryavanshi",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
+    "vite": "^5.3.1"
+  },
+  "build": {
+    "appId": "com.setupcenter.app",
+    "productName": "Setup Center",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-Portable.${ext}"
+    }
+  },
+  "allowScripts": {
+    "electron@31.7.7": true,
+    "esbuild@0.21.5": true
+  }
+}

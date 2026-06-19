@@ -1,0 +1,7 @@
+{
+  "id": "it-admin",
+  "name": "IT Administrator",
+  "description": "Standard administration bundle. Configures remote desktop viewports (AnyDesk/UltraViewer), security tools, and Tailscale VPN.",
+  "windowsSoftware": ["1", "6", "7"],
+  "linuxSoftware": ["1", "3", "11", "12", "13"]
+}

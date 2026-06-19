@@ -1,0 +1,7 @@
+{
+  "id": "developer",
+  "name": "Developer Workstation",
+  "description": "Standard dev bundle. Installs Google Chrome, Mozilla Firefox, VS Code, Git, databases, and core dev utilities.",
+  "windowsSoftware": ["1", "2", "3", "4", "5"],
+  "linuxSoftware": ["1", "2", "3", "4", "5", "6"]
+}

@@ -1,0 +1,6 @@
+node_modules/
+dist/win-unpacked/
+dist/builder-debug.yml
+dist/setup-center-*.nsis.7z
+build.log
+test-download.js
