@@ -112,6 +112,7 @@ OPTIONS=(
   "Core Utilities & libfuse2 (Git, curl, unzip, etc.)"
   "Node.js v15.14.0 (via NVM)"
   "Google Chrome"
+  "Brave Browser"
   "Visual Studio Code"
   "MySQL Workbench"
   "DBeaver Community Edition (.deb)"
@@ -119,12 +120,12 @@ OPTIONS=(
   "Redis Insight (Snap)"
   "MongoDB Compass (.deb)"
   "Tailscale VPN"
-  "GNOME Tweaks & Extension Manager"
+  "GNOME Tweaks & Extension Manager (from Store)"
   "ClamAV (Antivirus daemon configuration)"
 )
 
 # Selections array: 1 = Selected for install, 0 = Deselected. Default to all selected.
-SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1)
+SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1 1)
 
 # --- Installer Functions ---
 
@@ -186,6 +187,25 @@ install_chrome() {
         return 1
     fi
     rm -f "$DEB_FILE"
+}
+
+install_brave() {
+    log_info "Installing Brave Browser..."
+    if ! command -v curl > /dev/null 2>&1; then
+        sudo apt-get install -y curl
+    fi
+    log_info "Importing Brave Browser GPG key and repository..."
+    if ! sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg; then
+        log_error "Failed to import Brave Browser GPG key."
+        return 1
+    fi
+    echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" | sudo tee /etc/apt/sources.list.d/brave-browser-release.list
+    sudo apt-get update -y
+    if ! sudo apt-get install -y brave-browser; then
+        log_error "Failed to install Brave Browser."
+        return 1
+    fi
+    log_success "Brave Browser installed successfully."
 }
 
 install_vscode() {
@@ -305,11 +325,20 @@ install_tailscale() {
 }
 
 install_gnome_tools() {
-    log_info "Installing GNOME Tweaks & Extension Manager..."
+    log_info "Installing GNOME Tweaks & Extension Manager (from Store)..."
     sudo apt-get update -y
-    if ! sudo apt-get install -y gnome-tweaks gnome-shell-extension-manager; then
-        log_error "Failed to install GNOME Tweaks & Extension Manager."
+    # Install GNOME Tweaks via apt
+    if ! sudo apt-get install -y gnome-tweaks; then
+        log_error "Failed to install GNOME Tweaks."
         return 1
+    fi
+    # Install GNOME Shell Extension Manager from Snap Store
+    log_info "Installing GNOME Shell Extension Manager from Snap Store..."
+    if ! sudo snap install gnome-extension-manager; then
+        log_warning "Snap install failed. Trying apt fallback for gnome-shell-extension-manager..."
+        sudo apt-get install -y gnome-shell-extension-manager || log_warning "apt fallback also failed. Extension Manager skipped."
+    else
+        log_success "GNOME Shell Extension Manager installed from Snap Store."
     fi
 }
 
@@ -365,6 +394,15 @@ uninstall_chrome() {
     log_success "Google Chrome uninstalled."
 }
 
+uninstall_brave() {
+    log_info "Uninstalling Brave Browser..."
+    sudo apt-get remove --purge -y brave-browser || true
+    sudo rm -f /etc/apt/sources.list.d/brave-browser-release.list
+    sudo rm -f /usr/share/keyrings/brave-browser-archive-keyring.gpg
+    sudo apt-get autoremove -y
+    log_success "Brave Browser uninstalled."
+}
+
 uninstall_vscode() {
     log_info "Uninstalling Visual Studio Code..."
     sudo apt-get remove --purge -y code || true
@@ -418,6 +456,7 @@ uninstall_tailscale() {
 
 uninstall_gnome_tools() {
     log_info "Uninstalling GNOME Tweaks & Extension Manager..."
+    sudo snap remove gnome-extension-manager || true
     sudo apt-get remove --purge -y gnome-tweaks gnome-shell-extension-manager || true
     sudo apt-get autoremove -y
     log_success "GNOME tools uninstalled."
@@ -512,6 +551,7 @@ show_status_results() {
     check_status "Node.js (v15.14.0 via NVM)" "command -v node && node -v | grep -q 'v15.14.0'"
     
     check_status "Google Chrome" "command -v google-chrome"
+    check_status "Brave Browser" "command -v brave-browser"
     check_status "Visual Studio Code" "command -v code"
     check_status "MySQL Workbench" "command -v mysql-workbench || command -v mysql-workbench-community"
     check_status "DBeaver Community Edition" "command -v dbeaver"
@@ -519,7 +559,8 @@ show_status_results() {
     check_status "Redis Insight (Snap)" "command -v redisinsight"
     check_status "MongoDB Compass" "command -v mongodb-compass"
     check_status "Tailscale VPN" "command -v tailscale" "tailscaled"
-    check_status "GNOME Tweaks & Extension Manager" "dpkg -s gnome-tweaks && dpkg -s gnome-shell-extension-manager"
+    check_status "GNOME Tweaks" "dpkg -s gnome-tweaks"
+    check_status "GNOME Extension Manager (Snap/apt)" "snap list gnome-extension-manager 2>/dev/null || dpkg -s gnome-shell-extension-manager"
     check_status "ClamAV Antivirus Daemon" "command -v clamscan" "clamav-daemon"
     check_status "ClamAV Freshclam Updates" "command -v freshclam" "clamav-freshclam"
     
@@ -532,46 +573,49 @@ is_component_installed() {
     local index=$1
     case $index in
         0)
-            command -v curl >/dev/null 2>&1 && command -v git >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1 && dpkg -s libfuse2 >/dev/null 2>&1
+            command -v curl > /dev/null 2>&1 && command -v git > /dev/null 2>&1 && command -v unzip > /dev/null 2>&1 && dpkg -s libfuse2 > /dev/null 2>&1
             ;;
         1)
             local NVM_DIR="$HOME/.nvm"
             if [ -s "$NVM_DIR/nvm.sh" ]; then
                 \. "$NVM_DIR/nvm.sh"
-                command -v node >/dev/null 2>&1 && node -v | grep -q 'v15.14.0'
+                command -v node > /dev/null 2>&1 && node -v | grep -q 'v15.14.0'
             else
                 return 1
             fi
             ;;
         2)
-            command -v google-chrome >/dev/null 2>&1
+            command -v google-chrome > /dev/null 2>&1
             ;;
         3)
-            command -v code >/dev/null 2>&1
+            command -v brave-browser > /dev/null 2>&1
             ;;
         4)
-            command -v mysql-workbench >/dev/null 2>&1 || command -v mysql-workbench-community >/dev/null 2>&1
+            command -v code > /dev/null 2>&1
             ;;
         5)
-            command -v dbeaver >/dev/null 2>&1
+            command -v mysql-workbench > /dev/null 2>&1 || command -v mysql-workbench-community > /dev/null 2>&1
             ;;
         6)
-            command -v postman >/dev/null 2>&1
+            command -v dbeaver > /dev/null 2>&1
             ;;
         7)
-            command -v redisinsight >/dev/null 2>&1
+            command -v postman > /dev/null 2>&1
             ;;
         8)
-            command -v mongodb-compass >/dev/null 2>&1
+            command -v redisinsight > /dev/null 2>&1
             ;;
         9)
-            command -v tailscale >/dev/null 2>&1
+            command -v mongodb-compass > /dev/null 2>&1
             ;;
         10)
-            dpkg -s gnome-tweaks >/dev/null 2>&1 && dpkg -s gnome-shell-extension-manager >/dev/null 2>&1
+            command -v tailscale > /dev/null 2>&1
             ;;
         11)
-            command -v clamscan >/dev/null 2>&1 && command -v freshclam >/dev/null 2>&1
+            dpkg -s gnome-tweaks > /dev/null 2>&1 || snap list gnome-extension-manager > /dev/null 2>&1
+            ;;
+        12)
+            command -v clamscan > /dev/null 2>&1 && command -v freshclam > /dev/null 2>&1
             ;;
         *)
             return 1
@@ -585,15 +629,16 @@ install_component() {
         0) install_core_utilities ;;
         1) install_node ;;
         2) install_chrome ;;
-        3) install_vscode ;;
-        4) install_mysql_workbench ;;
-        5) install_dbeaver ;;
-        6) install_postman ;;
-        7) install_redisinsight ;;
-        8) install_mongodb_compass ;;
-        9) install_tailscale ;;
-        10) install_gnome_tools ;;
-        11) install_clamav ;;
+        3) install_brave ;;
+        4) install_vscode ;;
+        5) install_mysql_workbench ;;
+        6) install_dbeaver ;;
+        7) install_postman ;;
+        8) install_redisinsight ;;
+        9) install_mongodb_compass ;;
+        10) install_tailscale ;;
+        11) install_gnome_tools ;;
+        12) install_clamav ;;
     esac
 }
 
@@ -658,15 +703,16 @@ uninstall_component() {
         0) uninstall_core_utilities ;;
         1) uninstall_node ;;
         2) uninstall_chrome ;;
-        3) uninstall_vscode ;;
-        4) uninstall_mysql_workbench ;;
-        5) uninstall_dbeaver ;;
-        6) uninstall_postman ;;
-        7) uninstall_redisinsight ;;
-        8) uninstall_mongodb_compass ;;
-        9) uninstall_tailscale ;;
-        10) uninstall_gnome_tools ;;
-        11) uninstall_clamav ;;
+        3) uninstall_brave ;;
+        4) uninstall_vscode ;;
+        5) uninstall_mysql_workbench ;;
+        6) uninstall_dbeaver ;;
+        7) uninstall_postman ;;
+        8) uninstall_redisinsight ;;
+        9) uninstall_mongodb_compass ;;
+        10) uninstall_tailscale ;;
+        11) uninstall_gnome_tools ;;
+        12) uninstall_clamav ;;
     esac
 }
 
