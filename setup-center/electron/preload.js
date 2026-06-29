@@ -19,5 +19,8 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('task-status', subscription);
     return () => ipcRenderer.removeListener('task-status', subscription);
   },
-  getProfiles: () => ipcRenderer.invoke('get-profiles')
+  getProfiles: () => ipcRenderer.invoke('get-profiles'),
+  getConfig: () => ipcRenderer.invoke('get-config'),
+  saveConfig: (config) => ipcRenderer.invoke('save-config', config),
 });
+

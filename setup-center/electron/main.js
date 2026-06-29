@@ -9,6 +9,14 @@ let mainWindow = null;
 let activeChildProcess = null;
 let telemetryInterval = null;
 
+// Fix GPU process crash (exit code 0xC0000135 - missing DLL) on Windows
+// Must be called before app.whenReady() to prevent GPU process from spawning
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('in-process-gpu');
+
 const baseResourcesPath = app.isPackaged 
   ? process.resourcesPath 
   : path.join(__dirname, '../..');
@@ -80,39 +88,48 @@ function cleanup() {
 // =========================================================================
 // SYSTEM TELEMETRY
 // =========================================================================
+let telemetryBusy = false;
+
 function startTelemetry() {
   telemetryInterval = setInterval(() => {
-    if (!mainWindow) return;
+    if (!mainWindow || telemetryBusy) return;
+    telemetryBusy = true;
 
     if (process.platform === 'win32') {
-      // Query CPU and Memory stats on Windows
-      const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_Processor | Select-Object -ExpandProperty LoadPercentage; Get-CimInstance Win32_OperatingSystem | % { [math]::Round((($_.TotalVisibleMemorySize - $_.FreePhysicalMemory) / $_.TotalVisibleMemorySize) * 100) }"`;
-      exec(cmd, (err, stdout) => {
-        if (err || !stdout) return;
-        const lines = stdout.trim().split(/\r?\n/);
-        if (lines.length >= 2) {
-          const cpu = parseInt(lines[0]) || 0;
-          const ram = parseInt(lines[1]) || 0;
-          mainWindow.webContents.send('system-metrics', { cpu, ram });
+      // Use wmic — much faster than spawning powershell + CimInstance every tick
+      exec('wmic cpu get LoadPercentage /value & wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /value', { timeout: 4000 }, (err, stdout) => {
+        telemetryBusy = false;
+        if (err || !stdout || !mainWindow) return;
+        let cpu = 0, ram = 0;
+        const cpuMatch = stdout.match(/LoadPercentage=(\d+)/);
+        const freeMatch = stdout.match(/FreePhysicalMemory=(\d+)/);
+        const totalMatch = stdout.match(/TotalVisibleMemorySize=(\d+)/);
+        if (cpuMatch) cpu = parseInt(cpuMatch[1]) || 0;
+        if (freeMatch && totalMatch) {
+          const free = parseInt(freeMatch[1]);
+          const total = parseInt(totalMatch[1]);
+          if (total > 0) ram = Math.round(((total - free) / total) * 100);
         }
+        mainWindow.webContents.send('system-metrics', { cpu, ram });
       });
     } else {
       // Query stats on Linux
-      exec("free | grep Mem | awk '{print $3/$2 * 100.0}'", (err, ramStdout) => {
+      exec("free | grep Mem | awk '{print $3/$2 * 100.0}'", { timeout: 4000 }, (err, ramStdout) => {
         let ram = 0;
         if (!err && ramStdout) {
           ram = Math.round(parseFloat(ramStdout)) || 0;
         }
-        exec("top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}'", (err, cpuStdout) => {
+        exec("top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}'", { timeout: 4000 }, (err, cpuStdout) => {
+          telemetryBusy = false;
           let cpu = 0;
           if (!err && cpuStdout) {
             cpu = Math.round(parseFloat(cpuStdout)) || 0;
           }
-          mainWindow.webContents.send('system-metrics', { cpu, ram });
+          if (mainWindow) mainWindow.webContents.send('system-metrics', { cpu, ram });
         });
       });
     }
-  }, 2000);
+  }, 5000); // 5s interval — avoids overlapping wmic/ps queries
 }
 
 // =========================================================================
@@ -142,6 +159,27 @@ ipcMain.handle('get-profiles', () => {
     }
   });
   return profiles;
+});
+
+// Config: save/load repo URL from userData
+const configPath = path.join(app.getPath('userData'), 'setup-center-config.json');
+
+ipcMain.handle('get-config', () => {
+  try {
+    if (fs.existsSync(configPath)) {
+      return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    }
+  } catch (e) {}
+  return { repoUrl: '' };
+});
+
+ipcMain.handle('save-config', (event, config) => {
+  try {
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 });
 
 ipcMain.handle('cancel-task', () => {
@@ -176,7 +214,33 @@ ipcMain.handle('run-task', async (event, { action, params }) => {
     }
 
     try {
-      let scriptText = fs.readFileSync(originalScript, 'utf8');
+      const scriptBuffer = fs.readFileSync(originalScript);
+      let scriptText = "";
+      if (scriptBuffer[0] === 0xFF && scriptBuffer[1] === 0xFE) {
+        scriptText = scriptBuffer.toString('utf16le');
+      } else if (scriptBuffer[0] === 0xFE && scriptBuffer[1] === 0xFF) {
+        scriptText = scriptBuffer.toString('utf16be');
+      } else {
+        // Check for null bytes to detect UTF-16 without BOM
+        let hasNulls = false;
+        for (let i = 0; i < Math.min(scriptBuffer.length, 1000); i++) {
+          if (scriptBuffer[i] === 0x00) {
+            hasNulls = true;
+            break;
+          }
+        }
+        if (hasNulls) {
+          scriptText = scriptBuffer.toString('utf16le');
+        } else {
+          scriptText = scriptBuffer.toString('utf8');
+        }
+      }
+      // Strip BOM character if present after decode
+      if (scriptText.charCodeAt(0) === 0xFEFF) {
+        scriptText = scriptText.slice(1);
+      }
+      // Remove any embedded null bytes that may still be present
+      scriptText = scriptText.replace(/\x00/g, '');
       
       // Strip trailing main menu do-while loop
       const mainProgramIndex = scriptText.indexOf('# Main program');
@@ -197,8 +261,6 @@ ipcMain.handle('run-task', async (event, { action, params }) => {
           taskName = "Installing Essential Software";
           break;
         case "office":
-          inputQueue.push(params.choice);
-          if (params.choice === "2") inputQueue.push(""); // default directory path prompt
           inputQueue.push(""); // return trigger
           startCmd = "Install-MSOffice";
           taskName = "Installing MS Office";
@@ -230,6 +292,22 @@ ipcMain.handle('run-task', async (event, { action, params }) => {
           startCmd = "Install-OfficeSoftwareMenu";
           taskName = `Dev Stack: ${params.label}`;
           break;
+        case "syssetup":
+          if (params.mode === 'netinfo') {
+            startCmd = "Get-NetworkInfo";
+            taskName = "Network Information";
+          } else if (params.mode === 'hostname') {
+            inputQueue.push(params.hostname);
+            inputQueue.push("");
+            startCmd = "Set-PCHostname";
+            taskName = "Change PC Hostname";
+          } else if (params.mode === 'createuser') {
+            inputQueue.push(params.username);
+            inputQueue.push("");
+            startCmd = "New-WorkUser";
+            taskName = "Create Work User";
+          }
+          break;
       }
 
       mainWindow.webContents.send('task-status', { running: true, taskName });
@@ -237,14 +315,24 @@ ipcMain.handle('run-task', async (event, { action, params }) => {
       const isOffline = !!(params && params.offline);
       const resPathEscaped = baseResourcesPath.replace(/\\/g, '\\\\');
 
+      // Load repo URL from saved config
+      let repoUrl = '';
+      try {
+        if (fs.existsSync(configPath)) {
+          const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          repoUrl = (cfg.repoUrl || '').trim().replace(/\/+$/, '').replace(/\\/g, '\\\\');
+        }
+      } catch (e) {}
+
       // Generate helper input overrides code
       const inputsStr = inputQueue.map(i => `"${i.replace(/"/g, '`"')}"`).join(', ');
       
       const overrideCode = `
 $syncInputs = [System.Collections.Generic.List[string]]::new()
-$syncInputs.AddRange(@(${inputsStr}))
+$syncInputs.AddRange([string[]]@(${inputsStr}))
 $baseResourcesPath = "${resPathEscaped}"
 $isOffline = ${isOffline ? '$true' : '$false'}
+$softwareRepoUrl = "${repoUrl}"
 
 # Redefine Write-Host to stream out to standard output immediately
 function Write-Host {
@@ -346,7 +434,10 @@ function Start-Process {
 
       const finalScript = overrideCode + "\n\n" + scriptText + "\n\n" + `Ensure-PackageManagers\n` + startCmd + "\n";
       const tempScriptPath = path.join(tempDir, 'runner.ps1');
-      fs.writeFileSync(tempScriptPath, finalScript, 'utf8');
+      // Write with UTF-8 BOM so PowerShell parses it cleanly
+      const bom = Buffer.from([0xEF, 0xBB, 0xBF]);
+      const scriptBytes = Buffer.from(finalScript, 'utf8');
+      fs.writeFileSync(tempScriptPath, Buffer.concat([bom, scriptBytes]));
 
       // Spawn PowerShell child process
       activeChildProcess = spawn('powershell.exe', [

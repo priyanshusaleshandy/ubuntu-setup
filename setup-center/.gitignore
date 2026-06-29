@@ -1,6 +1,9 @@
 node_modules/
-dist/win-unpacked/
-dist/builder-debug.yml
-dist/setup-center-*.nsis.7z
+dist/
 build.log
 test-download.js
+check_encoding.js
+search.js
+run_analysis.js
+check_time.js
+build_time.txt

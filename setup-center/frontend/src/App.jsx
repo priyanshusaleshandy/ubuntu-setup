@@ -4,13 +4,25 @@ import React, { useState, useEffect, useRef } from 'react';
 // CONSTANTS (SOFTWARE LISTS)
 // =========================================================================
 const WINDOWS_SOFTWARE = [
-  { id: "1", name: "Google Chrome", desc: "Fast & secure web browser" },
-  { id: "2", name: "Mozilla Firefox", desc: "Privacy-focused web browser" },
-  { id: "3", name: "WinRAR Archiver", desc: "Archive compress & extraction tool" },
-  { id: "4", name: "VLC Media Player", desc: "Multi-format open source media player" },
-  { id: "5", name: "Sumatra PDF Reader", desc: "Lightweight document viewer" },
-  { id: "6", name: "AnyDesk Remote Control", desc: "Desktop screen sharing client" },
-  { id: "7", name: "UltraViewer Client", desc: "Helpdesk support connector" }
+  // i3 Basic Office Tools
+  { id: "1",  name: "Google Chrome",        desc: "Fast & secure web browser",               cat: "basic" },
+  { id: "2",  name: "Brave Browser",         desc: "Privacy-focused Chromium browser",        cat: "basic" },
+  { id: "3",  name: "Basecamp",              desc: "Project management desktop shortcut",      cat: "basic" },
+  { id: "4",  name: "Sprinto",               desc: "Compliance platform web shortcut",         cat: "basic" },
+  { id: "5",  name: "ESET Antivirus",        desc: "Endpoint security & real-time protection", cat: "basic" },
+  { id: "6",  name: "Time Doctor",           desc: "Employee time tracking & productivity",    cat: "basic" },
+  { id: "7",  name: "Action1 RMM",           desc: "Remote monitoring & management agent",    cat: "basic" },
+  { id: "8",  name: "Tailscale VPN",         desc: "Mesh VPN split-tunnel client",            cat: "basic" },
+  { id: "9",  name: "RustDesk",              desc: "Open-source remote support client",       cat: "basic" },
+  // i5/i7 Developer Tools
+  { id: "10", name: "Visual Studio Code",    desc: "Microsoft code & script editor",          cat: "dev" },
+  { id: "11", name: "Git",                   desc: "Distributed version control system",      cat: "dev" },
+  { id: "12", name: "Node.js v15.14 (NVM)",  desc: "JavaScript runtime via NVM for Windows", cat: "dev" },
+  { id: "13", name: "MySQL Workbench",       desc: "MySQL GUI designer & SQL client",         cat: "dev" },
+  { id: "14", name: "DBeaver",               desc: "Universal database manager & client",     cat: "dev" },
+  { id: "15", name: "Postman",               desc: "API platform for testing & docs",         cat: "dev" },
+  { id: "16", name: "Redis Insight",         desc: "Redis database graphical manager",        cat: "dev" },
+  { id: "17", name: "MongoDB Compass",       desc: "MongoDB official graphical client",       cat: "dev" },
 ];
 
 const LINUX_SOFTWARE = [
@@ -44,8 +56,15 @@ export default function App() {
   
   // Form Selections
   const [checkedSoftware, setCheckedSoftware] = useState({});
-  const [officeMethod, setOfficeMethod] = useState('1'); // 1 = Online, 2 = Offline
   const [installMode, setInstallMode] = useState('online'); // online or offline
+
+  // System Setup inputs
+  const [newHostname, setNewHostname] = useState('');
+  const [newUsername, setNewUsername] = useState('');
+
+  // Repository config
+  const [repoUrl, setRepoUrl] = useState('');
+  const [repoSaved, setRepoSaved] = useState(false);
   
   // UI Helpers
   const [autoScroll, setAutoScroll] = useState(true);
@@ -75,6 +94,13 @@ export default function App() {
     if (window.electron && window.electron.getProfiles) {
       window.electron.getProfiles().then(data => {
         setProfiles(data);
+      });
+    }
+
+    // 2b. Load saved repo URL
+    if (window.electron && window.electron.getConfig) {
+      window.electron.getConfig().then(cfg => {
+        setRepoUrl(cfg.repoUrl || '');
       });
     }
 
@@ -310,6 +336,18 @@ export default function App() {
             </button>
           )}
 
+          {os === 'win32' && (
+            <button className={`nav-item ${activeTab === 'syssetup' ? 'active' : ''}`} onClick={() => setActiveTab('syssetup')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"></path></svg>
+              System Setup
+            </button>
+          )}
+
+          <button className={`nav-item ${activeTab === 'repo' ? 'active' : ''}`} onClick={() => setActiveTab('repo')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            Software Repo
+          </button>
+
           <button className={`nav-item ${activeTab === 'dev' ? 'active' : ''}`} onClick={() => setActiveTab('dev')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
             Dev Stack
@@ -326,7 +364,12 @@ export default function App() {
       <div className="main-content">
         <header className="app-header">
           <div className="header-title">
-            <h2>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('-', ' ')}</h2>
+            <h2>{
+              activeTab === 'syssetup' ? 'System Setup' :
+              activeTab === 'dev' ? 'Dev Stack' :
+              activeTab === 'repo' ? 'Software Repository' :
+              activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('-', ' ')
+            }</h2>
           </div>
           
           <div className="header-status">
@@ -384,9 +427,9 @@ export default function App() {
                 </div>
                 <p className="card-desc">Welcome to Setup Center desktop automation portal.</p>
                 <div className="sys-list" style={{ fontSize: '0.8rem', lineHeight: '1.4', color: 'var(--text-muted)' }}>
-                  <p>Choose <strong>Software Catalog</strong> to install custom app bundles silently on this PC.</p>
-                  <p>Load <strong>Deployment Profiles</strong> to auto-apply developer workstation templates instantly.</p>
-                  <p>Execute diagnostics on <strong>Dev Stack</strong> to set up RabbitMQ servers, ElasticSearch instances, and config Tailscale VPN meshes.</p>
+                  <p>Use <strong>Software Catalog</strong> to install i3 office tools or full developer stacks (i5/i7) silently on this machine.</p>
+                  <p>Use <strong>Deployment Profiles</strong> to auto-apply predefined software presets — Basic (i3) or Developer (i5/i7).</p>
+                  <p>Use <strong>System Setup</strong> to get WiFi MAC address, change hostname, and create the work user account.</p>
                 </div>
               </div>
             </div>
@@ -419,20 +462,47 @@ export default function App() {
                       marginBottom: '16px'
                     }}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16, flexShrink: 0 }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                      <span>Offline mode is active. Package manager installs still require internet. Office suite can be installed fully offline.</span>
+                      <span>Offline mode is active. Package manager and Office suite installations still require internet.</span>
                     </div>
                   )}
 
                   <div className="software-list-grid">
-                    {(os === 'win32' ? WINDOWS_SOFTWARE : LINUX_SOFTWARE).map(app => (
-                      <label key={app.id} className="software-item">
-                        <input type="checkbox" checked={!!checkedSoftware[app.id]} onChange={() => handleCheckboxChange(app.id)} disabled={taskRunning} />
-                        <span className="checkbox-custom"></span>
-                        <div>
-                          <span className="software-name">{app.name}</span>
-                        </div>
-                      </label>
-                    ))}
+                    {os === 'win32' ? (
+                      <>
+                        <div className="software-cat-header"><span>🏢 i3 Basic Office Tools</span></div>
+                        {WINDOWS_SOFTWARE.filter(a => a.cat === 'basic').map(app => (
+                          <label key={app.id} className="software-item">
+                            <input type="checkbox" checked={!!checkedSoftware[app.id]} onChange={() => handleCheckboxChange(app.id)} disabled={taskRunning} />
+                            <span className="checkbox-custom"></span>
+                            <div>
+                              <span className="software-name">{app.name}</span>
+                              <span className="software-desc">{app.desc}</span>
+                            </div>
+                          </label>
+                        ))}
+                        <div className="software-cat-header" style={{ marginTop: '10px' }}><span>💻 i5 / i7 Developer Tools</span></div>
+                        {WINDOWS_SOFTWARE.filter(a => a.cat === 'dev').map(app => (
+                          <label key={app.id} className="software-item">
+                            <input type="checkbox" checked={!!checkedSoftware[app.id]} onChange={() => handleCheckboxChange(app.id)} disabled={taskRunning} />
+                            <span className="checkbox-custom"></span>
+                            <div>
+                              <span className="software-name">{app.name}</span>
+                              <span className="software-desc">{app.desc}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </>
+                    ) : (
+                      LINUX_SOFTWARE.map(app => (
+                        <label key={app.id} className="software-item">
+                          <input type="checkbox" checked={!!checkedSoftware[app.id]} onChange={() => handleCheckboxChange(app.id)} disabled={taskRunning} />
+                          <span className="checkbox-custom"></span>
+                          <div>
+                            <span className="software-name">{app.name}</span>
+                          </div>
+                        </label>
+                      ))
+                    )}
                   </div>
 
                   <div className="flex-row">
@@ -471,32 +541,31 @@ export default function App() {
                         </span>
                       </div>
                     ) : (
-                      <div className="radio-list">
-                        <label className="radio-item">
-                          <input type="radio" name="office" value="1" checked={officeMethod === '1'} onChange={() => setOfficeMethod('1')} disabled={taskRunning} />
-                          <span className="radio-custom"></span>
-                          <div className="radio-text">
-                            <span className="radio-title">Online Installer</span>
-                            <span className="radio-desc">Downloads directly from official Office CDN</span>
-                          </div>
-                        </label>
-                        <label className="radio-item">
-                          <input type="radio" name="office" value="2" checked={officeMethod === '2'} onChange={() => setOfficeMethod('2')} disabled={taskRunning} />
-                          <span className="radio-custom"></span>
-                          <div className="radio-text">
-                            <span className="radio-title">Create Offline Installer folder</span>
-                            <span className="radio-desc">Saves installation pack files directly to disk path</span>
-                          </div>
-                        </label>
+                      <div style={{
+                        background: 'rgba(6, 182, 212, 0.1)',
+                        border: '1px solid rgba(6, 182, 212, 0.2)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '12px 14px',
+                        fontSize: '0.8rem',
+                        color: 'var(--cyan)',
+                        marginBottom: '20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}>
+                        <span style={{ fontWeight: '700' }}>🌐 Online Office Installer</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
+                          Downloads and installs Microsoft Office Pro Plus 2021 Volume License directly from the official Office CDN.
+                        </span>
                       </div>
                     )}
 
                     <button 
                       className="btn btn-primary btn-full" 
-                      onClick={() => runTask('office', { choice: installMode === 'offline' ? '1' : officeMethod })} 
+                      onClick={() => runTask('office')} 
                       disabled={taskRunning}
                     >
-                      {installMode === 'offline' ? 'Install Office Offline' : 'Install Office'}
+                      {installMode === 'offline' ? 'Install Office Offline' : 'Install Office Online'}
                     </button>
                   </section>
                 )}
@@ -589,8 +658,220 @@ export default function App() {
             </div>
           )}
 
+          {/* TAB 4b: SYSTEM SETUP */}
+          {activeTab === 'syssetup' && os === 'win32' && (
+            <div className="preset-grid">
+
+              <section className="card">
+                <div className="card-title-row">
+                  <div className="card-icon icon-cyan">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+                  </div>
+                  <h3>Network Information</h3>
+                </div>
+                <p className="card-desc">Display WiFi MAC address, IP address, gateway, and DHCP status of all active adapters. Use MAC for firewall binding.</p>
+                <button className="btn btn-cyan btn-full" onClick={() => runTask('syssetup', { mode: 'netinfo' })} disabled={taskRunning}>
+                  Get Network Info
+                </button>
+              </section>
+
+              <section className="card">
+                <div className="card-title-row">
+                  <div className="card-icon icon-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                  </div>
+                  <h3>Change PC Hostname</h3>
+                </div>
+                <p className="card-desc">Rename this computer. Changes take effect after a restart. Current name is shown in the terminal after running.</p>
+                <div style={{ marginBottom: '14px' }}>
+                  <input
+                    type="text"
+                    className="sys-input"
+                    placeholder="Enter new hostname (e.g. PC-HR-01)"
+                    value={newHostname}
+                    onChange={e => setNewHostname(e.target.value)}
+                    disabled={taskRunning}
+                  />
+                </div>
+                <button
+                  className="btn btn-primary btn-full"
+                  onClick={() => {
+                    if (!newHostname.trim()) { showToast('Please enter a hostname.'); return; }
+                    runTask('syssetup', { mode: 'hostname', hostname: newHostname.trim() });
+                  }}
+                  disabled={taskRunning}
+                >
+                  Change Hostname
+                </button>
+              </section>
+
+              <section className="card">
+                <div className="card-title-row">
+                  <div className="card-icon icon-green">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  </div>
+                  <h3>Create Work User</h3>
+                </div>
+                <p className="card-desc">Create a second local administrator account for the end user. Default password set to <strong>123456</strong>.</p>
+                <div style={{ marginBottom: '14px' }}>
+                  <input
+                    type="text"
+                    className="sys-input"
+                    placeholder="Enter username (e.g. user01)"
+                    value={newUsername}
+                    onChange={e => setNewUsername(e.target.value)}
+                    disabled={taskRunning}
+                  />
+                </div>
+                <button
+                  className="btn btn-green btn-full"
+                  onClick={() => {
+                    if (!newUsername.trim()) { showToast('Please enter a username.'); return; }
+                    runTask('syssetup', { mode: 'createuser', username: newUsername.trim() });
+                  }}
+                  disabled={taskRunning}
+                >
+                  Create User Account
+                </button>
+              </section>
+
+            </div>
+          )}
+
+          {/* TAB: SOFTWARE REPOSITORY */}
+          {activeTab === 'repo' && (
+            <div className="page-split-layout">
+              <div className="left-panel">
+
+                <section className="card">
+                  <div className="card-title-row">
+                    <div className="card-icon icon-cyan">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    </div>
+                    <h3>Private Software Repository</h3>
+                  </div>
+                  <p className="card-desc">
+                    Enter the URL of your local server or network share where your installer files are hosted.
+                    When set, Setup Center will download apps from <em>your server first</em>, then fall back to the internet if unavailable.
+                  </p>
+
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      Repository URL
+                    </label>
+                    <input
+                      type="text"
+                      className="sys-input"
+                      placeholder="e.g. http://192.168.1.100:8080  or  \\192.168.1.100\SetupApps"
+                      value={repoUrl}
+                      onChange={e => { setRepoUrl(e.target.value); setRepoSaved(false); }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+                    <button
+                      className="btn btn-primary"
+                      style={{ flex: 1 }}
+                      onClick={async () => {
+                        if (window.electron && window.electron.saveConfig) {
+                          await window.electron.saveConfig({ repoUrl: repoUrl.trim() });
+                          setRepoSaved(true);
+                          showToast('Repository URL saved successfully!');
+                        }
+                      }}
+                    >
+                      {repoSaved ? '✅ Saved' : 'Save Repository URL'}
+                    </button>
+                    <button
+                      className="btn btn-outline"
+                      onClick={() => {
+                        setRepoUrl('');
+                        setRepoSaved(false);
+                        if (window.electron && window.electron.saveConfig) {
+                          window.electron.saveConfig({ repoUrl: '' });
+                          showToast('Repository URL cleared. Using internet mode.');
+                        }
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  {repoUrl.trim() ? (
+                    <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: '0.78rem', color: 'var(--green)' }}>
+                      <strong>🟢 Repo Active:</strong> Installers will be fetched from your server first.
+                    </div>
+                  ) : (
+                    <div style={{ background: 'rgba(100,100,100,0.08)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      <strong>⚫ Repo Not Set:</strong> All installations use the internet (winget / direct download).
+                    </div>
+                  )}
+                </section>
+
+                <section className="card">
+                  <div className="card-title-row">
+                    <div className="card-icon icon-amber">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    </div>
+                    <h3>How to Set Up a Server</h3>
+                  </div>
+                  <div className="sys-list" style={{ fontSize: '0.78rem', lineHeight: 1.6, color: 'var(--text-muted)' }}>
+                    <p><strong style={{ color: 'var(--cyan)' }}>Option A — Windows Network Share (Easiest)</strong><br/>
+                    Share a folder on any PC: right-click folder → Share → Everyone.<br/>
+                    Enter as: <code style={{ color: 'var(--primary)', background: 'rgba(99,102,241,0.1)', padding: '1px 5px', borderRadius: '4px' }}>\\192.168.x.x\SetupApps</code></p>
+
+                    <p><strong style={{ color: 'var(--cyan)' }}>Option B — HFS HTTP File Server (Free)</strong><br/>
+                    Download <strong>HFS.exe</strong> (single file, no install) from <em>rejetto.com/hfs</em>.<br/>
+                    Drag your app folder into HFS. It serves on port 8080.<br/>
+                    Enter as: <code style={{ color: 'var(--primary)', background: 'rgba(99,102,241,0.1)', padding: '1px 5px', borderRadius: '4px' }}>http://192.168.x.x:8080</code></p>
+
+                    <p><strong style={{ color: 'var(--cyan)' }}>Option C — Python (Quick)</strong><br/>
+                    In your apps folder: <code style={{ color: 'var(--green)', background: 'rgba(16,185,129,0.1)', padding: '1px 5px', borderRadius: '4px' }}>python -m http.server 8080</code></p>
+                  </div>
+                </section>
+              </div>
+
+              <section className="card" style={{ height: 'fit-content' }}>
+                <div className="card-title-row">
+                  <div className="card-icon icon-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                  </div>
+                  <h3>Required File Names</h3>
+                </div>
+                <p className="card-desc">Put your installer files on the server using <em>exactly</em> these filenames:</p>
+                <div style={{ fontSize: '0.76rem' }}>
+                  {[
+                    ['Chrome.exe',           'Google Chrome'],
+                    ['Brave.exe',            'Brave Browser'],
+                    ['ESET.exe',             'ESET Antivirus'],
+                    ['TimeDoctor.exe',       'Time Doctor'],
+                    ['Tailscale.exe',        'Tailscale VPN'],
+                    ['RustDesk.exe',         'RustDesk'],
+                    ['VSCode.exe',           'Visual Studio Code'],
+                    ['Git.exe',              'Git'],
+                    ['NVM-Setup.exe',        'Node.js v15.14 (NVM)'],
+                    ['MySQL-Workbench.exe',  'MySQL Workbench'],
+                    ['DBeaver.exe',          'DBeaver'],
+                    ['Postman.exe',          'Postman'],
+                    ['RedisInsight.exe',     'Redis Insight'],
+                    ['MongoDB-Compass.exe',  'MongoDB Compass'],
+                  ].map(([file, app]) => (
+                    <div key={file} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
+                      <code style={{ color: 'var(--primary)', fontFamily: 'monospace', fontSize: '0.75rem' }}>{file}</code>
+                      <span style={{ color: 'var(--text-muted)' }}>{app}</span>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ marginTop: '12px', fontSize: '0.72rem', color: 'var(--text-dark)', lineHeight: 1.5 }}>
+                  💡 Basecamp &amp; Sprinto are web apps — they always create desktop shortcuts. Action1 requires org-specific agent download.
+                </p>
+              </section>
+            </div>
+          )}
+
           {/* TAB 5: DEV STACK */}
           {activeTab === 'dev' && (
+
             <section className="card">
               <div className="card-title-row">
                 <div className="card-icon icon-purple">

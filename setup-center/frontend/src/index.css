@@ -394,6 +394,50 @@ h1, h2, h3, .brand-title {
   margin-bottom: 20px;
 }
 
+.software-cat-header {
+  grid-column: 1 / -1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 0 6px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 4px;
+}
+
+.software-desc {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-dark);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* System Setup Input */
+.sys-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: var(--font-main);
+}
+
+.sys-input:focus {
+  border-color: var(--primary);
+}
+
+.sys-input::placeholder {
+  color: var(--text-dark);
+}
+
+
 .software-item {
   display: flex;
   align-items: center;

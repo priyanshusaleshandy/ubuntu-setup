@@ -36,7 +36,23 @@
     "files": [
       "electron/**/*",
       "frontend/dist/**/*",
+      "profiles/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../install.sh",
+        "to": "install.sh"
+      },
+      {
+        "from": "../linux/install.sh",
+        "to": "linux/install.sh"
+      },
+      {
+        "from": "../windows/my-choco-install-script",
+        "to": "windows/my-choco-install-script",
+        "filter": ["**/*", "!*.zip"]
+      }
     ],
     "win": {
       "target": "portable"
