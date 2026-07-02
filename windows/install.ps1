@@ -1,4 +1,4 @@
-﻿# .SYNOPSIS
+# .SYNOPSIS (UTF-8 Edition)
 #   Priyanshu Suryavanshi PC Setup Toolkit
 # .DESCRIPTION
 #   Automated PC setup with software installation and system activation
@@ -382,87 +382,9 @@ function Install-OfficeOnline {
     if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 }
 
-
-function Create-OfficeOfflineInstaller {
-    $targetDir = "C:\OfficeOfflineInstaller"
-    $setupExe = Join-Path $targetDir "setup.exe"
-    $configFile = Join-Path $targetDir "Configuration.xml"
-
-    Write-Host "`n [ OFFICE OFFLINE INSTALLER CREATOR ]" -ForegroundColor Yellow
-    Write-Host " This will download Office files for offline use." -ForegroundColor Gray
-    Write-Host " Target Directory: $targetDir" -ForegroundColor Cyan
-    
-    $userPath = Read-Host " Press Enter to use default path, or type a new path"
-    if (-not [string]::IsNullOrWhiteSpace($userPath)) {
-        $targetDir = $userPath
-        $setupExe = Join-Path $targetDir "setup.exe"
-        $configFile = Join-Path $targetDir "Configuration.xml"
-    }
-
-    try {
-        # 1. Create Directory
-        if (-not (Test-Path $targetDir)) {
-            New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
-        }
-
-        # 2. Download ODT Setup.exe
-        Write-Host "⏬ Downloading Office Deployment Tool..." -ForegroundColor Yellow
-        $odtUrl = "https://officecdn.microsoft.com/pr/wsus/setup.exe"
-        Invoke-WebRequest -Uri $odtUrl -OutFile $setupExe -UseBasicParsing -ErrorAction Stop
-
-        # 3. Create Configuration.xml
-        Write-Host "📝 Generating configuration file..." -ForegroundColor Yellow
-        $xmlContent = @"
-<Configuration>
-  <Add OfficeClientEdition="64" Channel="PerpetualVL2021">
-    <Product ID="ProPlus2021Volume">
-      <Language ID="en-us" />
-      <ExcludeApp ID="Groove" />
-      <ExcludeApp ID="Lync" />
-      <ExcludeApp ID="Bing" />
-    </Product>
-  </Add>
-  <Updates Enabled="TRUE" />
-  <Display Level="Full" AcceptEULA="TRUE" />
-</Configuration>
-"@
-        $xmlContent | Set-Content -Path $configFile -Encoding UTF8
-
-        # 4. Run Installer in Download Mode
-        Write-Host "⏬ Starting Office Download..." -ForegroundColor Yellow
-        Write-Host "   (This will take a while depending on internet speed. Please wait...)" -ForegroundColor Gray
-        
-        Start-Process -FilePath $setupExe -ArgumentList "/download Configuration.xml" -WorkingDirectory $targetDir -Wait -NoNewWindow -ErrorAction Stop
-        
-        Write-Host "✅ Office offline files downloaded successfully to: $targetDir" -ForegroundColor Green
-        Write-Host "   To install later, run: setup.exe /configure Configuration.xml" -ForegroundColor Gray
-    }
-    catch {
-        Write-Host "❌ Office download failed: $($_.Exception.Message)" -ForegroundColor Red
-    }
-}
-
 function Install-MSOffice {
-    Write-Host "`n [ OFFICE INSTALLATION ]" -ForegroundColor Yellow
-    Write-Host " Choose installation method:" -ForegroundColor Gray
-    Write-Host "   [1] Office Online Installer" -ForegroundColor White
-    Write-Host "   [2] Office Offline Installer" -ForegroundColor White
-    Write-Host "   [0] Go Back" -ForegroundColor DarkGray
-    $subChoice = Read-Host "Enter your choice [0-2]"
-
-    switch ($subChoice) {
-        '1' {
-            Install-OfficeOnline
-            Read-Host "Press Enter to return to the menu..."
-        }
-        '2' {
-            Create-OfficeOfflineInstaller
-            Read-Host "Press Enter to return to the menu..."
-        }
-        default {
-            return
-        }
-    }
+    Install-OfficeOnline
+    Read-Host "Press Enter to return to the menu..."
 }
 
 # -------------------------------------------------------------------------

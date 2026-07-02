@@ -1,4 +1,4 @@
-﻿# .SYNOPSIS
+# .SYNOPSIS
 #   Priyanshu Suryavanshi PC Setup Toolkit
 # .DESCRIPTION
 #   Automated PC setup with software installation and system activation
@@ -223,17 +223,137 @@ function Install-UltraViewerDirectly {
     }
 }
 
+# -------------------------------------------------------------------------
+# Local Software Repository Helper
+# -------------------------------------------------------------------------
+# Maps winget package IDs / custom IDs to expected installer filenames on repo
+$repoFileMap = @{
+    "winget:Google.Chrome"              = @{ Pattern = "Chrome*";          Default = "Chrome.exe" }
+    "winget:Brave.Brave"                = @{ Pattern = "Brave*";           Default = "BraveBrowserSetup-BRV011.exe" }
+    "winget:ESET.NOD32Antivirus"        = @{ Pattern = "ESET*";            Default = "ESET.exe" }
+    "winget:Tailscale.Tailscale"        = @{ Pattern = "Tailscale*";       Default = "Tailscale.exe" }
+    "winget:RustDesk.RustDesk"          = @{ Pattern = "RustDesk*";        Default = "RustDesk.exe" }
+    "winget:Microsoft.VisualStudioCode" = @{ Pattern = "VSCode*";          Default = "VSCode.exe" }
+    "winget:Git.Git"                    = @{ Pattern = "Git*";             Default = "Git.exe" }
+    "winget:Oracle.MySQLWorkbench"      = @{ Pattern = "MySQL-Workbench*"; Default = "MySQL-Workbench.exe" }
+    "winget:dbeaver.dbeaver"            = @{ Pattern = "DBeaver*";         Default = "DBeaver.exe" }
+    "winget:Postman.Postman"            = @{ Pattern = "Postman*";         Default = "Postman.exe" }
+    "winget:RedisLabs.RedisInsight"     = @{ Pattern = "RedisInsight*";    Default = "RedisInsight.exe" }
+    "winget:MongoDB.Compass.Full"       = @{ Pattern = "MongoDB-Compass*"; Default = "MongoDB-Compass.exe" }
+    "custom:timedoctor"                 = @{ Pattern = "timedoctor*";      Default = "timedoctor2-setup-3.18.70-windows.msi" }
+    "custom:basecamp"                   = @{ Pattern = "Basecamp*";        Default = "Basecamp-setup.exe" }
+    "custom:sprinto"                    = @{ Pattern = "sfproc*";          Default = "sfproc-3.18.74-67ebb4c267041f1c3eb98aab.msi" }
+    "custom:action1"                    = @{ Pattern = "Action1*";         Default = "Action1.exe" }
+    "custom:nvm-node"                   = @{ Pattern = "NVM-Setup*";       Default = "NVM-Setup.exe" }
+}
+
+function Get-InstallerFromRepo {
+    param([string]$AppID, [string]$AppName)
+
+    if ([string]::IsNullOrWhiteSpace($softwareRepoUrl)) { return $null }
+    if (-not $repoFileMap.ContainsKey($AppID))          { return $null }
+
+    $map = $repoFileMap[$AppID]
+    $pattern = $map.Pattern
+    $defaultName = $map.Default
+
+    try {
+        if (Test-Path $softwareRepoUrl -ErrorAction SilentlyContinue) {
+            # Directory path (local or UNC share)
+            $file = Get-ChildItem -Path $softwareRepoUrl -Filter $pattern | Select-Object -First 1
+            if ($file) {
+                $fileName = $file.Name
+                $dest = "$env:TEMP\repo-$fileName"
+                $src = $file.FullName
+                Write-Host "  📂 Copying $AppName from repo ($fileName)..." -ForegroundColor Yellow
+                Copy-Item -Path $src -Destination $dest -Force -ErrorAction Stop
+                Write-Host "  ✅ Downloaded from repo." -ForegroundColor Green
+                return $dest
+            } else {
+                Write-Host "  ⚠️  File matching pattern '$pattern' not found in repo: $softwareRepoUrl" -ForegroundColor Yellow
+            }
+        } else {
+            # HTTP/HTTPS URL
+            $dest = "$env:TEMP\repo-$defaultName"
+            $url = "$softwareRepoUrl/$defaultName"
+            Write-Host "  ⏬ Downloading $AppName from repo URL: $url" -ForegroundColor Yellow
+            (New-Object System.Net.WebClient).DownloadFile($url, $dest)
+            if (Test-Path $dest) {
+                Write-Host "  ✅ Downloaded from repo." -ForegroundColor Green
+                return $dest
+            }
+        }
+    } catch {
+        Write-Host "  ⚠️  Repo download/copy failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "       Falling back to winget/internet..." -ForegroundColor Gray
+    }
+    return $null
+}
+
+function Install-LocalExe {
+    param([string]$Path, [string]$AppName)
+
+    if ($Path -like "*.msi") {
+        Write-Host "🚀 Running MSI installer silently..." -ForegroundColor Yellow
+        try {
+            $proc = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$Path`" /qn /norestart" -Wait -NoNewWindow -PassThru -ErrorAction Stop
+            if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
+                Write-Host "✅ $AppName installed successfully from local repo (MSI)." -ForegroundColor Green
+                return $true
+            } else {
+                Write-Host "  ⚠️  Silent MSI install returned exit code $($proc.ExitCode). Launching interactive MSI..." -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "  ⚠️  Silent MSI install failed. Launching interactive MSI..." -ForegroundColor Yellow
+        }
+        # Interactive fallback
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$Path`"" -Wait -NoNewWindow -ErrorAction SilentlyContinue
+        Write-Host "✅ $AppName installer launched." -ForegroundColor Green
+        return $true
+    }
+
+    # Otherwise it's an EXE
+    # Try common silent install flags in order
+    $silentFlags = @("/S", "/VERYSILENT", "/quiet", "/silent")
+    foreach ($flag in $silentFlags) {
+        try {
+            $proc = Start-Process -FilePath $Path -ArgumentList $flag -Wait -NoNewWindow -PassThru -ErrorAction Stop
+            if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
+                Write-Host "✅ $AppName installed from local repo." -ForegroundColor Green
+                return $true
+            }
+        } catch {}
+    }
+    # Last resort: run without silent flags
+    Write-Host "  ⚠️  Silent install failed. Launching installer UI..." -ForegroundColor Yellow
+    Start-Process -FilePath $Path -Wait -NoNewWindow -ErrorAction SilentlyContinue
+    Write-Host "✅ $AppName installer launched." -ForegroundColor Green
+    return $true
+}
+
 function Install-NormalSoftware {
     Ensure-PackageManagers
 
     $softwareList = @(
-        @{Name = "Google Chrome"; ID = "Google.Chrome" },
-        @{Name = "Mozilla Firefox"; ID = "Mozilla.Firefox" },
-        @{Name = "WinRAR"; ID = "RARLab.WinRAR" },
-        @{Name = "VLC Player"; ID = "VideoLAN.VLC" },
-        @{Name = "PDF Reader (Sumatra)"; ID = "SumatraPDF.SumatraPDF" },
-        @{Name = "AnyDesk"; ID = "custom-anydesk" },
-        @{Name = "UltraViewer"; ID = "custom-ultraviewer" }
+        # --- i3 Basic Office Tools ---
+        @{Name = "Google Chrome";         ID = "winget:Google.Chrome" },
+        @{Name = "Brave Browser";          ID = "winget:Brave.Brave" },
+        @{Name = "Basecamp";               ID = "custom:basecamp" },
+        @{Name = "Sprinto";                ID = "custom:sprinto" },
+        @{Name = "ESET Antivirus";         ID = "winget:ESET.NOD32Antivirus" },
+        @{Name = "Time Doctor";            ID = "custom:timedoctor" },
+        @{Name = "Action1 RMM";            ID = "custom:action1" },
+        @{Name = "Tailscale VPN";          ID = "winget:Tailscale.Tailscale" },
+        @{Name = "RustDesk";               ID = "winget:RustDesk.RustDesk" },
+        # --- i5/i7 Developer Tools ---
+        @{Name = "Visual Studio Code";     ID = "winget:Microsoft.VisualStudioCode" },
+        @{Name = "Git";                    ID = "winget:Git.Git" },
+        @{Name = "Node.js v15.14 (NVM)";   ID = "custom:nvm-node" },
+        @{Name = "MySQL Workbench";        ID = "winget:Oracle.MySQLWorkbench" },
+        @{Name = "DBeaver";                ID = "winget:dbeaver.dbeaver" },
+        @{Name = "Postman";                ID = "winget:Postman.Postman" },
+        @{Name = "Redis Insight";          ID = "winget:RedisLabs.RedisInsight" },
+        @{Name = "MongoDB Compass";        ID = "winget:MongoDB.Compass.Full" }
     )
 
     Write-Host "`n [ SOFTWARE SELECTION ]" -ForegroundColor Yellow
@@ -264,26 +384,48 @@ function Install-NormalSoftware {
     foreach ($index in $selectedIndices | Sort-Object -Unique) {
         if ($index -ge 1 -and $index -le $softwareList.Count) {
             $app = $softwareList[$index - 1]
-            if ($app.ID -eq "custom-anydesk") {
-                Install-AnyDeskDirectly
+            
+            # 1. Try local repository check first for ALL apps
+            $localInstaller = Get-InstallerFromRepo -AppID $app.ID -AppName $app.Name
+            if ($localInstaller -and (Test-Path $localInstaller)) {
+                Install-LocalExe -Path $localInstaller -AppName $app.Name
             }
-            elseif ($app.ID -eq "custom-ultraviewer") {
-                Install-UltraViewerDirectly
-            }
+            # 2. Fallback to normal method
             else {
-                Write-Host "`n📦 Installing $($app.Name) via winget..." -ForegroundColor Gray
-                try {
-                    if (Get-Command winget -ErrorAction SilentlyContinue) {
-                        # Use --accept flags to avoid prompts
-                        Start-Process -FilePath "winget" -ArgumentList "install --id $($app.ID) --silent --accept-source-agreements --accept-package-agreements" -Wait -NoNewWindow -ErrorAction Stop
-                        Write-Host "✅ $($app.Name) installed successfully!" -ForegroundColor Green
+                if ($app.ID -like "winget:*") {
+                    $pkgId = $app.ID.Replace("winget:", "")
+                    Write-Host "`n📦 Installing $($app.Name) via winget..." -ForegroundColor Gray
+                    try {
+                        if (Get-Command winget -ErrorAction SilentlyContinue) {
+                            Start-Process -FilePath "winget" -ArgumentList "install --id $pkgId --silent --accept-source-agreements --accept-package-agreements" -Wait -NoNewWindow -ErrorAction Stop
+                            Write-Host "✅ $($app.Name) installed via winget." -ForegroundColor Green
+                        }
+                        else {
+                            Write-Host "⚠️ winget not available. Skipping $($app.Name)." -ForegroundColor Yellow
+                        }
                     }
-                    else {
-                        Write-Host "⚠️ winget not available. Skipping $($app.Name)." -ForegroundColor Yellow
+                    catch {
+                        Write-Host "❌ Failed to install $($app.Name): $($_.Exception.Message)" -ForegroundColor Red
                     }
                 }
-                catch {
-                    Write-Host "❌ Failed to install $($app.Name): $($_.Exception.Message)" -ForegroundColor Red
+                elseif ($app.ID -like "shortcut:*") {
+                    $parts = $app.ID.Replace("shortcut:", "") -split ":"
+                    New-WebShortcut -Url $parts[0] -Name $parts[1]
+                }
+                elseif ($app.ID -eq "custom:timedoctor") {
+                    Install-TimeDoctor
+                }
+                elseif ($app.ID -eq "custom:basecamp") {
+                    Install-Basecamp
+                }
+                elseif ($app.ID -eq "custom:sprinto") {
+                    Install-Sprinto
+                }
+                elseif ($app.ID -eq "custom:action1") {
+                    Install-Action1
+                }
+                elseif ($app.ID -eq "custom:nvm-node") {
+                    Install-NVMAndNode
                 }
             }
         }
@@ -382,87 +524,9 @@ function Install-OfficeOnline {
     if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 }
 
-
-function Create-OfficeOfflineInstaller {
-    $targetDir = "C:\OfficeOfflineInstaller"
-    $setupExe = Join-Path $targetDir "setup.exe"
-    $configFile = Join-Path $targetDir "Configuration.xml"
-
-    Write-Host "`n [ OFFICE OFFLINE INSTALLER CREATOR ]" -ForegroundColor Yellow
-    Write-Host " This will download Office files for offline use." -ForegroundColor Gray
-    Write-Host " Target Directory: $targetDir" -ForegroundColor Cyan
-    
-    $userPath = Read-Host " Press Enter to use default path, or type a new path"
-    if (-not [string]::IsNullOrWhiteSpace($userPath)) {
-        $targetDir = $userPath
-        $setupExe = Join-Path $targetDir "setup.exe"
-        $configFile = Join-Path $targetDir "Configuration.xml"
-    }
-
-    try {
-        # 1. Create Directory
-        if (-not (Test-Path $targetDir)) {
-            New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
-        }
-
-        # 2. Download ODT Setup.exe
-        Write-Host "⏬ Downloading Office Deployment Tool..." -ForegroundColor Yellow
-        $odtUrl = "https://officecdn.microsoft.com/pr/wsus/setup.exe"
-        Invoke-WebRequest -Uri $odtUrl -OutFile $setupExe -UseBasicParsing -ErrorAction Stop
-
-        # 3. Create Configuration.xml
-        Write-Host "📝 Generating configuration file..." -ForegroundColor Yellow
-        $xmlContent = @"
-<Configuration>
-  <Add OfficeClientEdition="64" Channel="PerpetualVL2021">
-    <Product ID="ProPlus2021Volume">
-      <Language ID="en-us" />
-      <ExcludeApp ID="Groove" />
-      <ExcludeApp ID="Lync" />
-      <ExcludeApp ID="Bing" />
-    </Product>
-  </Add>
-  <Updates Enabled="TRUE" />
-  <Display Level="Full" AcceptEULA="TRUE" />
-</Configuration>
-"@
-        $xmlContent | Set-Content -Path $configFile -Encoding UTF8
-
-        # 4. Run Installer in Download Mode
-        Write-Host "⏬ Starting Office Download..." -ForegroundColor Yellow
-        Write-Host "   (This will take a while depending on internet speed. Please wait...)" -ForegroundColor Gray
-        
-        Start-Process -FilePath $setupExe -ArgumentList "/download Configuration.xml" -WorkingDirectory $targetDir -Wait -NoNewWindow -ErrorAction Stop
-        
-        Write-Host "✅ Office offline files downloaded successfully to: $targetDir" -ForegroundColor Green
-        Write-Host "   To install later, run: setup.exe /configure Configuration.xml" -ForegroundColor Gray
-    }
-    catch {
-        Write-Host "❌ Office download failed: $($_.Exception.Message)" -ForegroundColor Red
-    }
-}
-
 function Install-MSOffice {
-    Write-Host "`n [ OFFICE INSTALLATION ]" -ForegroundColor Yellow
-    Write-Host " Choose installation method:" -ForegroundColor Gray
-    Write-Host "   [1] Office Online Installer" -ForegroundColor White
-    Write-Host "   [2] Office Offline Installer" -ForegroundColor White
-    Write-Host "   [0] Go Back" -ForegroundColor DarkGray
-    $subChoice = Read-Host "Enter your choice [0-2]"
-
-    switch ($subChoice) {
-        '1' {
-            Install-OfficeOnline
-            Read-Host "Press Enter to return to the menu..."
-        }
-        '2' {
-            Create-OfficeOfflineInstaller
-            Read-Host "Press Enter to return to the menu..."
-        }
-        default {
-            return
-        }
-    }
+    Install-OfficeOnline
+    Read-Host "Press Enter to return to the menu..."
 }
 
 # -------------------------------------------------------------------------
@@ -995,6 +1059,168 @@ function Install-OfficeSoftwareMenu {
         '5' { Repair-ElasticSearch }
     }
     Read-Host "Press Enter to return..."
+}
+
+# -------------------------------------------------------------------------
+# Custom install helpers
+# -------------------------------------------------------------------------
+function New-WebShortcut {
+    param([string]$Url, [string]$Name)
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $WshShell = New-Object -ComObject WScript.Shell
+    $Shortcut = $WshShell.CreateShortcut("$desktop\$Name.url")
+    $Shortcut.TargetPath = $Url
+    $Shortcut.Save()
+    Write-Host "✅ Desktop shortcut created: $Name -> $Url" -ForegroundColor Green
+}
+
+function Install-Basecamp {
+    Write-Host "`n [ SETTING UP BASECAMP ]" -ForegroundColor Cyan
+    Write-Host "  Local installer not found in repo." -ForegroundColor Yellow
+    # Create web shortcut as fallback
+    New-WebShortcut -Url "https://basecamp.com" -Name "Basecamp Web"
+    Write-Host "✅ Basecamp web shortcut created on Desktop." -ForegroundColor Green
+}
+
+function Install-Sprinto {
+    Write-Host "`n [ SETTING UP SPRINTO ]" -ForegroundColor Cyan
+    Write-Host "  Sprinto File Processor (sfproc) installer not found in repo." -ForegroundColor Yellow
+    # Create web shortcut as fallback
+    New-WebShortcut -Url "https://app.sprinto.com" -Name "Sprinto Dashboard"
+    Write-Host "✅ Sprinto dashboard shortcut created on Desktop." -ForegroundColor Green
+}
+
+function Install-TimeDoctor {
+    Write-Host "`n [ INSTALLING TIME DOCTOR ]" -ForegroundColor Cyan
+    $url  = "https://updates.timedoctor.com/download/td2/windows/TimeDoctor.exe"
+    $dest = "$env:TEMP\TimeDoctor-Setup.exe"
+    try {
+        Write-Host "⏬ Downloading Time Doctor installer..." -ForegroundColor Yellow
+        (New-Object System.Net.WebClient).DownloadFile($url, $dest)
+        Write-Host "🚀 Launching Time Doctor installer..." -ForegroundColor Yellow
+        Start-Process -FilePath $dest -Wait -NoNewWindow -ErrorAction SilentlyContinue
+        Write-Host "✅ Time Doctor installation complete." -ForegroundColor Green
+    } catch {
+        Write-Host "❌ Failed to download/install Time Doctor: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "   Please download manually from: https://www.timedoctor.com/download" -ForegroundColor Yellow
+    }
+}
+
+function Install-Action1 {
+    Write-Host "`n [ SETTING UP ACTION1 RMM ]" -ForegroundColor Cyan
+    Write-Host "⚠️  Action1 requires an org-specific agent URL from your Action1 dashboard." -ForegroundColor Yellow
+    New-WebShortcut -Url "https://app.action1.com" -Name "Action1 Dashboard"
+    Write-Host "   Open the shortcut, log in, and download your org agent from:" -ForegroundColor Gray
+    Write-Host "   Settings > Endpoints > Download Agent" -ForegroundColor Gray
+    Write-Host "✅ Action1 dashboard shortcut created on Desktop." -ForegroundColor Green
+}
+
+function Install-NVMAndNode {
+    Write-Host "`n [ INSTALLING NVM FOR WINDOWS + NODE.JS v15.14.0 ]" -ForegroundColor Cyan
+    $nvmUrl       = "https://github.com/coreybutler/nvm-windows/releases/download/1.1.12/nvm-setup.exe"
+    $nvmInstaller = "$env:TEMP\nvm-setup.exe"
+    try {
+        Write-Host "⏬ Downloading NVM for Windows..." -ForegroundColor Yellow
+        (New-Object System.Net.WebClient).DownloadFile($nvmUrl, $nvmInstaller)
+        Write-Host "🚀 Installing NVM silently..." -ForegroundColor Yellow
+        Start-Process -FilePath $nvmInstaller -ArgumentList "/SILENT" -Wait -NoNewWindow -ErrorAction Stop
+        Write-Host "✅ NVM installed." -ForegroundColor Green
+
+        # Refresh NVM environment variables
+        $nvmHome = "$env:APPDATA\nvm"
+        if (Test-Path "$nvmHome\nvm.exe") {
+            Write-Host "⏬ Installing Node.js v15.14.0 via NVM..." -ForegroundColor Yellow
+            & "$nvmHome\nvm.exe" install 15.14.0
+            & "$nvmHome\nvm.exe" use 15.14.0
+            Write-Host "✅ Node.js v15.14.0 activated via NVM." -ForegroundColor Green
+        } else {
+            Write-Host "⚠️  NVM installed but nvm.exe not found at $nvmHome" -ForegroundColor Yellow
+            Write-Host "   Please open a new terminal and run: nvm install 15.14.0 && nvm use 15.14.0" -ForegroundColor Gray
+        }
+    } catch {
+        Write-Host "❌ Failed to install NVM: $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+
+# -------------------------------------------------------------------------
+# System Setup functions
+# -------------------------------------------------------------------------
+function Get-NetworkInfo {
+    Write-Host "`n [ NETWORK ADAPTER INFORMATION ]" -ForegroundColor Cyan
+    Write-Host " ================================================================" -ForegroundColor DarkGray
+
+    $adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' }
+    if (-not $adapters) {
+        Write-Host "  ⚠️  No active network adapters found." -ForegroundColor Yellow
+        return
+    }
+
+    foreach ($adapter in $adapters) {
+        $ipConfig = Get-NetIPAddress -InterfaceIndex $adapter.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+        $gateway  = (Get-NetRoute -InterfaceIndex $adapter.InterfaceIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Select-Object -First 1).NextHop
+        $isDhcp   = ($ipConfig.PrefixOrigin -eq 'Dhcp') -or ($ipConfig.SuffixOrigin -eq 'Dhcp')
+
+        Write-Host ""
+        Write-Host "  Adapter   : $($adapter.Name)" -ForegroundColor Yellow
+        Write-Host "  Type      : $($adapter.InterfaceDescription)" -ForegroundColor Gray
+        Write-Host "  MAC Addr  : $($adapter.MacAddress)" -ForegroundColor Cyan
+        Write-Host "  IP Addr   : $($ipConfig.IPAddress)" -ForegroundColor White
+        Write-Host "  Subnet    : /$($ipConfig.PrefixLength)" -ForegroundColor White
+        Write-Host "  Gateway   : $gateway" -ForegroundColor White
+        Write-Host "  DHCP      : $(if ($isDhcp) { 'Yes' } else { 'No (Static)' })" -ForegroundColor White
+        Write-Host " ----------------------------------------------------------------" -ForegroundColor DarkGray
+    }
+
+    Write-Host ""
+    Write-Host "✅ Network info retrieved. Use MAC address above for firewall binding." -ForegroundColor Green
+}
+
+function Set-PCHostname {
+    Write-Host "`n [ CHANGE PC HOSTNAME ]" -ForegroundColor Cyan
+    Write-Host "  Current Hostname: $env:COMPUTERNAME" -ForegroundColor Gray
+
+    $newName = Read-Host "Enter new hostname"
+    if ([string]::IsNullOrWhiteSpace($newName)) {
+        Write-Host "⚠️  No hostname provided. Operation cancelled." -ForegroundColor Yellow
+        return
+    }
+
+    try {
+        Rename-Computer -NewName $newName -Force -ErrorAction Stop
+        Write-Host "✅ Hostname changed to: $newName" -ForegroundColor Green
+        Write-Host "⚠️  A restart is required for the new name to take effect." -ForegroundColor Yellow
+    } catch {
+        Write-Host "❌ Failed to change hostname: $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+
+function New-WorkUser {
+    Write-Host "`n [ CREATE WORK USER ACCOUNT ]" -ForegroundColor Cyan
+
+    $username = Read-Host "Enter username"
+    if ([string]::IsNullOrWhiteSpace($username)) {
+        Write-Host "⚠️  No username provided. Operation cancelled." -ForegroundColor Yellow
+        return
+    }
+
+    $password      = "123456"
+    $securePass    = ConvertTo-SecureString $password -AsPlainText -Force
+
+    try {
+        $existingUser = Get-LocalUser -Name $username -ErrorAction SilentlyContinue
+        if ($existingUser) {
+            Write-Host "⚠️  User '$username' already exists. Ensuring admin membership..." -ForegroundColor Yellow
+        } else {
+            New-LocalUser -Name $username -Password $securePass -FullName $username -Description "Work User Account" -ErrorAction Stop
+            Write-Host "✅ User '$username' created." -ForegroundColor Green
+        }
+        Add-LocalGroupMember -Group "Administrators" -Member $username -ErrorAction SilentlyContinue
+        Write-Host "✅ '$username' added to Administrators group." -ForegroundColor Green
+        Write-Host "   Username : $username" -ForegroundColor Cyan
+        Write-Host "   Password : $password" -ForegroundColor Cyan
+    } catch {
+        Write-Host "❌ Failed to create user: $($_.Exception.Message)" -ForegroundColor Red
+    }
 }
 
 # -------------------------------------------------------------------------
