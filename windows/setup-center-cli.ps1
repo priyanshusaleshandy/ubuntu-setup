@@ -128,8 +128,15 @@ function Install-NormalSoftware {
     for ($i=0;$i -lt $list.Count;$i++) { Write-Host "  [$($i+1)] $($list[$i].N)" -ForegroundColor White }
     Write-Host ""
     $sel = Read-Host "  Selection (e.g. 1,3,5 or 'all')"
-    $indices = if ($sel.Trim().ToLower() -eq 'all') { 1..$list.Count }
-               else { $sel -split "," | ForEach-Object { $t=$_.Trim(); if ($t -match '^\d+$'){[int]$t} } }
+    $indices = @()
+    if ($sel.Trim().ToLower() -eq 'all') {
+        $indices = 1..$list.Count
+    } else {
+        foreach ($token in ($sel -split ",")) {
+            $t = $token.Trim()
+            if ($t -match '^\d+$') { $indices += [int]$t }
+        }
+    }
     Ensure-PackageManagers
     foreach ($idx in ($indices|Sort-Object -Unique)) {
         if ($idx -lt 1 -or $idx -gt $list.Count) { Write-WARN "Invalid: $idx"; continue }
@@ -252,7 +259,7 @@ function Launch-RamOptimizer {
     Write-Host "  [3] Remove       — uninstall optimizer & remove scheduled task"    -ForegroundColor Red
     Write-Host "  [0] Back"                                                          -ForegroundColor DarkGray
     Write-Host ""
-    $sub = Read-Host "  Choice"
+    $sub = (Read-Host "  Choice").Trim()
 
     # --- Shared: MemoryTrimmer C# type ---
     $trimmerCode = @'
@@ -552,7 +559,8 @@ function Show-OfficeSoftwareMenu {
         Write-Host "  [5] Repair ElasticSearch  (user + restart)"        -ForegroundColor Yellow
         Write-Host "  [0] Back"                                           -ForegroundColor DarkGray
         Write-Host ""
-        switch (Read-Host "  Choice") {
+        $sub = (Read-Host "  Choice").Trim()
+        switch ($sub) {
             '1' { Install-RabbitMQ }
             '2' { Install-ElasticSearch }
             '3' { Get-RabbitMQStatus }
@@ -599,42 +607,6 @@ function Set-PCHostname {
     Pause-Menu
 }
 
-function New-WorkUser {
-    Show-Header; Write-Host "  [8.3] CREATE WORK USER" -ForegroundColor Cyan; Write-Host ""
-    $uname = Read-Host "  Username (blank = cancel)"
-    if ([string]::IsNullOrWhiteSpace($uname)) { Write-WARN "Cancelled."; Pause-Menu; return }
-    $pass    = Read-Host "  Password" -AsSecureString
-    $full    = Read-Host "  Full name (optional)"
-    $isAdmin = Read-Host "  Administrator? (y/N)"
-    try {
-        $p = @{Name=$uname; Password=$pass; AccountNeverExpires=$true; PasswordNeverExpires=$true}
-        if ($full) { $p.FullName = $full }
-        New-LocalUser @p
-        Add-LocalGroupMember -Group "Users" -Member $uname -ErrorAction SilentlyContinue
-        if ($isAdmin -match '^[Yy]$') { Add-LocalGroupMember -Group "Administrators" -Member $uname; Write-OK "Admin user '$uname' created." }
-        else { Write-OK "Standard user '$uname' created." }
-    } catch { Write-ERR "$($_.Exception.Message)" }
-    Pause-Menu
-}
-
-function Show-SystemSetupMenu {
-    while ($true) {
-        Show-Header
-        Write-Host "  [8] SYSTEM SETUP" -ForegroundColor Yellow; Write-Host ""
-        Write-Host "  [1] Network Information"    -ForegroundColor White
-        Write-Host "  [2] Change PC Hostname"     -ForegroundColor White
-        Write-Host "  [3] Create Work User"       -ForegroundColor White
-        Write-Host "  [0] Back"                   -ForegroundColor DarkGray
-        Write-Host ""
-        switch (Read-Host "  Choice") {
-            '1' { Get-NetworkInfo }
-            '2' { Set-PCHostname }
-            '3' { New-WorkUser }
-            '0' { return }
-        }
-    }
-}
-
 # =============================================================================
 # [9] TAILSCALE VPN
 # =============================================================================
@@ -652,12 +624,29 @@ function Install-Tailscale {
 }
 
 function Invoke-TailscaleLogin {
-    Show-Header; Write-Host "  [9.2] TAILSCALE LOGIN" -ForegroundColor Cyan; Write-Host ""
-    Write-INFO "Opening browser to authenticate with bifrost.saleshandy.com..."
-    try {
-        tailscale login --login-server https://bifrost.saleshandy.com
-        Write-OK "Login command sent. Complete authentication in the browser."
-    } catch { Write-ERR "Login failed: $($_.Exception.Message)" }
+    Show-Header; Write-Host "  [9.2] TAILSCALE LOGIN / REGISTER" -ForegroundColor Cyan; Write-Host ""
+    Write-Host "  [1] Web Browser Login (Sends Auth URL to Admin)" -ForegroundColor White
+    Write-Host "  [2] Auth Key Login    (Use pre-authorized key from Admin)" -ForegroundColor Green
+    Write-Host "  [0] Back" -ForegroundColor DarkGray
+    Write-Host ""
+    $subChoice = (Read-Host "  Select Login Method").Trim()
+    
+    if ($subChoice -eq '1') {
+        Write-INFO "Opening browser login..."
+        Write-WARN "If browser does not open, COPY the URL printed below and send it to your Admin:"
+        try {
+            tailscale login --login-server https://bifrost.saleshandy.com
+        } catch { Write-ERR "Login failed: $($_.Exception.Message)" }
+    }
+    elseif ($subChoice -eq '2') {
+        $authKey = (Read-Host "  Enter Tailscale Auth Key (tskey-auth-...)").Trim()
+        if ([string]::IsNullOrWhiteSpace($authKey)) { Write-WARN "Cancelled."; Pause-Menu; return }
+        Write-INFO "Registering node using Auth Key..."
+        try {
+            tailscale up --authkey=$authKey --login-server=https://bifrost.saleshandy.com --accept-routes --accept-dns
+            Write-OK "Node successfully registered with Auth Key!"
+        } catch { Write-ERR "Registration failed: $($_.Exception.Message)" }
+    }
     Pause-Menu
 }
 
@@ -733,7 +722,8 @@ function Show-TailscaleMenu {
         Write-Host "  [7] Uninstall Tailscale"                                                      -ForegroundColor Red
         Write-Host "  [0] Back"                                                                     -ForegroundColor DarkGray
         Write-Host ""
-        switch (Read-Host "  Choice") {
+        $sub = (Read-Host "  Choice").Trim()
+        switch ($sub) {
             '1' { Install-Tailscale }
             '2' { Invoke-TailscaleLogin }
             '3' { Invoke-TailscaleConnect }
@@ -775,7 +765,8 @@ while ($true) {
     }
     Write-Host ""; Write-Sep "-"
 
-    switch (Read-Host "`n  Enter choice [0-9]") {
+    $opt = (Read-Host "`n  Enter choice [0-9]").Trim()
+    switch ($opt) {
         '1' { Install-NormalSoftware }
         '2' { Install-MSOffice }
         '3' { Invoke-Activation }

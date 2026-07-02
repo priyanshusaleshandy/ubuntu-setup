@@ -128,8 +128,15 @@ function Install-NormalSoftware {
     for ($i=0;$i -lt $list.Count;$i++) { Write-Host "  [$($i+1)] $($list[$i].N)" -ForegroundColor White }
     Write-Host ""
     $sel = Read-Host "  Selection (e.g. 1,3,5 or 'all')"
-    $indices = if ($sel.Trim().ToLower() -eq 'all') { 1..$list.Count }
-               else { $sel -split "," | ForEach-Object { $t=$_.Trim(); if ($t -match '^\d+$'){[int]$t} } }
+    $indices = @()
+    if ($sel.Trim().ToLower() -eq 'all') {
+        $indices = 1..$list.Count
+    } else {
+        foreach ($token in ($sel -split ",")) {
+            $t = $token.Trim()
+            if ($t -match '^\d+$') { $indices += [int]$t }
+        }
+    }
     Ensure-PackageManagers
     foreach ($idx in ($indices|Sort-Object -Unique)) {
         if ($idx -lt 1 -or $idx -gt $list.Count) { Write-WARN "Invalid: $idx"; continue }
@@ -252,7 +259,7 @@ function Launch-RamOptimizer {
     Write-Host "  [3] Remove       — uninstall optimizer & remove scheduled task"    -ForegroundColor Red
     Write-Host "  [0] Back"                                                          -ForegroundColor DarkGray
     Write-Host ""
-    $sub = Read-Host "  Choice"
+    $sub = (Read-Host "  Choice").Trim()
 
     # --- Shared: MemoryTrimmer C# type ---
     $trimmerCode = @'
@@ -552,7 +559,8 @@ function Show-OfficeSoftwareMenu {
         Write-Host "  [5] Repair ElasticSearch  (user + restart)"        -ForegroundColor Yellow
         Write-Host "  [0] Back"                                           -ForegroundColor DarkGray
         Write-Host ""
-        switch (Read-Host "  Choice") {
+        $sub = (Read-Host "  Choice").Trim()
+        switch ($sub) {
             '1' { Install-RabbitMQ }
             '2' { Install-ElasticSearch }
             '3' { Get-RabbitMQStatus }
@@ -626,7 +634,8 @@ function Show-SystemSetupMenu {
         Write-Host "  [3] Create Work User"       -ForegroundColor White
         Write-Host "  [0] Back"                   -ForegroundColor DarkGray
         Write-Host ""
-        switch (Read-Host "  Choice") {
+        $sub = (Read-Host "  Choice").Trim()
+        switch ($sub) {
             '1' { Get-NetworkInfo }
             '2' { Set-PCHostname }
             '3' { New-WorkUser }
@@ -750,7 +759,8 @@ function Show-TailscaleMenu {
         Write-Host "  [7] Uninstall Tailscale"                                                      -ForegroundColor Red
         Write-Host "  [0] Back"                                                                     -ForegroundColor DarkGray
         Write-Host ""
-        switch (Read-Host "  Choice") {
+        $sub = (Read-Host "  Choice").Trim()
+        switch ($sub) {
             '1' { Install-Tailscale }
             '2' { Invoke-TailscaleLogin }
             '3' { Invoke-TailscaleConnect }
@@ -792,7 +802,8 @@ while ($true) {
     }
     Write-Host ""; Write-Sep "-"
 
-    switch (Read-Host "`n  Enter choice [0-9]") {
+    $opt = (Read-Host "`n  Enter choice [0-9]").Trim()
+    switch ($opt) {
         '1' { Install-NormalSoftware }
         '2' { Install-MSOffice }
         '3' { Invoke-Activation }

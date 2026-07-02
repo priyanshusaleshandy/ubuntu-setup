@@ -297,6 +297,7 @@ menu_install() {
         done
         echo -e "\n  ${BOLD}e)${NC} Select all   ${BOLD}c)${NC} Clear all   ${BOLD}i)${NC} ${GREEN}Start Install${NC}   ${BOLD}b)${NC} Back"
         read -rp "  Toggle (number) or command: " ch
+        ch="${ch//[[:space:]]/}" # Trim all whitespace
 
         if   [[ "$ch" =~ ^[Bb]$ ]]; then return
         elif [[ "$ch" =~ ^[Ee]$ ]]; then for j in "${!SELECTIONS[@]}"; do SELECTIONS[$j]=1; done
@@ -337,6 +338,7 @@ menu_uninstall() {
         done
         echo -e "\n  ${BOLD}e)${NC} Select all   ${BOLD}c)${NC} Clear all   ${BOLD}u)${NC} ${RED}Uninstall Selected${NC}   ${BOLD}a)${NC} ${RED}Uninstall ALL${NC}   ${BOLD}b)${NC} Back"
         read -rp "  Toggle (number) or command: " ch
+        ch="${ch//[[:space:]]/}" # Trim all whitespace
 
         if   [[ "$ch" =~ ^[Bb]$ ]]; then return
         elif [[ "$ch" =~ ^[Ee]$ ]]; then for j in "${!SELECTIONS[@]}"; do SELECTIONS[$j]=1; done
