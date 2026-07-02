@@ -392,7 +392,28 @@ menu_tailscale() {
         read -rp "  Choice: " ch
         case "$ch" in
             1) install_tailscale; press_enter ;;
-            2) sudo tailscale login --login-server "$server"; press_enter ;;
+            2)
+                clear
+                echo -e "${CYAN}${BOLD}=== [5.2] TAILSCALE LOGIN / REGISTER ===${NC}\n"
+                echo -e "  [1] Web Browser Login (Sends Auth URL to Admin)"
+                echo -e "  [2] Auth Key Login    (Use pre-authorized key from Admin)"
+                echo -e "  [0] Back\n"
+                read -rp "  Select Login Method: " subChoice
+                if [[ "$subChoice" -eq 1 ]]; then
+                    log_info "Opening browser login..."
+                    log_warn "If browser doesn't open, COPY the URL printed below and send it to your Admin:"
+                    sudo tailscale login --login-server "$server"
+                elif [[ "$subChoice" -eq 2 ]]; then
+                    read -rp "  Enter Tailscale Auth Key (tskey-auth-...): " authKey
+                    if [[ -z "$authKey" ]]; then
+                        log_warn "Cancelled."
+                    else
+                        log_info "Registering node using Auth Key..."
+                        sudo tailscale up --authkey="$authKey" --login-server="$server" --accept-routes --accept-dns
+                        log_ok "Node successfully registered with Auth Key!"
+                    fi
+                fi
+                press_enter ;;
             3) sudo tailscale up --accept-routes --login-server="$server"; press_enter ;;
             4) sudo tailscale up --login-server="$server" --reset --accept-dns --accept-routes; press_enter ;;
             5) sudo tailscale up --login-server="$server" --accept-dns --accept-routes --exit-node=100.64.0.7; press_enter ;;

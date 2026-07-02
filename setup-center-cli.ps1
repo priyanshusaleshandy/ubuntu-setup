@@ -652,12 +652,29 @@ function Install-Tailscale {
 }
 
 function Invoke-TailscaleLogin {
-    Show-Header; Write-Host "  [9.2] TAILSCALE LOGIN" -ForegroundColor Cyan; Write-Host ""
-    Write-INFO "Opening browser to authenticate with bifrost.saleshandy.com..."
-    try {
-        tailscale login --login-server https://bifrost.saleshandy.com
-        Write-OK "Login command sent. Complete authentication in the browser."
-    } catch { Write-ERR "Login failed: $($_.Exception.Message)" }
+    Show-Header; Write-Host "  [9.2] TAILSCALE LOGIN / REGISTER" -ForegroundColor Cyan; Write-Host ""
+    Write-Host "  [1] Web Browser Login (Sends Auth URL to Admin)" -ForegroundColor White
+    Write-Host "  [2] Auth Key Login    (Use pre-authorized key from Admin)" -ForegroundColor Green
+    Write-Host "  [0] Back" -ForegroundColor DarkGray
+    Write-Host ""
+    $subChoice = Read-Host "  Select Login Method"
+    
+    if ($subChoice -eq '1') {
+        Write-INFO "Opening browser login..."
+        Write-WARN "If browser does not open, COPY the URL printed below and send it to your Admin:"
+        try {
+            tailscale login --login-server https://bifrost.saleshandy.com
+        } catch { Write-ERR "Login failed: $($_.Exception.Message)" }
+    }
+    elseif ($subChoice -eq '2') {
+        $authKey = Read-Host "  Enter Tailscale Auth Key (tskey-auth-...)"
+        if ([string]::IsNullOrWhiteSpace($authKey)) { Write-WARN "Cancelled."; Pause-Menu; return }
+        Write-INFO "Registering node using Auth Key..."
+        try {
+            tailscale up --authkey=$authKey --login-server=https://bifrost.saleshandy.com --accept-routes --accept-dns
+            Write-OK "Node successfully registered with Auth Key!"
+        } catch { Write-ERR "Registration failed: $($_.Exception.Message)" }
+    }
     Pause-Menu
 }
 
