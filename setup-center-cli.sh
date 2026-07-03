@@ -63,7 +63,7 @@ OPTIONS=(
     "ClamAV Antivirus"
     "Time Doctor"
 )
-SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1 1)   # all selected by default
+SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
