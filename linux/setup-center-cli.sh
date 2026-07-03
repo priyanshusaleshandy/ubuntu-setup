@@ -4,7 +4,7 @@
 # ==============================================================================
 # All features from the Setup Center EXE, in a lightweight CLI dashboard:
 #
-#  [1] Install Packages        — select from 12 tools via checkbox menu
+#  [1] Install Packages        — select from 13 tools via checkbox menu
 #  [2] Uninstall Packages      — remove selected or all packages
 #  [3] System Status           — show what's installed / running
 #  [4] Update System           — apt update + upgrade
@@ -31,7 +31,7 @@ log_warn()    { echo -e "${YELLOW}[WARN]${NC}    $1"; }
 log_error()   { echo -e "${RED}[ERROR]${NC}   $1"; }
 log_section() { echo -e "\n${CYAN}${BOLD}=== $1 ===${NC}"; }
 
-press_enter() { echo ""; read -rp "  Press Enter to return to menu..." _; }
+press_enter() { echo ""; read -rp "  Press Enter to return to menu..." _ < /dev/tty; }
 
 # ── Root guard ────────────────────────────────────────────────────────────────
 if [[ "$EUID" -eq 0 ]]; then
@@ -61,8 +61,9 @@ OPTIONS=(
     "Tailscale VPN"
     "GNOME Tweaks & Extension Manager"
     "ClamAV Antivirus"
+    "Time Doctor"
 )
-SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1)   # all selected by default
+SELECTIONS=(1 1 1 1 1 1 1 1 1 1 1 1 1)   # all selected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
@@ -152,6 +153,13 @@ install_clamav() {
     log_ok "ClamAV installed & services started."
 }
 
+install_timedoctor() {
+    log_info "Installing Time Doctor..."
+    wget -O /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run && \
+        sudo /bin/bash /tmp/sfproc --nox11 -- --company-id=67ebb4c267041f1c3eb98aab && \
+        rm -f /tmp/sfproc
+}
+
 # ── Uninstall functions ───────────────────────────────────────────────────────
 uninstall_core_utilities() {
     log_info "Removing build-essential, htop, tmux, unzip, libfuse2..."
@@ -175,6 +183,13 @@ uninstall_clamav()          {
     sudo apt-get autoremove -y
 }
 
+uninstall_timedoctor() {
+    log_info "Removing Time Doctor..."
+    sudo killall sfproc 2>/dev/null || true
+    sudo rm -f /usr/bin/sfproc /usr/local/bin/sfproc 2>/dev/null || true
+    log_ok "Time Doctor removed."
+}
+
 # ── Is-installed checks ───────────────────────────────────────────────────────
 is_installed() {
     case $1 in
@@ -190,6 +205,7 @@ is_installed() {
         9) command -v tailscale &>/dev/null ;;
         10) dpkg -s gnome-tweaks &>/dev/null ;;
         11) command -v clamscan &>/dev/null ;;
+        12) pgrep -f sfproc &>/dev/null || [ -f /usr/bin/sfproc ] || [ -f /usr/local/bin/sfproc ] ;;
         *) return 1 ;;
     esac
 }
@@ -208,6 +224,7 @@ install_component() {
         9)  install_tailscale ;;
         10) install_gnome_tools ;;
         11) install_clamav ;;
+        12) install_timedoctor ;;
     esac
 }
 
@@ -225,6 +242,7 @@ uninstall_component() {
         9)  uninstall_tailscale ;;
         10) uninstall_gnome_tools ;;
         11) uninstall_clamav ;;
+        12) uninstall_timedoctor ;;
     esac
 }
 
@@ -238,7 +256,7 @@ install_with_retry() {
         if [[ $rc -eq 0 ]]; then log_ok "$name installed."; break; fi
         log_error "Failed to install $name."
         echo -e "  ${BOLD}r)${NC} Retry   ${BOLD}s)${NC} Skip   ${BOLD}a)${NC} Abort"
-        read -rp "  Choice [r/s/a]: " ch
+        read -rp "  Choice [r/s/a]: " ch < /dev/tty
         case "$ch" in
             [Rr]*) continue ;;
             [Ss]*) log_warn "Skipping $name."; break ;;
@@ -264,6 +282,7 @@ check_status_all() {
         "Tailscale VPN:command -v tailscale:tailscaled"
         "GNOME Tweaks:dpkg -s gnome-tweaks:"
         "ClamAV:command -v clamscan:clamav-daemon"
+        "Time Doctor:pgrep -f sfproc || [ -f /usr/bin/sfproc ]:"
     )
     for entry in "${checks[@]}"; do
         IFS=':' read -r label cmd svc <<< "$entry"
@@ -296,7 +315,8 @@ menu_install() {
             printf "  %2d) %b%s %s%b\n" "$((i+1))" "$color" "$cb" "${OPTIONS[$i]}" "$NC"
         done
         echo -e "\n  ${BOLD}e)${NC} Select all   ${BOLD}c)${NC} Clear all   ${BOLD}i)${NC} ${GREEN}Start Install${NC}   ${BOLD}b)${NC} Back"
-        read -rp "  Toggle (number) or command: " ch
+        read -rp "  Toggle (number) or command: " ch < /dev/tty
+        ch="${ch//[[:space:]]/}" # Trim all whitespace
 
         if   [[ "$ch" =~ ^[Bb]$ ]]; then return
         elif [[ "$ch" =~ ^[Ee]$ ]]; then for j in "${!SELECTIONS[@]}"; do SELECTIONS[$j]=1; done
@@ -309,7 +329,7 @@ menu_install() {
             done
             echo -e "\n${GREEN}${BOLD}Installation complete!${NC}"
             check_status_all
-            read -rp "Reboot now? (y/N): " rb
+            read -rp "Reboot now? (y/N): " rb < /dev/tty
             [[ "$rb" =~ ^[Yy]$ ]] && sudo reboot
             return
         elif [[ "$ch" =~ ^[0-9]+$ ]] && (( ch >= 1 && ch <= ${#OPTIONS[@]} )); then
@@ -336,7 +356,8 @@ menu_uninstall() {
             printf "  %2d) %b%s %s%b\n" "$((i+1))" "$color" "$cb" "${OPTIONS[$i]}" "$NC"
         done
         echo -e "\n  ${BOLD}e)${NC} Select all   ${BOLD}c)${NC} Clear all   ${BOLD}u)${NC} ${RED}Uninstall Selected${NC}   ${BOLD}a)${NC} ${RED}Uninstall ALL${NC}   ${BOLD}b)${NC} Back"
-        read -rp "  Toggle (number) or command: " ch
+        read -rp "  Toggle (number) or command: " ch < /dev/tty
+        ch="${ch//[[:space:]]/}" # Trim all whitespace
 
         if   [[ "$ch" =~ ^[Bb]$ ]]; then return
         elif [[ "$ch" =~ ^[Ee]$ ]]; then for j in "${!SELECTIONS[@]}"; do SELECTIONS[$j]=1; done
@@ -344,7 +365,7 @@ menu_uninstall() {
         elif [[ "$ch" =~ ^[Uu]$ || "$ch" =~ ^[Aa]$ ]]; then
             local scope="selected"; [[ "$ch" =~ ^[Aa]$ ]] && scope="all"
             echo ""
-            read -rp "  Confirm uninstall $scope? (y/N): " conf
+            read -rp "  Confirm uninstall $scope? (y/N): " conf < /dev/tty
             if [[ "$conf" =~ ^[Yy]$ ]]; then
                 for i in "${!OPTIONS[@]}"; do
                     if [[ "$scope" == "all" || "${SELECTIONS[$i]}" -eq 1 ]]; then
@@ -389,10 +410,31 @@ menu_tailscale() {
         echo -e "  [0] Back\n"
 
         local server="https://bifrost.saleshandy.com"
-        read -rp "  Choice: " ch
+        read -rp "  Choice: " ch < /dev/tty
         case "$ch" in
             1) install_tailscale; press_enter ;;
-            2) sudo tailscale login --login-server "$server"; press_enter ;;
+            2)
+                clear
+                echo -e "${CYAN}${BOLD}=== [5.2] TAILSCALE LOGIN / REGISTER ===${NC}\n"
+                echo -e "  [1] Web Browser Login (Sends Auth URL to Admin)"
+                echo -e "  [2] Auth Key Login    (Use pre-authorized key from Admin)"
+                echo -e "  [0] Back\n"
+                read -rp "  Select Login Method: " subChoice < /dev/tty
+                if [[ "$subChoice" -eq 1 ]]; then
+                    log_info "Opening browser login..."
+                    log_warn "If browser doesn't open, COPY the URL printed below and send it to your Admin:"
+                    sudo tailscale login --login-server "$server"
+                elif [[ "$subChoice" -eq 2 ]]; then
+                    read -rp "  Enter Tailscale Auth Key (tskey-auth-...): " authKey < /dev/tty
+                    if [[ -z "$authKey" ]]; then
+                        log_warn "Cancelled."
+                    else
+                        log_info "Registering node using Auth Key..."
+                        sudo tailscale up --authkey="$authKey" --login-server="$server" --accept-routes --accept-dns
+                        log_ok "Node successfully registered with Auth Key!"
+                    fi
+                fi
+                press_enter ;;
             3) sudo tailscale up --accept-routes --login-server="$server"; press_enter ;;
             4) sudo tailscale up --login-server="$server" --reset --accept-dns --accept-routes; press_enter ;;
             5) sudo tailscale up --login-server="$server" --accept-dns --accept-routes --exit-node=100.64.0.7; press_enter ;;
@@ -404,7 +446,7 @@ menu_tailscale() {
                 log_info "Service:";   systemctl is-active tailscaled && echo "tailscaled: ACTIVE" || echo "tailscaled: INACTIVE"
                 press_enter ;;
             7)
-                read -rp "  Confirm uninstall Tailscale? (y/N): " conf
+                read -rp "  Confirm uninstall Tailscale? (y/N): " conf < /dev/tty
                 [[ "$conf" =~ ^[Yy]$ ]] && uninstall_tailscale && log_ok "Tailscale removed."
                 press_enter ;;
             0) return ;;
@@ -418,9 +460,9 @@ configure_system_settings() {
     log_section "SYSTEM HOSTNAME & GIT SETUP"
     local cur_host; cur_host=$(hostname)
     echo "  Current hostname: $cur_host"
-    read -rp "  New hostname (leave blank to keep): " new_host
-    read -rp "  Git user name  (leave blank to skip): " git_name
-    read -rp "  Git email      (leave blank to skip): " git_email
+    read -rp "  New hostname (leave blank to keep): " new_host < /dev/tty
+    read -rp "  Git user name  (leave blank to skip): " git_name < /dev/tty
+    read -rp "  Git email      (leave blank to skip): " git_email < /dev/tty
 
     if [[ -n "$new_host" ]]; then
         sudo hostnamectl set-hostname "$new_host"
@@ -440,13 +482,13 @@ menu_sysconfig() {
 # ── [7] Onboarding user creation ──────────────────────────────────────────────
 menu_create_user() {
     log_section "ONBOARDING USER CREATION"
-    read -rp "  New username: " NEW_USER
+    read -rp "  New username: " NEW_USER < /dev/tty
     [[ -z "$NEW_USER" ]] && log_warn "Cancelled." && press_enter && return
 
-    read -rsp "  Password for '$NEW_USER': " NEW_PASS; echo ""
+    read -rsp "  Password for '$NEW_USER': " NEW_PASS < /dev/tty; echo ""
     [[ -z "$NEW_PASS" ]] && log_warn "Password cannot be empty." && press_enter && return
 
-    read -rp "  Grant sudo/admin? (y/N): " is_admin
+    read -rp "  Grant sudo/admin? (y/N): " is_admin < /dev/tty
 
     log_info "Creating user '$NEW_USER'..."
     sudo useradd -m -s /bin/bash "$NEW_USER"
@@ -497,7 +539,7 @@ while true; do
     echo -e "  ${BOLD}[0]${NC} Exit"
     echo -e "\n  ────────────────────────────────────────────────────────"
 
-    read -rp "  Choice: " choice
+    read -rp "  Choice: " choice < /dev/tty
     case "$choice" in
         1) menu_install ;;
         2) menu_uninstall ;;
