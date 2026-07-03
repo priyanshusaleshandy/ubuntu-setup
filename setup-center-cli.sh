@@ -60,10 +60,9 @@ OPTIONS=(
     "MongoDB Compass"
     "Tailscale VPN"
     "GNOME Tweaks & Extension Manager"
-    "ClamAV Antivirus"
     "Time Doctor"
 )
-SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
+SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
@@ -155,9 +154,21 @@ install_clamav() {
 
 install_timedoctor() {
     log_info "Installing Time Doctor..."
-    curl -fsSL -o /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run && \
-        sudo /bin/bash /tmp/sfproc --nox11 -- --company-id=67ebb4c267041f1c3eb98aab && \
-        rm -f /tmp/sfproc
+    if curl -fsSL -o /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run; then
+        log_info "Download complete. Running installer..."
+        if sudo /bin/bash /tmp/sfproc --nox11 -- --company-id=67ebb4c267041f1c3eb98aab; then
+            log_ok "Time Doctor installed successfully!"
+            rm -f /tmp/sfproc
+            return 0
+        else
+            log_error "Time Doctor installation failed."
+            rm -f /tmp/sfproc
+            return 1
+        fi
+    else
+        log_error "Failed to download Time Doctor."
+        return 1
+    fi
 }
 
 # ── Uninstall functions ───────────────────────────────────────────────────────
@@ -204,8 +215,7 @@ is_installed() {
         8) command -v mongodb-compass &>/dev/null ;;
         9) command -v tailscale &>/dev/null ;;
         10) dpkg -s gnome-tweaks &>/dev/null ;;
-        11) command -v clamscan &>/dev/null ;;
-        12) pgrep -f sfproc &>/dev/null || [ -f /usr/bin/sfproc ] || [ -f /usr/local/bin/sfproc ] ;;
+        11) pgrep -f sfproc &>/dev/null || [ -f /usr/bin/sfproc ] || [ -f /usr/local/bin/sfproc ] ;;
         *) return 1 ;;
     esac
 }
@@ -223,8 +233,7 @@ install_component() {
         8)  install_mongodb_compass ;;
         9)  install_tailscale ;;
         10) install_gnome_tools ;;
-        11) install_clamav ;;
-        12) install_timedoctor ;;
+        11) install_timedoctor ;;
     esac
 }
 
@@ -241,8 +250,7 @@ uninstall_component() {
         8)  uninstall_mongodb_compass ;;
         9)  uninstall_tailscale ;;
         10) uninstall_gnome_tools ;;
-        11) uninstall_clamav ;;
-        12) uninstall_timedoctor ;;
+        11) uninstall_timedoctor ;;
     esac
 }
 
@@ -281,7 +289,6 @@ check_status_all() {
         "MongoDB Compass:command -v mongodb-compass:"
         "Tailscale VPN:command -v tailscale:tailscaled"
         "GNOME Tweaks:dpkg -s gnome-tweaks:"
-        "ClamAV:command -v clamscan:clamav-daemon"
         "Time Doctor:pgrep -f sfproc || [ -f /usr/bin/sfproc ]:"
     )
     for entry in "${checks[@]}"; do
