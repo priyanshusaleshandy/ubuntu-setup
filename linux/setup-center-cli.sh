@@ -155,7 +155,7 @@ install_clamav() {
 
 install_timedoctor() {
     log_info "Installing Time Doctor..."
-    wget -O /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run && \
+    curl -fsSL -o /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run && \
         sudo /bin/bash /tmp/sfproc --nox11 -- --company-id=67ebb4c267041f1c3eb98aab && \
         rm -f /tmp/sfproc
 }
@@ -322,8 +322,6 @@ menu_install() {
         elif [[ "$ch" =~ ^[Ee]$ ]]; then for j in "${!SELECTIONS[@]}"; do SELECTIONS[$j]=1; done
         elif [[ "$ch" =~ ^[Cc]$ ]]; then for j in "${!SELECTIONS[@]}"; do SELECTIONS[$j]=0; done
         elif [[ "$ch" =~ ^[Ii]$ ]]; then
-            # configure hostname/git first
-            configure_system_settings
             for i in "${!OPTIONS[@]}"; do
                 [[ "${SELECTIONS[$i]}" -eq 1 ]] && install_with_retry "$i"
             done
@@ -536,6 +534,7 @@ while true; do
     echo -e "  ${BOLD}[5]${NC} Tailscale VPN         — install / connect / diagnose / remove"
     echo -e "  ${BOLD}[6]${NC} System Config         — hostname & git setup"
     echo -e "  ${BOLD}[7]${NC} Create Onboarding User"
+    echo -e "  ${BOLD}[8]${NC} Install Time Doctor   — direct setup"
     echo -e "  ${BOLD}[0]${NC} Exit"
     echo -e "\n  ────────────────────────────────────────────────────────"
 
@@ -548,7 +547,8 @@ while true; do
         5) menu_tailscale ;;
         6) menu_sysconfig ;;
         7) menu_create_user ;;
+        8) install_timedoctor; press_enter ;;
         0) echo -e "\n  ${CYAN}Goodbye!${NC}\n"; exit 0 ;;
-        *) log_warn "Invalid choice — enter 0-7."; sleep 1 ;;
+        * ) log_warn "Invalid choice — enter 0-8."; sleep 1 ;;
     esac
 done
