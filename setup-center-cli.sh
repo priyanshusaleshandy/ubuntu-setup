@@ -560,18 +560,21 @@ menu_wayland() {
         case "$ch" in
             1)
                 if [ -f "$conf_file" ]; then
-                    sudo sed -i 's/^[[:space:]]*#[[:space:]]*WaylandEnable[[:space:]]*=[[:space:]]*false/WaylandEnable=false/' "$conf_file"
-                    if ! grep -q "^WaylandEnable=false" "$conf_file"; then
+                    if grep -q "WaylandEnable" "$conf_file"; then
+                        sudo sed -i 's/.*WaylandEnable.*/WaylandEnable=false/' "$conf_file"
+                    else
                         sudo sed -i '/\[daemon\]/a WaylandEnable=false' "$conf_file"
                     fi
-                    log_ok "Wayland forced to Xorg/X11. Restart GDM to apply."
+                    log_ok "Wayland disabled (forced Xorg/X11). Restart GDM to apply."
                 else
                     log_error "GDM configuration file not found!"
                 fi
                 press_enter ;;
             2)
                 if [ -f "$conf_file" ]; then
-                    sudo sed -i 's/^[[:space:]]*WaylandEnable[[:space:]]*=[[:space:]]*false/#WaylandEnable=false/' "$conf_file"
+                    if grep -q "WaylandEnable" "$conf_file"; then
+                        sudo sed -i 's/.*WaylandEnable.*/#WaylandEnable=false/' "$conf_file"
+                    fi
                     log_ok "Wayland enabled (restored default). Restart GDM to apply."
                 else
                     log_error "GDM configuration file not found!"
@@ -582,15 +585,10 @@ menu_wayland() {
                 read -rp "  This will instantly close your desktop and log you out. Continue? (y/N): " conf < /dev/tty
                 if [[ "$conf" =~ ^[Yy]$ ]]; then
                     log_info "Restarting display manager..."
-                    if systemctl is-active --quiet gdm3 2>/dev/null; then
-                        sudo systemctl restart gdm3
-                    elif systemctl is-active --quiet gdm 2>/dev/null; then
-                        sudo systemctl restart gdm
-                    elif systemctl is-active --quiet lightdm 2>/dev/null; then
-                        sudo systemctl restart lightdm
-                    else
-                        log_error "No active display manager (gdm3, gdm, lightdm) found."
-                    fi
+                    sudo systemctl restart gdm3 2>/dev/null || \
+                    sudo systemctl restart gdm 2>/dev/null || \
+                    sudo systemctl restart lightdm 2>/dev/null || \
+                    log_error "Failed to restart display manager. Please reboot manually."
                 else
                     log_info "Cancelled."
                 fi
