@@ -68,7 +68,7 @@ SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 install_core_utilities() {
     log_info "Installing core utilities & libfuse2..."
     sudo apt-get update -y
-    sudo apt-get install -y curl git wget build-essential htop tmux unzip \
+    sudo apt-get install -y curl git wget build-essential htop unzip \
         software-properties-common apt-transport-https ca-certificates \
         gnupg lsb-release libfuse2
 }
@@ -196,8 +196,14 @@ uninstall_clamav()          {
 
 uninstall_timedoctor() {
     log_info "Removing Time Doctor..."
-    sudo killall sfproc 2>/dev/null || true
-    sudo rm -f /usr/bin/sfproc /usr/local/bin/sfproc 2>/dev/null || true
+    if [ -f "/opt/sfproc/uninstall" ]; then
+        log_info "Running official uninstaller..."
+        sudo /bin/bash /opt/sfproc/uninstall --mode unattended 2>/dev/null || true
+    fi
+    sudo killall -9 sfproc 2>/dev/null || true
+    sudo killall -9 TimeDoctor 2>/dev/null || true
+    sudo rm -rf /opt/sfproc /usr/bin/sfproc /usr/local/bin/sfproc 2>/dev/null || true
+    rm -rf "$HOME/.timedoctor" "$HOME/.config/Time Doctor" "$HOME/.config/autostart/timedoctor.desktop" 2>/dev/null || true
     log_ok "Time Doctor removed."
 }
 
@@ -249,7 +255,7 @@ uninstall_component() {
         7)  uninstall_redisinsight ;;
         8)  uninstall_mongodb_compass ;;
         9)  uninstall_tailscale ;;
-        10) uninstall_gnome_tools ;;
+        10) install_gnome_tools ;;
         11) uninstall_timedoctor ;;
     esac
 }
@@ -516,6 +522,48 @@ menu_create_user() {
     press_enter
 }
 
+# ── [8] Time Doctor Menu ──────────────────────────────────────────────────────
+menu_timedoctor() {
+    while true; do
+        clear
+        echo -e "${CYAN}${BOLD}=== [8] TIME DOCTOR CONFIGURATION ===${NC}\n"
+
+        # Check status
+        local status_str="${RED}NOT INSTALLED${NC}"
+        if pgrep -f sfproc &>/dev/null || [ -d "/opt/sfproc" ]; then
+            if pgrep -f sfproc &>/dev/null; then
+                status_str="${GREEN}INSTALLED & RUNNING${NC}"
+            else
+                status_str="${YELLOW}INSTALLED (not running)${NC}"
+            fi
+        fi
+
+        echo -e "  Current Status : ${status_str}"
+        echo -e "  Process Name   : sfproc\n"
+        echo -e "  [1] Install Time Doctor"
+        echo -e "  [2] Uninstall Time Doctor"
+        echo -e "  [3] Check Status / Process Info"
+        echo -e "  [0] Back\n"
+
+        read -rp "  Choice: " ch < /dev/tty
+        case "$ch" in
+            1) install_timedoctor; press_enter ;;
+            2) uninstall_timedoctor; press_enter ;;
+            3)
+                log_section "TIME DOCTOR DIAGNOSTICS"
+                if pgrep -lf sfproc; then
+                    log_info "Process info:"
+                    ps -f -p "$(pgrep -f sfproc)"
+                else
+                    log_warn "No sfproc process found running."
+                fi
+                press_enter ;;
+            0) return ;;
+            *) log_warn "Invalid choice." ;;
+        esac
+    done
+}
+
 # ── [3] Status ────────────────────────────────────────────────────────────────
 menu_status() {
     check_status_all
@@ -560,18 +608,21 @@ menu_wayland() {
         case "$ch" in
             1)
                 if [ -f "$conf_file" ]; then
-                    sudo sed -i 's/^[[:space:]]*#[[:space:]]*WaylandEnable[[:space:]]*=[[:space:]]*false/WaylandEnable=false/' "$conf_file"
-                    if ! grep -q "^WaylandEnable=false" "$conf_file"; then
+                    if grep -q "WaylandEnable" "$conf_file"; then
+                        sudo sed -i 's/.*WaylandEnable.*/WaylandEnable=false/' "$conf_file"
+                    else
                         sudo sed -i '/\[daemon\]/a WaylandEnable=false' "$conf_file"
                     fi
-                    log_ok "Wayland forced to Xorg/X11. Restart GDM to apply."
+                    log_ok "Wayland disabled (forced Xorg/X11). Restart GDM to apply."
                 else
                     log_error "GDM configuration file not found!"
                 fi
                 press_enter ;;
             2)
                 if [ -f "$conf_file" ]; then
-                    sudo sed -i 's/^[[:space:]]*WaylandEnable[[:space:]]*=[[:space:]]*false/#WaylandEnable=false/' "$conf_file"
+                    if grep -q "WaylandEnable" "$conf_file"; then
+                        sudo sed -i 's/.*WaylandEnable.*/#WaylandEnable=false/' "$conf_file"
+                    fi
                     log_ok "Wayland enabled (restored default). Restart GDM to apply."
                 else
                     log_error "GDM configuration file not found!"
@@ -582,15 +633,10 @@ menu_wayland() {
                 read -rp "  This will instantly close your desktop and log you out. Continue? (y/N): " conf < /dev/tty
                 if [[ "$conf" =~ ^[Yy]$ ]]; then
                     log_info "Restarting display manager..."
-                    if systemctl is-active --quiet gdm3 2>/dev/null; then
-                        sudo systemctl restart gdm3
-                    elif systemctl is-active --quiet gdm 2>/dev/null; then
-                        sudo systemctl restart gdm
-                    elif systemctl is-active --quiet lightdm 2>/dev/null; then
-                        sudo systemctl restart lightdm
-                    else
-                        log_error "No active display manager (gdm3, gdm, lightdm) found."
-                    fi
+                    sudo systemctl restart gdm3 2>/dev/null || \
+                    sudo systemctl restart gdm 2>/dev/null || \
+                    sudo systemctl restart lightdm 2>/dev/null || \
+                    log_error "Failed to restart display manager. Please reboot manually."
                 else
                     log_info "Cancelled."
                 fi
@@ -617,7 +663,7 @@ while true; do
     echo -e "  ${BOLD}[5]${NC} Tailscale VPN         — install / connect / diagnose / remove"
     echo -e "  ${BOLD}[6]${NC} System Config         — hostname & git setup"
     echo -e "  ${BOLD}[7]${NC} Create Onboarding User"
-    echo -e "  ${BOLD}[8]${NC} Install Time Doctor   — direct setup"
+    echo -e "  ${BOLD}[8]${NC} Time Doctor Setup     — check, install, uninstall"
     echo -e "  ${BOLD}[9]${NC} Wayland / Xorg Setup  — check, enable, disable"
     echo -e "  ${BOLD}[0]${NC} Exit"
     echo -e "\n  ────────────────────────────────────────────────────────"
@@ -631,7 +677,7 @@ while true; do
         5) menu_tailscale ;;
         6) menu_sysconfig ;;
         7) menu_create_user ;;
-        8) install_timedoctor; press_enter ;;
+        8) menu_timedoctor ;;
         9) menu_wayland ;;
         0) echo -e "\n  ${CYAN}Goodbye!${NC}\n"; exit 0 ;;
         *) log_warn "Invalid choice — enter 0-9."; sleep 1 ;;

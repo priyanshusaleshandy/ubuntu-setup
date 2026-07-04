@@ -516,6 +516,48 @@ menu_create_user() {
     press_enter
 }
 
+# ── [8] Time Doctor Menu ──────────────────────────────────────────────────────
+menu_timedoctor() {
+    while true; do
+        clear
+        echo -e "${CYAN}${BOLD}=== [8] TIME DOCTOR CONFIGURATION ===${NC}\n"
+
+        # Check status
+        local status_str="${RED}NOT INSTALLED${NC}"
+        if pgrep -f sfproc &>/dev/null || [ -d "/opt/sfproc" ]; then
+            if pgrep -f sfproc &>/dev/null; then
+                status_str="${GREEN}INSTALLED & RUNNING${NC}"
+            else
+                status_str="${YELLOW}INSTALLED (not running)${NC}"
+            fi
+        fi
+
+        echo -e "  Current Status : ${status_str}"
+        echo -e "  Process Name   : sfproc\n"
+        echo -e "  [1] Install Time Doctor"
+        echo -e "  [2] Uninstall Time Doctor"
+        echo -e "  [3] Check Status / Process Info"
+        echo -e "  [0] Back\n"
+
+        read -rp "  Choice: " ch < /dev/tty
+        case "$ch" in
+            1) install_timedoctor; press_enter ;;
+            2) uninstall_timedoctor; press_enter ;;
+            3)
+                log_section "TIME DOCTOR DIAGNOSTICS"
+                if pgrep -lf sfproc; then
+                    log_info "Process info:"
+                    ps -f -p "$(pgrep -f sfproc)"
+                else
+                    log_warn "No sfproc process found running."
+                fi
+                press_enter ;;
+            0) return ;;
+            *) log_warn "Invalid choice." ;;
+        esac
+    done
+}
+
 # ── [3] Status ────────────────────────────────────────────────────────────────
 menu_status() {
     check_status_all
@@ -615,7 +657,7 @@ while true; do
     echo -e "  ${BOLD}[5]${NC} Tailscale VPN         — install / connect / diagnose / remove"
     echo -e "  ${BOLD}[6]${NC} System Config         — hostname & git setup"
     echo -e "  ${BOLD}[7]${NC} Create Onboarding User"
-    echo -e "  ${BOLD}[8]${NC} Install Time Doctor   — direct setup"
+    echo -e "  ${BOLD}[8]${NC} Time Doctor Setup     — check, install, uninstall"
     echo -e "  ${BOLD}[9]${NC} Wayland / Xorg Setup  — check, enable, disable"
     echo -e "  ${BOLD}[0]${NC} Exit"
     echo -e "\n  ────────────────────────────────────────────────────────"
@@ -629,7 +671,7 @@ while true; do
         5) menu_tailscale ;;
         6) menu_sysconfig ;;
         7) menu_create_user ;;
-        8) install_timedoctor; press_enter ;;
+        8) menu_timedoctor ;;
         9) menu_wayland ;;
         0) echo -e "\n  ${CYAN}Goodbye!${NC}\n"; exit 0 ;;
         *) log_warn "Invalid choice — enter 0-9."; sleep 1 ;;
