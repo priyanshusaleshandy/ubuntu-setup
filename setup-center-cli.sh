@@ -61,8 +61,9 @@ OPTIONS=(
     "Tailscale VPN"
     "GNOME Tweaks & Extension Manager"
     "Time Doctor"
+    "GNOME Screen Blank Timeout (14 minutes)"
 )
-SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
+SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
@@ -171,6 +172,14 @@ install_timedoctor() {
     fi
 }
 
+set_screen_time_14m() {
+    log_info "Setting GNOME Screen Blanking timeout to 14 minutes..."
+    gsettings set org.gnome.desktop.session idle-delay 840 2>/dev/null || true
+    gsettings set org.gnome.desktop.screensaver lock-delay 0 2>/dev/null || true
+    gsettings set org.gnome.desktop.screensaver lock-enabled true 2>/dev/null || true
+    log_ok "Screen timeout set to 14 minutes."
+}
+
 # ── Uninstall functions ───────────────────────────────────────────────────────
 uninstall_core_utilities() {
     log_info "Removing build-essential, htop, tmux, unzip, libfuse2..."
@@ -196,9 +205,22 @@ uninstall_clamav()          {
 
 uninstall_timedoctor() {
     log_info "Removing Time Doctor..."
-    sudo killall sfproc 2>/dev/null || true
-    sudo rm -f /usr/bin/sfproc /usr/local/bin/sfproc 2>/dev/null || true
+    if [ -f "/opt/sfproc/uninstall" ]; then
+        log_info "Running official uninstaller..."
+        sudo /bin/bash /opt/sfproc/uninstall --mode unattended 2>/dev/null || true
+    fi
+    sudo killall -9 sfproc 2>/dev/null || true
+    sudo killall -9 TimeDoctor 2>/dev/null || true
+    sudo rm -rf /opt/sfproc /usr/bin/sfproc /usr/local/bin/sfproc 2>/dev/null || true
+    rm -rf "$HOME/.timedoctor" "$HOME/.config/Time Doctor" "$HOME/.config/autostart/timedoctor.desktop" 2>/dev/null || true
     log_ok "Time Doctor removed."
+}
+
+reset_screen_time() {
+    log_info "Resetting GNOME Screen Blanking timeout to default (5 minutes)..."
+    gsettings set org.gnome.desktop.session idle-delay 300 2>/dev/null || true
+    gsettings set org.gnome.desktop.screensaver lock-delay 0 2>/dev/null || true
+    log_ok "Screen timeout reset."
 }
 
 # ── Is-installed checks ───────────────────────────────────────────────────────
@@ -216,6 +238,7 @@ is_installed() {
         9) command -v tailscale &>/dev/null ;;
         10) dpkg -s gnome-tweaks &>/dev/null ;;
         11) pgrep -f sfproc &>/dev/null || [ -f /usr/bin/sfproc ] || [ -f /usr/local/bin/sfproc ] ;;
+        12) [[ "$(gsettings get org.gnome.desktop.session idle-delay 2>/dev/null)" == *"840"* ]] ;;
         *) return 1 ;;
     esac
 }
@@ -234,6 +257,7 @@ install_component() {
         9)  install_tailscale ;;
         10) install_gnome_tools ;;
         11) install_timedoctor ;;
+        12) set_screen_time_14m ;;
     esac
 }
 
@@ -251,6 +275,7 @@ uninstall_component() {
         9)  uninstall_tailscale ;;
         10) uninstall_gnome_tools ;;
         11) uninstall_timedoctor ;;
+        12) reset_screen_time ;;
     esac
 }
 
@@ -290,6 +315,7 @@ check_status_all() {
         "Tailscale VPN:command -v tailscale:tailscaled"
         "GNOME Tweaks:dpkg -s gnome-tweaks:"
         "Time Doctor:pgrep -f sfproc || [ -f /usr/bin/sfproc ]:"
+        "Screen Timeout (14m):gsettings get org.gnome.desktop.session idle-delay | grep -q 840:"
     )
     for entry in "${checks[@]}"; do
         IFS=':' read -r label cmd svc <<< "$entry"
