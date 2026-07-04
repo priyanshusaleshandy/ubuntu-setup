@@ -525,6 +525,82 @@ menu_status() {
     press_enter
 }
 
+# ── [9] Wayland / Xorg Setup ──────────────────────────────────────────────────
+menu_wayland() {
+    while true; do
+        clear
+        echo -e "${CYAN}${BOLD}=== [9] WAYLAND / XORG CONFIGURATION ===${NC}\n"
+
+        # Check current running session type
+        local session_type="${XDG_SESSION_TYPE:-Unknown}"
+        echo -e "  Current session type : ${GREEN}${session_type}${NC}"
+
+        # Find display manager configuration file path
+        local conf_file="/etc/gdm3/custom.conf"
+        if [ ! -f "$conf_file" ] && [ -f "/etc/gdm/custom.conf" ]; then
+            conf_file="/etc/gdm/custom.conf"
+        fi
+
+        local config_status="Enabled (Default)"
+        if [ -f "$conf_file" ]; then
+            if grep -E -q "^[[:space:]]*WaylandEnable[[:space:]]*=[[:space:]]*false" "$conf_file"; then
+                config_status="Disabled (Forced Xorg/X11)"
+            fi
+        else
+            config_status="No configuration file found"
+        fi
+        echo -e "  GDM Configuration    : ${YELLOW}${config_status}${NC}"
+        echo -e "  Config File Path     : ${conf_file}"
+        echo -e "\n  [1] Force Xorg/X11 (Disable Wayland)"
+        echo -e "  [2] Enable Wayland (Restore Default)"
+        echo -e "  [3] Restart Display Manager (Apply Changes — Logs you out!)"
+        echo -e "  [0] Back\n"
+
+        read -rp "  Choice: " ch < /dev/tty
+        case "$ch" in
+            1)
+                if [ -f "$conf_file" ]; then
+                    sudo sed -i 's/^[[:space:]]*#[[:space:]]*WaylandEnable[[:space:]]*=[[:space:]]*false/WaylandEnable=false/' "$conf_file"
+                    if ! grep -q "^WaylandEnable=false" "$conf_file"; then
+                        sudo sed -i '/\[daemon\]/a WaylandEnable=false' "$conf_file"
+                    fi
+                    log_ok "Wayland forced to Xorg/X11. Restart GDM to apply."
+                else
+                    log_error "GDM configuration file not found!"
+                fi
+                press_enter ;;
+            2)
+                if [ -f "$conf_file" ]; then
+                    sudo sed -i 's/^[[:space:]]*WaylandEnable[[:space:]]*=[[:space:]]*false/#WaylandEnable=false/' "$conf_file"
+                    log_ok "Wayland enabled (restored default). Restart GDM to apply."
+                else
+                    log_error "GDM configuration file not found!"
+                fi
+                press_enter ;;
+            3)
+                echo ""
+                read -rp "  This will instantly close your desktop and log you out. Continue? (y/N): " conf < /dev/tty
+                if [[ "$conf" =~ ^[Yy]$ ]]; then
+                    log_info "Restarting display manager..."
+                    if systemctl is-active --quiet gdm3 2>/dev/null; then
+                        sudo systemctl restart gdm3
+                    elif systemctl is-active --quiet gdm 2>/dev/null; then
+                        sudo systemctl restart gdm
+                    elif systemctl is-active --quiet lightdm 2>/dev/null; then
+                        sudo systemctl restart lightdm
+                    else
+                        log_error "No active display manager (gdm3, gdm, lightdm) found."
+                    fi
+                else
+                    log_info "Cancelled."
+                fi
+                press_enter ;;
+            0) return ;;
+            *) log_warn "Invalid choice." ;;
+        esac
+    done
+}
+
 # ── MAIN MENU ─────────────────────────────────────────────────────────────────
 while true; do
     clear
@@ -542,6 +618,7 @@ while true; do
     echo -e "  ${BOLD}[6]${NC} System Config         — hostname & git setup"
     echo -e "  ${BOLD}[7]${NC} Create Onboarding User"
     echo -e "  ${BOLD}[8]${NC} Install Time Doctor   — direct setup"
+    echo -e "  ${BOLD}[9]${NC} Wayland / Xorg Setup  — check, enable, disable"
     echo -e "  ${BOLD}[0]${NC} Exit"
     echo -e "\n  ────────────────────────────────────────────────────────"
 
@@ -555,7 +632,8 @@ while true; do
         6) menu_sysconfig ;;
         7) menu_create_user ;;
         8) install_timedoctor; press_enter ;;
+        9) menu_wayland ;;
         0) echo -e "\n  ${CYAN}Goodbye!${NC}\n"; exit 0 ;;
-        *) log_warn "Invalid choice — enter 0-8."; sleep 1 ;;
+        *) log_warn "Invalid choice — enter 0-9."; sleep 1 ;;
     esac
 done
