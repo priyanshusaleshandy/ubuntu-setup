@@ -20,6 +20,25 @@
 
 set -uo pipefail
 
+# ── Self-relaunch (fixes "won't run from USB pendrive") ─────────────────────
+# USB drives (FAT32/exFAT) don't preserve the executable bit, and Ubuntu mounts
+# removable media with `noexec` by default — so running the script directly off
+# a pendrive always fails, no matter how many times you chmod +x it.
+# Fix: copy ourselves to a safe local folder and re-launch from there via bash
+# (bash reading a file as an argument is not blocked by noexec, so this always
+# works — even the very first time, even with zero setup on a brand new PC).
+SAFE_DIR="$HOME/.local/share/setup-center"
+SAFE_SCRIPT="$SAFE_DIR/setup-center-cli.sh"
+THIS_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+if [[ "$THIS_SCRIPT" != "$SAFE_SCRIPT" ]]; then
+    mkdir -p "$SAFE_DIR" 2>/dev/null
+    if cp -f "$THIS_SCRIPT" "$SAFE_SCRIPT" 2>/dev/null; then
+        chmod +x "$SAFE_SCRIPT" 2>/dev/null
+        exec bash "$SAFE_SCRIPT" "$@"
+    fi
+    # If copy failed (e.g. read-only $HOME), just continue running from here.
+fi
+
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; MAGENTA='\033[0;35m'; CYAN='\033[0;36m'
@@ -46,6 +65,30 @@ sudo -v
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 SUDO_KEEPALIVE_PID=$!
 trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
+
+# ── Preflight: make sure base tools exist BEFORE anything else runs ──────────
+# On a truly fresh Ubuntu install, curl/wget/gnupg/snap etc. may be missing.
+# Without this, whichever menu option you pick first can silently fail with
+# "command not found". This runs once, up front, no matter what you choose.
+preflight_dependencies() {
+    log_info "Checking base tools (curl, wget, git, gnupg, snap, etc.)..."
+    local need_update=0
+    local base_pkgs=(curl wget git gnupg ca-certificates apt-transport-https \
+        software-properties-common lsb-release unzip)
+    local to_install=()
+    for pkg in "${base_pkgs[@]}"; do
+        dpkg -s "$pkg" &>/dev/null || to_install+=("$pkg")
+    done
+    if ! command -v snap &>/dev/null; then to_install+=(snapd); fi
+
+    if [[ ${#to_install[@]} -gt 0 ]]; then
+        log_warn "Missing: ${to_install[*]} — installing now..."
+        sudo apt-get update -y
+        sudo apt-get install -y "${to_install[@]}"
+    fi
+    log_ok "Base tools ready."
+}
+preflight_dependencies
 
 # ── Package list & selections ─────────────────────────────────────────────────
 OPTIONS=(
@@ -432,7 +475,7 @@ menu_tailscale() {
         clear
         echo -e "${CYAN}${BOLD}=== [5] TAILSCALE VPN ===${NC}\n"
         echo -e "  [1] Install Tailscale"
-        echo -e "  [2] Login  (open browser to bifrost.saleshandy.com)"
+        echo -e "  [2] Login  (auto-sent to Admin — no typing)"
         echo -e "  [3] Connect (accept routes)"
         echo -e "  [4] Full Reset + Connect (reset + accept DNS & routes)"
         echo -e "  [5] Connect with Exit Node (100.64.0.7)"
@@ -447,14 +490,26 @@ menu_tailscale() {
             2)
                 clear
                 echo -e "${CYAN}${BOLD}=== [5.2] TAILSCALE LOGIN / REGISTER ===${NC}\n"
-                echo -e "  [1] Web Browser Login (Sends Auth URL to Admin)"
+                echo -e "  [1] Auto-send Login Link to Admin (no typing, no QR)"
                 echo -e "  [2] Auth Key Login    (Use pre-authorized key from Admin)"
                 echo -e "  [0] Back\n"
                 read -rp "  Select Login Method: " subChoice < /dev/tty
                 if [[ "$subChoice" -eq 1 ]]; then
-                    log_info "Opening browser login..."
-                    log_warn "If browser doesn't open, COPY the URL printed below and send it to your Admin:"
-                    sudo tailscale login --login-server "$server"
+                    read -rp "  Admin Channel Name (agree once with Admin, e.g. priyanshu-setup): " NTFY_TOPIC < /dev/tty
+                    [[ -z "$NTFY_TOPIC" ]] && NTFY_TOPIC="setup-center-$(hostname)"
+                    log_info "Requesting login link..."
+                    LOGIN_OUTPUT=$(sudo tailscale up --login-server="$server" --accept-routes --accept-dns 2>&1 | tee /dev/tty)
+                    LOGIN_URL=$(echo "$LOGIN_OUTPUT" | grep -oE 'https://[^ ]+' | head -1)
+                    if [[ -n "$LOGIN_URL" ]]; then
+                        log_info "Sending link to Admin channel '$NTFY_TOPIC'..."
+                        if curl -fsSL -d "New PC ($(hostname)) Tailscale login: $LOGIN_URL" "https://ntfy.sh/$NTFY_TOPIC" &>/dev/null; then
+                            log_ok "Link sent! Admin should open: https://ntfy.sh/$NTFY_TOPIC in a browser tab (once, keep it open) to see it arrive instantly."
+                        else
+                            log_warn "Auto-send failed (no internet?). Admin can still see the URL printed above."
+                        fi
+                    else
+                        log_ok "Already logged in — no link needed."
+                    fi
                 elif [[ "$subChoice" -eq 2 ]]; then
                     read -rp "  Enter Tailscale Auth Key (tskey-auth-...): " authKey < /dev/tty
                     if [[ -z "$authKey" ]]; then
