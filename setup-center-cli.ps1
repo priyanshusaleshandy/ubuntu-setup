@@ -20,6 +20,11 @@ Set-StrictMode -Off
 $ErrorActionPreference = "Continue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+# ── Tailscale Auto-Send Config ────────────────────────────────────────────────
+# Change this ONE line if you ever want a different Admin channel.
+# No need to type it every time — the script uses this automatically.
+$NtfyAdminChannel = "priyanshu-setup"
+
 # ─── Helpers ────────────────────────────────────────────────────────────────
 function Write-Sep  { param([string]$c="=",[int]$w=70) Write-Host ($c*$w) -ForegroundColor Cyan }
 function Write-OK   { param([string]$m) Write-Host "  [OK]  $m" -ForegroundColor Green }
@@ -694,25 +699,42 @@ function Invoke-TailscaleLogin {
     $subChoice = Read-Host "  Select Login Method"
 
     if ($subChoice -eq '1') {
-        $topic = Read-Host "  Admin Channel Name (agree once with Admin, e.g. priyanshu-setup)"
-        if ([string]::IsNullOrWhiteSpace($topic)) { $topic = "setup-center-$env:COMPUTERNAME" }
-        Write-INFO "Requesting login link..."
+        $topic = $NtfyAdminChannel
+        # Auto-clean: strip any accidental "https://ntfy.sh/" or "ntfy.sh/" prefix
+        $topic = $topic -replace '^https?://ntfy\.sh/', '' -replace '^ntfy\.sh/', '' -replace '/$', ''
+        Write-INFO "Requesting login link (will auto-send to '$topic')..."
+        Write-WARN "This forces a fresh login even if already connected."
+        $logFile = [System.IO.Path]::GetTempFileName()
+        $errFile = [System.IO.Path]::GetTempFileName()
         try {
-            $loginOutput = & tailscale up --login-server=https://bifrost.saleshandy.com --accept-routes --accept-dns --force-reauth 2>&1 | Out-String
-            Write-Host $loginOutput
-            $match = [regex]::Match($loginOutput, 'https://\S+')
-            if ($match.Success) {
-                $loginUrl = $match.Value
+            $proc = Start-Process -FilePath "tailscale" -ArgumentList @(
+                "up","--login-server=https://bifrost.saleshandy.com","--accept-routes","--accept-dns","--force-reauth"
+            ) -NoNewWindow -RedirectStandardOutput $logFile -RedirectStandardError $errFile -PassThru
+
+            $loginUrl = $null
+            for ($i = 0; $i -lt 30; $i++) {
+                Start-Sleep -Seconds 1
+                $combined = (Get-Content $logFile -ErrorAction SilentlyContinue) + (Get-Content $errFile -ErrorAction SilentlyContinue) | Out-String
+                $match = [regex]::Match($combined, 'https://\S+')
+                if ($match.Success) { $loginUrl = $match.Value; break }
+                if ($proc.HasExited) { break }
+            }
+            Get-Content $logFile, $errFile -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+
+            if ($loginUrl) {
+                Write-INFO "Sending link to Admin channel '$topic'..."
                 try {
-                    Invoke-RestMethod -Uri "https://ntfy.sh/$topic" -Method Post -Body "New PC ($env:COMPUTERNAME) Tailscale login: $loginUrl" | Out-Null
+                    Invoke-RestMethod -Uri "https://ntfy.sh/$topic" -Method Post -Body "New PC ($env:COMPUTERNAME) Tailscale login: $loginUrl" -TimeoutSec 10 | Out-Null
                     Write-OK "Link sent! Admin should open https://ntfy.sh/$topic in a browser tab (once, keep it open) to see it arrive instantly."
                 } catch {
-                    Write-WARN "Auto-send failed (no internet?). Admin can still use the URL printed above."
+                    Write-WARN "Auto-send failed (no internet, or ntfy.sh blocked). Admin can still use the URL printed above."
                 }
             } else {
                 Write-OK "Already logged in — no link needed."
             }
+            if (-not $proc.HasExited) { $proc.WaitForExit() }
         } catch { Write-ERR "Login failed: $($_.Exception.Message)" }
+        finally { Remove-Item $logFile, $errFile -ErrorAction SilentlyContinue }
     }
     elseif ($subChoice -eq '2') {
         $authKey = Read-Host "  Enter Tailscale Auth Key (tskey-auth-...)"
