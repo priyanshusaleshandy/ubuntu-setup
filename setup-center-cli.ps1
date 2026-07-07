@@ -13,8 +13,7 @@
 #   [0] Exit
 # =============================================================================
 # Usage:
-#   Right-click PowerShell -> Run as Administrator
-#   powershell -ExecutionPolicy Bypass -File setup-center-cli.ps1
+#   Just double-click RUN-SETUP.bat (handles everything automatically)
 # =============================================================================
 
 Set-StrictMode -Off
@@ -38,16 +37,42 @@ function Show-Header {
     Write-Host ""
 }
 
-# ─── Admin check ────────────────────────────────────────────────────────────
+# ─── Self-unblock (fixes "downloaded from internet" security block) ────────
+# Any .ps1 downloaded via a browser or curl/iwr gets a hidden "Mark of the Web"
+# tag, which makes Windows refuse to run it ("cannot be loaded... digitally
+# signed" or similar). This strips that tag from ourselves automatically,
+# every single time, so it never blocks execution again.
+try {
+    if ($PSCommandPath) { Unblock-File -Path $PSCommandPath -ErrorAction SilentlyContinue }
+} catch { }
+
+# ─── Self-elevate to Administrator (fixes "forgot Run as Administrator") ───
+# Instead of refusing to continue, the script relaunches itself elevated via
+# a UAC prompt — so you never have to remember to right-click > Run as Admin.
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    Write-Host ""
-    Write-Host "  This script must be run as Administrator." -ForegroundColor Yellow
-    Write-Host "  Right-click PowerShell -> Run as Administrator, then re-run." -ForegroundColor DarkGray
-    Write-Host ""
-    Read-Host "  Press Enter to exit"
-    exit 1
+    if ($PSCommandPath) {
+        Write-Host "  Requesting Administrator privileges (a UAC popup will appear — click Yes)..." -ForegroundColor Yellow
+        try {
+            Start-Process powershell -Verb RunAs -ArgumentList @(
+                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`""
+            )
+            exit 0
+        } catch {
+            Write-Host ""
+            Write-Host "  Could not elevate automatically (UAC was cancelled or blocked)." -ForegroundColor Red
+            Write-Host "  Please right-click RUN-SETUP.bat and choose 'Run as administrator'." -ForegroundColor DarkGray
+            Read-Host "  Press Enter to exit"
+            exit 1
+        }
+    } else {
+        Write-Host ""
+        Write-Host "  This must run as Administrator. Since it was launched inline (no file)," -ForegroundColor Yellow
+        Write-Host "  open PowerShell as Administrator first, then run the command again." -ForegroundColor DarkGray
+        Read-Host "  Press Enter to exit"
+        exit 1
+    }
 }
 
 # ─── Package manager check ──────────────────────────────────────────────────
@@ -662,17 +687,31 @@ function Install-Tailscale {
 
 function Invoke-TailscaleLogin {
     Show-Header; Write-Host "  [9.2] TAILSCALE LOGIN / REGISTER" -ForegroundColor Cyan; Write-Host ""
-    Write-Host "  [1] Web Browser Login (Sends Auth URL to Admin)" -ForegroundColor White
+    Write-Host "  [1] Auto-send Login Link to Admin (no typing)" -ForegroundColor White
     Write-Host "  [2] Auth Key Login    (Use pre-authorized key from Admin)" -ForegroundColor Green
     Write-Host "  [0] Back" -ForegroundColor DarkGray
     Write-Host ""
     $subChoice = Read-Host "  Select Login Method"
-    
+
     if ($subChoice -eq '1') {
-        Write-INFO "Opening browser login..."
-        Write-WARN "If browser does not open, COPY the URL printed below and send it to your Admin:"
+        $topic = Read-Host "  Admin Channel Name (agree once with Admin, e.g. priyanshu-setup)"
+        if ([string]::IsNullOrWhiteSpace($topic)) { $topic = "setup-center-$env:COMPUTERNAME" }
+        Write-INFO "Requesting login link..."
         try {
-            tailscale login --login-server https://bifrost.saleshandy.com
+            $loginOutput = & tailscale up --login-server=https://bifrost.saleshandy.com --accept-routes --accept-dns --force-reauth 2>&1 | Out-String
+            Write-Host $loginOutput
+            $match = [regex]::Match($loginOutput, 'https://\S+')
+            if ($match.Success) {
+                $loginUrl = $match.Value
+                try {
+                    Invoke-RestMethod -Uri "https://ntfy.sh/$topic" -Method Post -Body "New PC ($env:COMPUTERNAME) Tailscale login: $loginUrl" | Out-Null
+                    Write-OK "Link sent! Admin should open https://ntfy.sh/$topic in a browser tab (once, keep it open) to see it arrive instantly."
+                } catch {
+                    Write-WARN "Auto-send failed (no internet?). Admin can still use the URL printed above."
+                }
+            } else {
+                Write-OK "Already logged in — no link needed."
+            }
         } catch { Write-ERR "Login failed: $($_.Exception.Message)" }
     }
     elseif ($subChoice -eq '2') {
@@ -751,7 +790,7 @@ function Show-TailscaleMenu {
         Write-Host "  Login Server: https://bifrost.saleshandy.com" -ForegroundColor DarkGray
         Write-Host ""
         Write-Host "  [1] Install Tailscale                   (via winget)"                        -ForegroundColor White
-        Write-Host "  [2] Login                               (open browser auth)"                  -ForegroundColor Cyan
+        Write-Host "  [2] Login                               (auto-sent to Admin)"                 -ForegroundColor Cyan
         Write-Host "  [3] Connect                             (--accept-routes)"                    -ForegroundColor Green
         Write-Host "  [4] Full Reset + Connect                (--reset --accept-dns --accept-routes)" -ForegroundColor Yellow
         Write-Host "  [5] Connect via Exit Node               (--exit-node=100.64.0.7)"             -ForegroundColor Magenta
