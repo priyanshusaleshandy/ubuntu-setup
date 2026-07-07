@@ -21,8 +21,9 @@ $ErrorActionPreference = "Continue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # ── Tailscale Auto-Send Config ────────────────────────────────────────────────
-# Change this ONE line if you ever want a different Admin channel.
+# Change these if you ever move to a different Admin channel or server.
 # No need to type it every time — the script uses this automatically.
+$NtfyServer = "http://192.168.126.101:8080"   # Private self-hosted ntfy (Mac Mini via Docker)
 $NtfyAdminChannel = "priyanshu-setup"
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
@@ -700,8 +701,8 @@ function Invoke-TailscaleLogin {
 
     if ($subChoice -eq '1') {
         $topic = $NtfyAdminChannel
-        # Auto-clean: strip any accidental "https://ntfy.sh/" or "ntfy.sh/" prefix
-        $topic = $topic -replace '^https?://ntfy\.sh/', '' -replace '^ntfy\.sh/', '' -replace '/$', ''
+        # Auto-clean: strip any accidental full-URL prefix
+        $topic = $topic -replace [regex]::Escape("$NtfyServer/"), '' -replace '^https?://ntfy\.sh/', '' -replace '^ntfy\.sh/', '' -replace '/$', ''
         Write-INFO "Requesting login link (will auto-send to '$topic')..."
         Write-WARN "This forces a fresh login even if already connected."
         $logFile = [System.IO.Path]::GetTempFileName()
@@ -724,10 +725,10 @@ function Invoke-TailscaleLogin {
             if ($loginUrl) {
                 Write-INFO "Sending link to Admin channel '$topic'..."
                 try {
-                    Invoke-RestMethod -Uri "https://ntfy.sh/$topic" -Method Post -Body "New PC ($env:COMPUTERNAME) Tailscale login: $loginUrl" -TimeoutSec 10 | Out-Null
-                    Write-OK "Link sent! Admin should open https://ntfy.sh/$topic in a browser tab (once, keep it open) to see it arrive instantly."
+                    Invoke-RestMethod -Uri "$NtfyServer/$topic" -Method Post -Body "New PC ($env:COMPUTERNAME) Tailscale login: $loginUrl" -TimeoutSec 10 | Out-Null
+                    Write-OK "Link sent! Admin should open $NtfyServer/$topic in a browser tab (once, keep it open) to see it arrive instantly."
                 } catch {
-                    Write-WARN "Auto-send failed (no internet, or ntfy.sh blocked). Admin can still use the URL printed above."
+                    Write-WARN "Auto-send failed (server unreachable — check VPN/Tailscale connection to $NtfyServer). Admin can still use the URL printed above."
                 }
             } else {
                 Write-OK "Already logged in — no link needed."
