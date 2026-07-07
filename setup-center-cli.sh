@@ -105,8 +105,9 @@ OPTIONS=(
     "GNOME Tweaks & Extension Manager"
     "Time Doctor"
     "GNOME Screen Blank Timeout (14 minutes)"
+    "ESET PROTECT Agent (Antivirus/EDR)"
 )
-SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
+SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
@@ -215,6 +216,150 @@ install_timedoctor() {
     fi
 }
 
+install_eset_protect() {
+    log_info "Installing ESET PROTECT Agent (Antivirus/EDR)..."
+    local tmp="$HOME/.sc_tmp/eset-protect-installer.sh"
+    mkdir -p "$HOME/.sc_tmp"
+    cat > "$tmp" << 'ESET_INSTALLER_EOF'
+#!/bin/sh -e
+# ESET PROTECT
+# Copyright (c) 1992-2026 ESET, spol. s r.o. All Rights Reserved
+
+cleanup_file="$(mktemp -q)"
+finalize()
+{
+  set +e
+  if test -f "$cleanup_file"
+  then
+    while read f
+    do
+      rm -f "$f"
+    done < "$cleanup_file"
+    rm -f "$cleanup_file"
+  fi
+}
+
+trap 'finalize' HUP INT QUIT TERM EXIT
+
+eraa_server_hostname="udwzq2pdhinundkpdrrdi7vzlu.a.ecaserver.eset.com"
+eraa_server_port="443"
+eraa_server_company_name='Ikigai Infotech LLP'
+eraa_peer_cert_b64="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"
+eraa_peer_cert_pwd=""
+eraa_ca_cert_b64="MIIFpDCCA4ygAwIBAgIIMUSW0eFkh/8wDQYJKoZIhvcNAQELBQAwaDELMAkGA1UEBhMCU0sxGDAWBgNVBAgTD1Nsb3ZhayBSZXB1YmxpYzETMBEGA1UEBxMKQnJhdGlzbGF2YTENMAsGA1UEChMERXNldDEbMBkGA1UEAxMSRVBDIEFnZW50IHByb3h5IENBMB4XDTIyMDYyMDAwMDAwMFoXDTMyMDYxOTIzNTk1OVowaDELMAkGA1UEBhMCU0sxGDAWBgNVBAgTD1Nsb3ZhayBSZXB1YmxpYzETMBEGA1UEBxMKQnJhdGlzbGF2YTENMAsGA1UEChMERXNldDEbMBkGA1UEAxMSRVBDIEFnZW50IHByb3h5IENBMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEApFyygZ31hn6s/K7+Lm/r3KP+P5Gn0pb5J6IR0F+KtBUiNE9nRn5PnVDdyj9uVd6BZIKcczoHebH/70GQUuOzprDtHhWUTNDZ7R4NfNz0u5cYn2mKPk9lJRPEcuvqKr+aGsCs1yMv226xd72ngJE/Z2MlGLGX5+kuO0HmQWRUK/SDtmcCvforHs7zE19PjXmZQnpW+bUFkLeHcHS4WtJ64CNkbuTHssK8nNDQoJXLZVKafLWCkAZ94vpZWDRG5AffdBDnKrSy+WOTI6dOJw8i+uJ7YtWconTJo9NRCcgTzCHujylXgqWkwm3f+Wh/h0u5KIJEzTPN/RTzP+/SWEDrYi7+wECXWv6kU3Ty3KkzPGsAt9ABmnvAUGShi8Heyhnes6E3IiUt3wko+LHVw9hFyXFjfqtgRtxvOTcX06zinpQbtl+d1Wm7mU/ORFIPffRec4B9YewF1VRCm4gT5vqFZbO7BUnuyKFeGr6Vxlgrgz0mPS0PAoATI500x9g8Md3Mmshc/6wLInMHgSh//n+aylnePRrTvLEJhcWgoDx57wZ7G5fTeHEFIRrcU3ez6PSKbodCBcjfWrGLkXNQzmIwhDxVRmo4DXLga6MzbYqU54zQVfk60CiFEvwwK8l7WBZ7XlqxRl8QmsIUGf278N8Hxe0qOs7fcZPvuVHyhS4WKxsCAwEAAaNSMFAwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUZ9DJSflsyGkpLas5Ll3dMzeMJSEwCwYDVR0PBAQDAgEGMBEGCWCGSAGG+EIBAQQEAwIABzANBgkqhkiG9w0BAQsFAAOCAgEAWrXSFAd4OmT0bxHj1q+zMROTxXalzfAfqncTGaTm2NiqL5be3WfgnQLjGOMX+VVC1YXDlI2xs2JAWD3myRT4u7g1Y320HmjWczaE36h8PrnL+M/LEIHem3bM7e6ZFGHzwN80D5bmM++qacrGnnSDXid/sVx2Vi5KKXOXcFB74Haef5mqVm9uNpjDuUO+7Zdip6xqieHOpYD7HIWCkq/bJXxyrPr9CY37KyVdeMoU8QuIzdlgn5l0yc8LNBXXv7pba+ykPirIWe1ZR0O0z5e0gAqUe0kz9fpiMmzWpaGS/4s8gt0oYX2Ahibc3Lgg179OOpUFOsz92TmPVQCnzseZCPirikCA7qUAmMFKqs+l+X6DdKIrL4ocHs5zFAL9fysdKpczKczAWpZXr9LtuY6WFDkcWhxm4kj1MXyte8UBBC4C1UX47Km5TlOQUApnp7LMXI3jlBB+2Lo3T9N2FhiQ5R2PoNdA+XONNaBb8E9mh83wOvA6+Me1Rb7bIO6q/dTULd41Jns3JQ8zy0H8rQrOSOREWfieW0Czd38ZRJoa7MRp6Z3aYAuqt8pJpOykVbKQY/OYh43pt5gfgFvIkI3CuoJvLPQ3bYKyBiJN8PYhFpOyLYOrOJqbd26x+QFORgiBdZo6u6Em31l3fVpiaMcSAD9Cny6VUEC2aYn00beB2Vc="
+eraa_product_uuid=""
+eraa_initial_sg_token="OWU3MTkwNjMtODY0Ny00YzdlLThiOTgtN2EyNGI1YzZjZTk18WFaj0hcTdKbrmRa7cLE4bKmLBA/I0Dml5b/Nk/RScXONGh83P9gx6+2ot1S4iwmYigq3w=="
+eraa_policy_data="eyJwb2xpY3kiOnsiZm9ybWF0IjoxfX0KITxhcmNoPgovLyAgICAgICAgICAgICAgMTc4MjI5OTA3MyAgMCAgICAgMCAgICAgNjQ0ICAgICAxOCAgICAgICAgYApvcmlnaW5hbFBvbGljaWVzLwovMCAgICAgICAgICAgICAgMTc4MjI5OTA3MyAgMCAgICAgMCAgICAgNjQ0ICAgICAxMDQ0MyAgICAgYApleUp3YjJ4cFkza2lPbnNpWm05eWJXRjBJam95TENKMlpYSnphVzl1WDIxaGFtOXlJam8wTWprME9UWTNNamsxTENKMlpYSnphVzl1WDIxcGJtOXlJam8wTWprME9UWTNNamsxTENKMlpYSnphVzl1WDJKMWFXeGtJam93TENKa1lYUmhJanA3SW5OMFlXNWtZV3h2Ym1VaU9uc2lVMlYwZEdsdVozTWlPbnNpVlhCa1lYUmxjaUk2ZXlKalpWOW1iR0ZuY3lJNk1Dd2lRWFYwYjFWd1pHRjBaWE1pT25zaVkyVmZabXhoWjNNaU9qQXNJa1Z1WVdKc1pXUWlPbnNpWTJWZlpteGhaM01pT2pRc0ltTmxYM1I1Y0dVaU9qWXNJbU5sWDNaaGJIVmxJam94Zlgwc0ltTmxYM1psY25OcGIyNGlPaUl6TGpBaWZYMTlmWDE5CmV5SndiMnhwWTNraU9uc2labTl5YldGMElqb3hmWDBLSVR4aGNtTm9QZ3BsYm1Sd2IybHVkQzVzZW0xaEx5QWdNVGM0TWpFeU5qUTRNaUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBek9Ea2dJQ0FnSUNBZ1lBcGRBQUFDQVAvLy8vLy8vLy8vQUQySWlnY3o4bXdudVYxUkZHd1cxd241bTZvaXJUOXhHbWJrbVVXcWdBOWNxNlN6L3pFTmtyZzVieGw1RXpXWnJRR3YxcGFPQnVkVkR5Q2JyaWJBaWtSNWR3QUI0RVRTWUwyVG4waWJMblhYOEczWFhaa0tSN1RmTVZGaXdEM0ptbWpPUWRqWmM2R1FDWWdJaG1JbUhpOEFldStIaTZuUDVwSFloeHlLL2tXUTNXdmk1TlZwWGFUdEFOaDlIUmxFeE4raHU3Q2QwTGQzcDN1TCtLcW8zcURHREwvOWJlcGJCeU9mR2pydUtFbytkbHpLQ1hHWHlkZjdzamRmTFVQekxCNzlmNVR3ak9xb2hLYUtrcFphNWF0U29SNkFQSFJuMld1UjUzMWFKektVWE1ESURXY1ViMWE2Q2RRa1pTZFc3aHM1aXA0bzkwaXdpakc1R0NBNVFIR3MyaU1VZ09DSHF5UWxtZ25NM0cwL0x3UEp2bmxhVVRzMzJYcENPM2dsUmVsanlqWXlyQmJLTjlkSFkxSGphczM4Z2J2Ri84N2RpaDlVZ29aellPbnhQNGZyWlQvbkdnaWhCSzRoQ1FNbEdFb2NZWU40YWF0dlludHRPOEVWVDVUcWduM2FOcC94MXJZMEhuK2NoZ3E0WGhYL2lJb0xBQXBvYVhOMGIzSjVMbUZ5THlBZ0lDQWdNVGM0TWpFeU5qUTRNaUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBeU56QWdJQ0FnSUNBZ1lBb2hQR0Z5WTJnK0NtbHVabTh1YW5OdmJpNXNlbTFoTHlBeE56Z3lNVEkyTkRneUlDQXdJQ0FnSUNBd0lDQWdJQ0EyTkRRZ0lDQWdJREl3TVNBZ0lDQWdJQ0JnQ2wwQUFFQUEvLy8vLy8vLy8vOEFQWUtBQVNMSzd5U3psd3BZVHZRWnpkMGYwZGEwaGNFaGtaRWg0U1BLNFJteEo1US8xdlo3S1d6RkNKUmlCQXQ3MDZDT1JHZUNMcmZxZVhxQSs5Qk91MkVYZjFySWZCbGJibkg4ZUxYZVUxdDNlVWRhMDgwdHlkNkxFMVJzV0ZSTVlSR2crWWUrb1pUTmdRNkh5ZndXL2NkT0RpNmY3WEk0dTM1RGNveUpsWWhyS2xzR2JQSXpsMGFad0JXTE9UNUZhUENRekp5RmhNbzBBdXgvVTJBb2RobGxkTnE0KzdMZHNxSFMxY0dWVXV6VmFNUFVXNTMrOWJhUFFBcHBibVp2TG1wemIyNHZJQ0FnSUNBZ01UYzRNakV5TmpRNE1pQWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0F4TlRBZ0lDQWdJQ0FnWUFwN0NpQWlkM0pwZEhSbGJsOWllVjlqWlNJNklqSXlNek11TlNBb01qQXlOakExTWpZcE95QXlORE16SWl3S0lDSmpiMjF3WVhScFltbHNhWFI1SWpwN0NpQWdJbVZ1WkhCdmFXNTBJanA3Q2lBZ0lDSTVMakVpT2lJM0xqQWlMQW9nSUNBaU1UTXVNQ0k2SWprdU1pSUtJQ0I5Q2lCOUxBb2dJbmR5YVhSbFgzUnBiV2x1WnlJNld6TXdMREFzTXpJc016SmRDbjExYzJWeVJHRjBZUzVxYzI5dUx5QWdNVGM0TWpJNU9UQTNNeUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBMU9TQWdJQ0FnSUNBZ1lBb2lkWFZwWkQweFlXTTNOREU1TlMxbVpHRmhMVFJrWkRNdFlqVmxZeTAxTkRKbVpUTXpOVGt6TXpFc2RtVnljMmx2Ymowd0xHNWhiV1U5SWdvPQpleUp3YjJ4cFkza2lPbnNpWm05eWJXRjBJam94ZlgwS0lUeGhjbU5vUGdwbFpuTjNMbXg2YldFdklDQWdJQ0FnTVRjNE1qRXlOalE0TWlBZ01DQWdJQ0FnTUNBZ0lDQWdOalEwSUNBZ0lDQXlOalVnSUNBZ0lDQWdZQXBkQUFBQ0FQLy8vLy8vLy8vL0FEMklpZ2N6OG13bnVWMVJGR3dXMXduNW02b2lyVDl4RWJ6U0ZJdmQwZlZJQ2drU0JwTmVZSmVYTW0rdlFrOFkwTTh0RGh5dGxBTUYyczdXaWwxbjlnVFE2T0VETWZWNkI1cEVOSnV5TUFtZjBjb2s0NzBZMlpoMUdnc210MXMrZldSWXpVVi80Z0VwdGlxM21EL282WjloMzgwbkpRWTRHbmxDR1RkU2c4WkxYbEJFeFFRQTNVTmdSOUxTaWQ3VHlBWjNKRXMvUkVFMytKUHZiRnVpSFpCSWJvS1Z0QitGU2Y5ZTNvczNPT3JpSGk2U1dwd1NQdkxVc2pHRjhaaVRSNnRmQjVvWEJlTGpzODVFYWpwSkVUVThoY25Gb3g3OHdJcjd3aHhGQUZIZ3J0RFhDTFQ3b1JBR05rT2tMMGdrdXJEYzZjRjkvUTc3NGl1ZkNtaHBjM1J2Y25rdVlYSXZJQ0FnSUNBeE56Z3lNVEkyTkRneUlDQXdJQ0FnSUNBd0lDQWdJQ0EyTkRRZ0lDQWdJREkxTkNBZ0lDQWdJQ0JnQ2lFOFlYSmphRDRLYVc1bWJ5NXFjMjl1TG14NmJXRXZJREUzT0RJeE1qWTBPRElnSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ01UZzJJQ0FnSUNBZ0lHQUtYUUFBUUFELy8vLy8vLy8vL3dBOWdvQUJJc3J2SkxPWENsaE85Qm5OM1IvUjFyU0Z3U0dSa1NIaDFlYVE0R3h4REVPMTlUL0JhTDRlMC84L1VTc0M5WGMrYVpCK0V0RHc5TlRHNmpLWU95bWhXZTJQN2pjK1IydThCdlF1NERidmJsQmpYWHJiT1VxcUl4ZHRqaG9WTXBES0N4alRCRHRGSG1JWlRzY0dXSXk0SEVMckVWZzNYcEdkdWRCakRMY1NiNTVoa1NEelk1R2dXVUFCZ3dyVlFpZ3RzdXlFK29admYrVjg0dWpxc2NoNXNzb1FxZi92NllRQWFXNW1ieTVxYzI5dUx5QWdJQ0FnSURFM09ESXhNalkwT0RJZ0lEQWdJQ0FnSURBZ0lDQWdJRFkwTkNBZ0lDQWdNVFEySUNBZ0lDQWdJR0FLZXdvZ0luZHlhWFIwWlc1ZllubGZZMlVpT2lJeU1qTXpMalVnS0RJd01qWXdOVEkyS1RzZ01qUXpNeUlzQ2lBaVkyOXRjR0YwYVdKcGJHbDBlU0k2ZXdvZ0lDSmxabk4zSWpwN0NpQWdJQ0k1TGpFaU9pSTNMakFpTEFvZ0lDQWlNVE11TUNJNklqa3VNaUlLSUNCOUNpQjlMQW9nSW5keWFYUmxYM1JwYldsdVp5STZXek0wTERBc016Z3NNemxkQ24xMWMyVnlSR0YwWVM1cWMyOXVMeUFnTVRjNE1qSTVPVEEzTXlBZ01DQWdJQ0FnTUNBZ0lDQWdOalEwSUNBZ0lDQTFPU0FnSUNBZ0lDQWdZQW9pZFhWcFpEMDFaVEk0WWpkaVlpMWpZekF4TFRReE1tWXRZalZpWmkwM05UYzNPV1ZsWmpFeFpEa3NkbVZ5YzJsdmJqMHdMRzVoYldVOUlnbz0KZXlKd2IyeHBZM2tpT25zaVptOXliV0YwSWpveGZYMEtJVHhoY21Ob1BncGxiWE40TG14NmJXRXZJQ0FnSUNBZ01UYzRNakV5TmpRNE1pQWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0F5TmpRZ0lDQWdJQ0FnWUFwZEFBQUNBUC8vLy8vLy8vLy9BRDJJaWdjejhtd251VjFSRkd3VzF3bjVtNm9pclQ5eEdWZE5kOFh3YVViU2NpVnFlTlJlU0dsd1FrZ1RKcnhBN3JnMGcybDU5QjMyZXJrYjNWY051NHFpbUs1UGdpbTdKdVFqUS9yY1lYVE8vcFJDSFh5MTcwbXpuTW5nR0RnVHhDcGhLK2xSZTBxK0dFL1lWV0Nxa05qbUsxUGd4Zk43aHlSWnJ6U3kzUDFyTnV3cTNrZjJJOXF4bkZRZENnRVFQZ3JJaUU4cWZwQnRvc1AvS0toQURZOXkyRWlxTDVnR2xLMnRiNGpGa2hoSGtCQ3BhVlB5NkdneTBTZXBMWjBsWXFJQml0U1hmT1JkLzRtSjFRbjhHSGZlRCt6eDRPcUxST25YSWxPS2dUOFlLZ05NaGJDR2pMemo3WkNLQTF1SFhjZC9PWDV3dHY0ZzUydG9hWE4wYjNKNUxtRnlMeUFnSUNBZ01UYzRNakV5TmpRNE1pQWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0F5TlRZZ0lDQWdJQ0FnWUFvaFBHRnlZMmcrQ21sdVptOHVhbk52Ymk1c2VtMWhMeUF4TnpneU1USTJORGd5SUNBd0lDQWdJQ0F3SUNBZ0lDQTJORFFnSUNBZ0lERTROeUFnSUNBZ0lDQmdDbDBBQUVBQS8vLy8vLy8vLy84QVBZS0FBU0xLN3lTemx3cFlUdlFaemQwZjBkYTBoY0Voa1pFWDYrSUwxNkkwbElDbE9CeGlCcmxPTXZGZ2pqZE5NZmJHTE93K1A3TDFpUnloVHd1KzhGNTR3SkJpQkpxL2NxME92cDZOeXZLQUpuOVVWQUhVdXJsSGxTSVVNUit3ZGlSNnFETmhIZURmbHNSUGFucmdjcmxucGRiM1J4L2pyTmNLMXhOdkpxTGZCZVpmK2F1QjJlVHprTWp4SUpqZnBjblVoYnlVdG03WEpjVDIyOGVzVzRvdDVyZ2RscjM4Ly9VZkxIZ0thVzVtYnk1cWMyOXVMeUFnSUNBZ0lERTNPREl4TWpZME9ESWdJREFnSUNBZ0lEQWdJQ0FnSURZME5DQWdJQ0FnTVRRMklDQWdJQ0FnSUdBS2V3b2dJbmR5YVhSMFpXNWZZbmxmWTJVaU9pSXlNak16TGpVZ0tESXdNall3TlRJMktUc2dNalF6TXlJc0NpQWlZMjl0Y0dGMGFXSnBiR2wwZVNJNmV3b2dJQ0psYlhONElqcDdDaUFnSUNJNUxqRWlPaUkzTGpBaUxBb2dJQ0FpTVRNdU1DSTZJamt1TWlJS0lDQjlDaUI5TEFvZ0luZHlhWFJsWDNScGJXbHVaeUk2V3pJMExEQXNNalVzTWpWZENuMTFjMlZ5UkdGMFlTNXFjMjl1THlBZ01UYzRNakk1T1RBM015QWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0ExT1NBZ0lDQWdJQ0FnWUFvaWRYVnBaRDFrWVdSbE1qYzRaaTFqT0RVMUxUUTRPR1F0T1RkbFppMDNPRFkxTXpoa09HUTBNRFVzZG1WeWMybHZiajB3TEc1aGJXVTlJZ289CmV5SndiMnhwWTNraU9uc2labTl5YldGMElqb3hmWDBLSVR4aGNtTm9QZ3BsYlhOc0xteDZiV0V2SUNBZ0lDQWdNVGM0TWpFeU5qUTRNaUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBeU5qUWdJQ0FnSUNBZ1lBcGRBQUFDQVAvLy8vLy8vLy8vQUQySWlnY3o4bXdudVYxUkZHd1cxd241bTZvaXJUOXhHVmM1a2poUHVlOVNpaWE1TnZ6Y2UzZ3NtTHlBK3BiTHJvdWxzMVpSQStLNElqcHlMVmk5TkFHTUI5V2ZMMUc5bkE0K2h0aUtGcVJzamFGb2dRbVVFNWNhVnl0aC9iQnhVNlMzV0YzejhRcnZLQ1NvN1FUNHJtWUkxeFFENkhwaThYdU1zbk11WUs0RUhvTUdMdGFUNTFIUjhIcmREcm1VK0UvbVFnQWp5Z3NnaHdKcDJwRXpxMk9KTlZnSUhBNUE3S0dnK2Q1ZmM4L3hPUmFQcHFBZzIvWkhvaXdSSUdENUFRYS9QYkEvZHRiaHBwd0pDMm1MS3FsbFVVOFJmWXdsNUJxOUVkaUJzSXFXR2Q0WFdNVm4xaDJFZVBTWnZVY2dnc2xubHE0Ny9mWkNkSzlvYVhOMGIzSjVMbUZ5THlBZ0lDQWdNVGM0TWpFeU5qUTRNaUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBeU5UUWdJQ0FnSUNBZ1lBb2hQR0Z5WTJnK0NtbHVabTh1YW5OdmJpNXNlbTFoTHlBeE56Z3lNVEkyTkRneUlDQXdJQ0FnSUNBd0lDQWdJQ0EyTkRRZ0lDQWdJREU0TmlBZ0lDQWdJQ0JnQ2wwQUFFQUEvLy8vLy8vLy8vOEFQWUtBQVNMSzd5U3psd3BZVHZRWnpkMGYwZGEwaGNFaGtaRVhRSmZNcVQ4NWgveEtNZjlHUUM4ektRWEVpbXRNNjZlbVNEY0ZzUi9IU1VMN2drQ0R2MUdXeDg3MXlxRDkweEdndWJOQWJodTFER1MvZTJOMTMxZGxkZEoxSjA1KytmdFJsUXIxQm9oZWZhbEpqdFRTa0IwNk04QW1tSW52ZWluYndaTmpHcUowQkExWEU5TmRuQ1kwazBsM3p1WENaUVpmTXc1R2tMZjE0V0ZnSHRmV2dZQ0RtOVJHcmVGay9zcjRRR2x1Wm04dWFuTnZiaThnSUNBZ0lDQXhOemd5TVRJMk5EZ3lJQ0F3SUNBZ0lDQXdJQ0FnSUNBMk5EUWdJQ0FnSURFME5pQWdJQ0FnSUNCZ0Nuc0tJQ0ozY21sMGRHVnVYMko1WDJObElqb2lNakl6TXk0MUlDZ3lNREkyTURVeU5pazdJREkwTXpNaUxBb2dJbU52YlhCaGRHbGlhV3hwZEhraU9uc0tJQ0FpWlcxemJDSTZld29nSUNBaU9TNHhJam9pTnk0d0lpd0tJQ0FnSWpFd0xqQWlPaUk1TGpJaUNpQWdmUW9nZlN3S0lDSjNjbWwwWlY5MGFXMXBibWNpT2xzeE9Dd3dMREU1TERJeFhRcDlkWE5sY2tSaGRHRXVhbk52Ymk4Z0lERTNPREl5T1Rrd056TWdJREFnSUNBZ0lEQWdJQ0FnSURZME5DQWdJQ0FnTlRrZ0lDQWdJQ0FnSUdBS0luVjFhV1E5TVdGaU1qQmhNamd0TnpjeFlpMDBaamsyTFdJM05URXRaV05pTWpnelpHTTFNVEZoTEhabGNuTnBiMjQ5TUN4dVlXMWxQU0lLCmV5SndiMnhwWTNraU9uc2labTl5YldGMElqb3hmWDBLSVR4aGNtTm9QZ3BsYzJod0xteDZiV0V2SUNBZ0lDQWdNVGM0TWpFeU5qUTRNeUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBeU5qUWdJQ0FnSUNBZ1lBcGRBQUFDQVAvLy8vLy8vLy8vQUQySWlnY3o4bXdudVYxUkZHd1cxd241bTZvaXJUOXhIN0pUcVRTdGQ3N2tNcWp5OGVwWnJEamw4alpJZGlpcDh4RE1mVEdMSU5KS1I2QmR0Wnl3eUJqc1BxdXdQaFJCZlJFcUhqeTFPcmtYc2FDRkxkS1VPVC9mdS9nZ21UNk5XUnk0Vmw4bTV5dEZDWno2ZzVRMmtnekhseTJ0eWZLaGNkSnZ6RVdZRmJ4RC9yTnEyNFk2RkQ1bytrYzkxRHlUVmVscFVkOC9jQnJLZGFzZjdJSkRpSjEwaThIdk54U2Z0c1ZjcnFOVUhPdStxMEYza2lNYlhEQVBTS2VQY0tCV1hicjNGb0FzM0tGWmlXaWJnUXZlR0ZYUERzUG1RNW5OWnM1T2dEUjZ2UER2bElIWG40L3o2bUNsNC9TM0RPYUdhbkdlSlBLZ2IvMUw2TnhvYVhOMGIzSjVMbUZ5THlBZ0lDQWdNVGM0TWpFeU5qUTRNeUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBeU5UUWdJQ0FnSUNBZ1lBb2hQR0Z5WTJnK0NtbHVabTh1YW5OdmJpNXNlbTFoTHlBeE56Z3lNVEkyTkRneklDQXdJQ0FnSUNBd0lDQWdJQ0EyTkRRZ0lDQWdJREU0TmlBZ0lDQWdJQ0JnQ2wwQUFFQUEvLy8vLy8vLy8vOEFQWUtBQVNMSzd5U3psd3BZVHZRWnpkMGYwZGEwaGNFaGtaRVhlcjkyaXZEK2pEbGNWVVNFSkVNQVRBUHRDUFVpNFAva1dQbGx2TmdHd1VEMkNLUnEwTWdlNHMxVkJtU2tNYTJ1N2tCVTFyMkdRU2FqTFJwbUloeGNrY2NCNnlCNjV5SEIvcklJb2tSSDlxemE3MUw2T1l2UEdTazljbW5GUVcrV3UvMGVGZFA2bWVpMEJjYi8rU0Z5ZGlxTUV4VU9IWDROOUUxcEdQVjNyRU9nMHpZUFpORVBXUGw5N1QvL2tRd1FBR2x1Wm04dWFuTnZiaThnSUNBZ0lDQXhOemd5TVRJMk5EZ3pJQ0F3SUNBZ0lDQXdJQ0FnSUNBMk5EUWdJQ0FnSURFME5pQWdJQ0FnSUNCZ0Nuc0tJQ0ozY21sMGRHVnVYMko1WDJObElqb2lNakl6TXk0MUlDZ3lNREkyTURVeU5pazdJREkwTXpNaUxBb2dJbU52YlhCaGRHbGlhV3hwZEhraU9uc0tJQ0FpWlhOb2NDSTZld29nSUNBaU9TNHhJam9pTnk0d0lpd0tJQ0FnSWpFekxqQWlPaUk1TGpJaUNpQWdmUW9nZlN3S0lDSjNjbWwwWlY5MGFXMXBibWNpT2xzeU1pd3dMREkwTERJMFhRcDlkWE5sY2tSaGRHRXVhbk52Ymk4Z0lERTNPREl5T1Rrd056TWdJREFnSUNBZ0lEQWdJQ0FnSURZME5DQWdJQ0FnTlRrZ0lDQWdJQ0FnSUdBS0luVjFhV1E5WldKak5EbGtZbUV0WVdSaE9DMDBPR1UzTFRreU1ERXRNVE5qTkRCbU9EZGtNRFUwTEhabGNuTnBiMjQ5TUN4dVlXMWxQU0lLCmV5SndiMnhwWTNraU9uc2labTl5YldGMElqb3hmWDBLSVR4aGNtTm9QZ3BsY21FdWJIcHRZUzhnSUNBZ0lDQWdNVGM0TWpFNU9EZ3hNU0FnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBek5qUWdJQ0FnSUNBZ1lBcGRBQUFDQVAvLy8vLy8vLy8vQUQySWlnY3o4bXdudVYxUkZHd1cxd241bTZvaXJUOXhIcXZNTVVna05sWlpnbDE0M3JyNW9IRVFyWlp0RWhyaU51WHFsZmhjSk9iSUhraGlwNHpDbjRLRXp5Y1F1RElqUVJIUHFGSVA1WXVQWTdMRVQ1QVUxYzVmRlBYQldGdEpxU1B5OHR6OWQ4UGwrdEdKV05hZ200UjRBVWdHN1VpWjExUk5LTHVFL0MwSVBWTDVzSW04YVE4RnB5MFRLNXA5aXY3UlZtR3VRSWFaTFY5R3NJUlYrRlZFL0FhM3lHNDZESWNLTTQ1RzVZbGdqUERNZkI0M2NnNHNQTUYzZ1cyaXZxb1UveDJyNW5obTljRjRFZzFja05FSnBqL2ZHOW13SVBtY3B3djZ2QkxYaW00Ykh2VHVDMXRvNkhVQVhRbEljaUVLZnJrSDNoRU9VRnp1VUdFNjNIblRyZHU2UWxkLzZGUVlwaVUrNSt4SlRqOFd4YVNGdFRWSnR3b3pQcEo2aUp6bWJBdHprQWwyMFVFbUxKMzEvYXREV0twLzBtVVhNU0hqaXpCNHdrTTBSeWt6dUw5RDgyV28zTUJxSEVoa0tPbDNwVGdrRWhKZU0vLzZCWnorYUdsemRHOXllUzVoY2k4Z0lDQWdJREUzT0RJeE9UZzRNVEVnSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ01qVTJJQ0FnSUNBZ0lHQUtJVHhoY21Ob1BncHBibVp2TG1wemIyNHViSHB0WVM4Z01UYzRNakU1T0RneE1TQWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0F4T0RjZ0lDQWdJQ0FnWUFwZEFBQkFBUC8vLy8vLy8vLy9BRDJDZ0FFaXl1OGtzNWNLV0U3MEdjM2RIOUhXdElYQklaR1JGbEp6SUp3b3RldFp3N1pqUVc5cnhraEVOTndnS3psUEptODBaeFp2V1VlYVpNbmtsaTlKcjRSMDJKNXJpWVgwT1dacTZNV0lzajk2aDRFY0h5YWxxWUJlVTV6TG9Fd2NZUHU4RGNSYjg2dHB5ejM4UVF2a0lNcllObTEyK0psV0loTXFNd25uK29sWmw3OXFCaG5DWTZLYlRtS3F1NHo1R1JMUndKcEpGVHZUdi8yMjZpRGhHRnUzVXRYOE12L3I5TXdBQ21sdVptOHVhbk52Ymk4Z0lDQWdJQ0F4TnpneU1UazRPREV4SUNBd0lDQWdJQ0F3SUNBZ0lDQTJORFFnSUNBZ0lEY3pJQ0FnSUNBZ0lDQmdDbnNLSUNKM2NtbDBkR1Z1WDJKNVgyTmxJam9pTWpJek15NDFJQ2d5TURJMk1EVXlOaWs3SURJME16TWlMQW9nSW5keWFYUmxYM1JwYldsdVp5STZXeklzTUN3eUxESmRDbjBLZFhObGNrUmhkR0V1YW5OdmJpOGdJREUzT0RJeU9Ua3dOek1nSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ05Ua2dJQ0FnSUNBZ0lHQUtJblYxYVdROVpXUmpaVFV3T1RjdE5qUmlaQzAwTW1ZekxXSXpZMll0WldWa1lUQTBOVEExWVRnMUxIWmxjbk5wYjI0OU1DeHVZVzFsUFNJSwpleUp3YjJ4cFkza2lPbnNpWm05eWJXRjBJam94ZlgwS0lUeGhjbU5vUGdwbFpXRmZkVzVwZUM1c2VtMWhMeUFnTVRjNE1qRTVPRGczTmlBZ01DQWdJQ0FnTUNBZ0lDQWdOalEwSUNBZ0lDQXpNelFnSUNBZ0lDQWdZQXBkQUFBQ0FQLy8vLy8vLy8vL0FEMklpZ2N6OG13bnVWMVJGR3dXMXduNW02b2lyVDl4RUpiaWhKLzFzcDlHRWk3YjZ2bDcyYXVFNk5nNFJOaXVOcXVXaitBeHZBUDlSQnppSG5kcHNhS2M5dFlLT1lkTnEvZ1l5RXEyeHRLSUgyb2dKbGVjQ0xIYUJsbSs4ZVMxeGpDZkhwTGpSVVdEejNtWnJXYWl6M2w1VVF3OWwyaDdCZ3huQUV2L3liV1JCWjVsNHRmZXZENEhIZy9GSzZqVDNSS29jMGdRcVYvZ0crY09LZ0habDZTL0NvNlIvVXFrZ2ZObGNYaklnbWNQbTNBYjcxYUVuS0FHcXhMNTdFTHUwQnloNHhqWDl2WnNyVCtKQ1JKbHBXL0tpRlNFRWlRd2RKQ2VqNW0yQk5rUGNQZHRkZjhRM1p4SXRBRVhMNTF6TU9admEvWnEza2wxejZEK0NYK3lGSUV3Um5vbGd2MjM5VXFQVVhVWlhteEdDd1c0RTlxOFBkRUlRR2J6dnhEd2ltNFd5RGNvYTh3RGhwTDNLTGQ5aE5DM0tNS3JJWklNd20xWGgvK1JocmFWYUdsemRHOXllUzVoY2k4Z0lDQWdJREUzT0RJeE9UZzROellnSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ05qY3lJQ0FnSUNBZ0lHQUtJVHhoY21Ob1Bnb3hMbUZ5TG5oNkx5QWdJQ0FnSUNBZ01UYzRNakU1T0RnM05pQWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0F5TmpnZ0lDQWdJQ0FnWUFyOU4zcFlXZ0FBQVdraTNqWUNBQ0VCRkFBQUFQL243QW5nQVdNQXpWMEFFSThJcUJseTEzVWZUcWc0OE5DbDB4ZWZ0RU5xTWpKcU5kMFd0U1JhcnRpdXBHQlZBREs3VVBWeEpMeUNLVGY5VUFYV1l3VmtTRCsrcW9nMHpRb05YNHFJUEVvM1VzTU5BdW9uM1Z3OWpDNDFSaGY5cklMUDhtRU12cTlVRGZzOTdTakpqYkFPOVNpVkRnbk5kZkxrK0VSZ0ZxNUJobzZ3a1B3aTloYlJzMlNtNGU1UFdiVTFaZExSQ2dqazFrWDk1LzNXeElIUTZTb3lkSEFRTzY1cG5tZCtxNDlDVEFqdmxJUmdOV3ZmYm9GSXdrMWRBQ3AxaW5zYVhzcGs3WHhDczhJbjNkdFd5MTJKNlRTTEFBQUFBQURYNzMrS0FBSGxBZVFDQUFCZGRTWGlQakFOaXdJQUFBQUFBVmxhYVc1bWJ5NXFjMjl1TG14NmJXRXZJREUzT0RJeE9UZzROellnSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ01qYzFJQ0FnSUNBZ0lHQUtYUUFBUUFELy8vLy8vLy8vL3dBOWdvQUJJc3J2SkxPWENsaE85Qm5OM1IvUjFyU0Z3U0dSa1NHdDFab0pmZEhJQzlEcko1b0NoV1doQjYzUE5mVG9nTVZndUE3MTh0cFYrdVlYMXF2N2VsUFl5dC9CTzhTQ0lLVXltL0J3RlZjcFlyM2lrbmtwdjFTNUZ3UzNMYkRySytBdGZ0ZG05eEl3R2loRnFUU25GbUJWc21oVDNMQmEvSU5heHhjdzIrdzl6ZFdpYTBzWk9QeUl1T0FOejk3c3FGMVZCU1BHYnhVVkdnRkE3R1lhWk5KSDlWOXAvZU9FcjdGS2FBY2FqUkV4MTBLTmhpMHhNdHE3WmZmRWVwS2xxRzFuN040SEdoUGJheFkycFJiSlQwVTlmOVNUVExJMTk0bmhaUDhBNWZLaVdoOGhlaCtRU2tSNHhNUWMxSEtxV2pVUW1SRzJsMnEvOUxzb3pIK3FsL3pXNk9ZS2FXNW1ieTVxYzI5dUx5QWdJQ0FnSURFM09ESXhPVGc0TnpZZ0lEQWdJQ0FnSURBZ0lDQWdJRFkwTkNBZ0lDQWdOek1nSUNBZ0lDQWdJR0FLZXdvZ0luZHlhWFIwWlc1ZllubGZZMlVpT2lJeU1qTXpMalVnS0RJd01qWXdOVEkyS1RzZ01qUXpNeUlzQ2lBaWQzSnBkR1ZmZEdsdGFXNW5JanBiTXl3d0xEUXNOVjBLZlFwMWMyVnlSR0YwWVM1cWMyOXVMeUFnTVRjNE1qSTVPVEEzTXlBZ01DQWdJQ0FnTUNBZ0lDQWdOalEwSUNBZ0lDQTFPU0FnSUNBZ0lDQWdZQW9pZFhWcFpEMWxNbVZqTW1GaFppMDNOVEUyTFRSaVlqZ3RZakJsTlMxbFpEZGlaVFptTVdabE9XTXNkbVZ5YzJsdmJqMHdMRzVoYldVOUlnbz0KaW5mby5qc29uLyAgICAgIDE3ODIyOTkwNzMgIDAgICAgIDAgICAgIDY0NCAgICAgNDYgICAgICAgIGAKewogIndyaXR0ZW5fYnlfY2UiOiIyMjMzLjcgKDIwMjYwNjEwKTsgMjQzOSIKfQ=="
+
+arch=$(uname -m)
+eraa_installer_url="http://repository.eset.com/v1/com/eset/apps/business/era/agent/v13/13.2.1189.0/agent_linux_i386.sh"
+eraa_installer_checksum="f11dbb5f28b57eef35a97dd8593aaed1ada160ceacd9cee11597e73eba00c03a"
+
+if $(echo "$arch" | grep -E "^(x86_64|amd64)$" 2>&1 > /dev/null)
+then
+    eraa_installer_url="http://repository.eset.com/v1/com/eset/apps/business/era/agent/v13/13.2.1189.0/agent_linux_x86_64.sh"
+    eraa_installer_checksum="79a380b04585ee92175a27a6036d1f5f3deabe623c9eb55a6e4cbbb68da1188b"
+else
+    if $(echo "$arch" | grep -E "^(aarch64|arm64)$" 2>&1 > /dev/null)
+    then
+        eraa_installer_url=""
+        eraa_installer_checksum=""
+    fi
+fi
+
+echo "ESET Management Agent live installer script. Copyright © 1992-2026 ESET, spol. s r.o. - All rights reserved."
+
+if test ! -z "$eraa_server_company_name"
+then
+  echo " * CompanyName: $eraa_server_company_name"
+fi
+echo " * Hostname: $eraa_server_hostname"
+echo " * Port: $eraa_server_port"
+echo " * Platform: $arch"
+echo " * Installer: $eraa_installer_url"
+echo
+
+if test -z "$eraa_installer_url"
+then
+  echo "No installer available for '$arch' arhitecture."
+  exit 1
+fi
+
+local_cert_path="$(mktemp -q -u)"
+echo $eraa_peer_cert_b64 | base64 -d > "$local_cert_path" && echo "$local_cert_path" >> "$cleanup_file"
+
+if test -n "$eraa_ca_cert_b64"
+then
+  local_ca_path="$(mktemp -q -u)"
+  echo $eraa_ca_cert_b64 | base64 -d > "$local_ca_path" && echo "$local_ca_path" >> "$cleanup_file"
+fi
+
+
+eraa_http_proxy_value=""
+
+local_installer="$(dirname $0)"/"$(basename $eraa_installer_url)"
+
+if $(echo "$eraa_installer_checksum  $local_installer" | sha256sum -c 2> /dev/null > /dev/null)
+then
+    echo "Verified local installer was found: '$local_installer'"
+else
+    local_installer="$(mktemp -q -u)"
+
+    echo "Downloading ESET Management Agent installer..."
+
+    if test -n "$eraa_http_proxy_value"
+    then
+      export use_proxy=yes
+      export http_proxy="$eraa_http_proxy_value"
+      (wget --connect-timeout 300 --no-check-certificate -O "$local_installer" "$eraa_installer_url" || wget --connect-timeout 300 --no-proxy --no-check-certificate -O "$local_installer" "$eraa_installer_url" || curl --fail --connect-timeout 300 -k "$eraa_installer_url" > "$local_installer") && echo "$local_installer" >> "$cleanup_file"
+    else
+      (wget --connect-timeout 300 --no-check-certificate -O "$local_installer" "$eraa_installer_url" || curl --fail --connect-timeout 300 -k "$eraa_installer_url" > "$local_installer") && echo "$local_installer" >> "$cleanup_file"
+    fi
+
+    if test ! -s "$local_installer"
+    then
+       echo "Failed to download installer file"
+       exit 2
+    fi
+
+    echo -n "Checking integrity of installer script " && echo "$eraa_installer_checksum  $local_installer" | sha256sum -c
+fi
+
+chmod +x "$local_installer"
+
+command -v sudo > /dev/null && usesudo="sudo -E" || usesudo=""
+
+export _ERAAGENT_PEER_CERT_PASSWORD="$eraa_peer_cert_pwd"
+
+echo
+echo Running installer script $local_installer
+echo
+
+$usesudo /bin/sh "$local_installer"\
+   --skip-license \
+   --hostname "$eraa_server_hostname"\
+   --port "$eraa_server_port"\
+   --cert-path "$local_cert_path"\
+   --cert-password "env:_ERAAGENT_PEER_CERT_PASSWORD"\
+   --cert-password-is-base64\
+   --initial-static-group "$eraa_initial_sg_token"\
+   \
+   --enable-imp-program\
+   $(test -n "$local_ca_path" && echo --cert-auth-path "$local_ca_path")\
+   $(test -n "$eraa_product_uuid" && echo --product-guid "$eraa_product_uuid")\
+   $(test -n "$eraa_policy_data" && echo --custom-policy "$eraa_policy_data")
+ESET_INSTALLER_EOF
+    chmod +x "$tmp"
+    if sudo /bin/sh "$tmp"; then
+        rm -f "$tmp"
+        log_ok "ESET PROTECT Agent installed & registered with server."
+    else
+        log_error "ESET PROTECT Agent installation failed."
+        rm -f "$tmp"
+        return 1
+    fi
+}
+
 set_screen_time_14m() {
     log_info "Setting GNOME Screen Blanking timeout to 14 minutes..."
     gsettings set org.gnome.desktop.session idle-delay 840 2>/dev/null || true
@@ -244,6 +389,21 @@ uninstall_clamav()          {
     sudo systemctl disable clamav-freshclam clamav-daemon 2>/dev/null || true
     sudo apt-get remove --purge -y clamav clamav-daemon clamav-freshclam || true
     sudo apt-get autoremove -y
+}
+
+uninstall_eset_protect() {
+    log_info "Removing ESET PROTECT Agent..."
+    local u
+    for u in /opt/eset/RemoteAdministrator/Agent/Uninstall.sh /opt/eset/RemoteAdministrator/Agent/uninstall.sh; do
+        if [ -f "$u" ]; then
+            sudo /bin/sh "$u" --unattended 2>/dev/null && { log_ok "ESET PROTECT Agent uninstalled."; return 0; }
+        fi
+    done
+    if dpkg -s eea &>/dev/null 2>&1; then
+        sudo apt-get remove --purge -y eea || true
+    fi
+    sudo rm -rf /opt/eset/RemoteAdministrator/Agent 2>/dev/null || true
+    log_ok "ESET PROTECT Agent removed (or was not installed)."
 }
 
 uninstall_timedoctor() {
@@ -282,6 +442,7 @@ is_installed() {
         10) dpkg -s gnome-tweaks &>/dev/null ;;
         11) pgrep -f sfproc &>/dev/null || [ -f /usr/bin/sfproc ] || [ -f /usr/local/bin/sfproc ] ;;
         12) [[ "$(gsettings get org.gnome.desktop.session idle-delay 2>/dev/null)" == *"840"* ]] ;;
+        13) [ -x /opt/eset/RemoteAdministrator/Agent/Agent ] || systemctl is-active --quiet eraagent 2>/dev/null ;;
         *) return 1 ;;
     esac
 }
@@ -301,6 +462,7 @@ install_component() {
         10) install_gnome_tools ;;
         11) install_timedoctor ;;
         12) set_screen_time_14m ;;
+        13) install_eset_protect ;;
     esac
 }
 
@@ -319,6 +481,7 @@ uninstall_component() {
         10) uninstall_gnome_tools ;;
         11) uninstall_timedoctor ;;
         12) reset_screen_time ;;
+        13) uninstall_eset_protect ;;
     esac
 }
 
@@ -358,6 +521,7 @@ check_status_all() {
         "Tailscale VPN:command -v tailscale:tailscaled"
         "GNOME Tweaks:dpkg -s gnome-tweaks:"
         "Time Doctor:pgrep -f sfproc || [ -f /usr/bin/sfproc ]:"
+        "ESET PROTECT Agent:[ -x /opt/eset/RemoteAdministrator/Agent/Agent ] || systemctl is-active --quiet eraagent:"
         "Screen Timeout (14m):gsettings get org.gnome.desktop.session idle-delay | grep -q 840:"
     )
     for entry in "${checks[@]}"; do
@@ -498,7 +662,8 @@ menu_tailscale() {
                     read -rp "  Admin Channel Name (agree once with Admin, e.g. priyanshu-setup): " NTFY_TOPIC < /dev/tty
                     [[ -z "$NTFY_TOPIC" ]] && NTFY_TOPIC="setup-center-$(hostname)"
                     log_info "Requesting login link..."
-                    LOGIN_OUTPUT=$(sudo tailscale up --login-server="$server" --accept-routes --accept-dns 2>&1 | tee /dev/tty)
+                    log_warn "This forces a fresh login even if already connected — if you're SSH'd in over Tailscale right now, that session may drop."
+                    LOGIN_OUTPUT=$(sudo tailscale up --login-server="$server" --accept-routes --accept-dns --force-reauth 2>&1 | tee /dev/tty)
                     LOGIN_URL=$(echo "$LOGIN_OUTPUT" | grep -oE 'https://[^ ]+' | head -1)
                     if [[ -n "$LOGIN_URL" ]]; then
                         log_info "Sending link to Admin channel '$NTFY_TOPIC'..."
