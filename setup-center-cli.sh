@@ -835,11 +835,13 @@ menu_status() {
     press_enter
 }
 
-# ── [9] Wayland / Xorg Setup ──────────────────────────────────────────────────
+# ── [9] Suspend/Wake Blinking Screen Fix ──────────────────────────────────────
 menu_wayland() {
     while true; do
         clear
-        echo -e "${CYAN}${BOLD}=== [9] WAYLAND / XORG CONFIGURATION ===${NC}\n"
+        echo -e "${CYAN}${BOLD}=== [9] FIX: SUSPEND/WAKE LOCK SCREEN BLINKING ===${NC}\n"
+        echo -e "  ${DIM}Symptom: after suspend, screen blinks instead of showing lock screen.${NC}"
+        echo -e "  ${DIM}Cause: GDM3 lock screen not syncing properly with the graphics driver.${NC}\n"
 
         # Check current running session type
         local session_type="${XDG_SESSION_TYPE:-Unknown}"
@@ -860,10 +862,15 @@ menu_wayland() {
             config_status="No configuration file found"
         fi
         echo -e "  GDM Configuration    : ${YELLOW}${config_status}${NC}"
-        echo -e "  Config File Path     : ${conf_file}"
-        echo -e "\n  [1] Force Xorg/X11 (Disable Wayland)"
-        echo -e "  [2] Enable Wayland (Restore Default)"
-        echo -e "  [3] Restart Display Manager (Apply Changes — Logs you out!)"
+        echo -e "  Config File Path     : ${conf_file}\n"
+
+        echo -e "  ${BOLD}Try these in order — Step 1 fixes most cases:${NC}"
+        echo -e "  [1] Step 1: Force Xorg/X11 (Disable Wayland) — most effective fix"
+        echo -e "  [2] Step 1b: Enable Wayland (Restore Default / undo Step 1)"
+        echo -e "  [3] Step 2: Restart Display Manager (Apply Changes — Logs you out!)"
+        echo -e "  [4] Step 2b: Enable NVIDIA Suspend/Resume Services (NVIDIA GPUs only)"
+        echo -e "  [5] Step 3: Check & Install System Updates (kernel/driver fixes)"
+        echo -e "  [6] Step 4: Disable Suspend-on-Lid-Close (fallback — lock+screen-off only, no real suspend)"
         echo -e "  [0] Back\n"
 
         read -rp "  Choice: " ch < /dev/tty
@@ -875,7 +882,7 @@ menu_wayland() {
                     else
                         sudo sed -i '/\[daemon\]/a WaylandEnable=false' "$conf_file"
                     fi
-                    log_ok "Wayland disabled (forced Xorg/X11). Restart GDM to apply."
+                    log_ok "Wayland disabled (forced Xorg/X11). Now do Step 2 (restart display manager) or reboot to apply."
                 else
                     log_error "GDM configuration file not found!"
                 fi
@@ -903,6 +910,47 @@ menu_wayland() {
                     log_info "Cancelled."
                 fi
                 press_enter ;;
+            4)
+                if lspci 2>/dev/null | grep -qi nvidia; then
+                    log_info "NVIDIA GPU detected. Enabling suspend/resume services..."
+                    sudo systemctl enable nvidia-suspend.service 2>/dev/null && log_ok "nvidia-suspend.service enabled." || log_warn "nvidia-suspend.service not found (driver may not provide it)."
+                    sudo systemctl enable nvidia-resume.service 2>/dev/null && log_ok "nvidia-resume.service enabled." || log_warn "nvidia-resume.service not found (driver may not provide it)."
+                else
+                    log_warn "No NVIDIA GPU detected — this step is not needed on this machine."
+                fi
+                press_enter ;;
+            5)
+                log_info "Checking for system updates..."
+                sudo apt-get update -y
+                local upgradable
+                upgradable=$(apt list --upgradable 2>/dev/null | grep -vc "^Listing...")
+                if [[ "$upgradable" -gt 0 ]]; then
+                    log_warn "$upgradable package(s) can be upgraded."
+                    read -rp "  Install all updates now? (y/N): " conf < /dev/tty
+                    if [[ "$conf" =~ ^[Yy]$ ]]; then
+                        sudo apt-get upgrade -y
+                        log_ok "Updates installed. Reboot recommended to apply kernel/driver updates."
+                    fi
+                else
+                    log_ok "System is already up to date."
+                fi
+                press_enter ;;
+            6)
+                echo ""
+                log_warn "This disables real suspend on lid-close. Laptop will only lock + turn off the screen, never deep-sleep."
+                read -rp "  Apply this fallback setting? (y/N): " conf < /dev/tty
+                if [[ "$conf" =~ ^[Yy]$ ]]; then
+                    if ! command -v gsettings &>/dev/null; then
+                        log_error "gsettings not found — GNOME desktop required for this step."
+                    else
+                        gsettings set org.gnome.settings-daemon.plugins.power lid-close-ac-action 'blank' 2>/dev/null
+                        gsettings set org.gnome.settings-daemon.plugins.power lid-close-battery-action 'blank' 2>/dev/null
+                        log_ok "Lid-close now locks + turns off screen only (no suspend). No more blinking on wake."
+                    fi
+                else
+                    log_info "Cancelled."
+                fi
+                press_enter ;;
             0) return ;;
             *) log_warn "Invalid choice." ;;
         esac
@@ -926,7 +974,7 @@ while true; do
     echo -e "  ${BOLD}[6]${NC} System Config         — hostname & git setup"
     echo -e "  ${BOLD}[7]${NC} Create Onboarding User"
     echo -e "  ${BOLD}[8]${NC} Time Doctor Setup     — check, install, uninstall"
-    echo -e "  ${BOLD}[9]${NC} Wayland / Xorg Setup  — check, enable, disable"
+    echo -e "  ${BOLD}[9]${NC} Fix Suspend/Wake Blinking Screen — Wayland/GDM3/lid-close fixes"
     echo -e "  ${BOLD}[0]${NC} Exit"
     echo -e "\n  ────────────────────────────────────────────────────────"
 
