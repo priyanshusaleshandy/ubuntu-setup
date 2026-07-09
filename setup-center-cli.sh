@@ -906,7 +906,10 @@ menu_wayland() {
         echo -e "  [3] Step 2: Restart Display Manager (Apply Changes — Logs you out!)"
         echo -e "  [4] Step 2b: Enable NVIDIA Suspend/Resume Services (NVIDIA GPUs only)"
         echo -e "  [5] Step 3: Check & Install System Updates (kernel/driver fixes)"
-        echo -e "  [6] Step 4: Disable Suspend-on-Lid-Close (fallback — lock+screen-off only, no real suspend)"
+        echo -e "  [6] Step 4: Disable Suspend-on-Lid-Close (systemd fix — lock only, never suspend)"
+        echo -e "  ${DIM}--- HP Victus / hybrid NVIDIA laptops (known unresolved kernel bug) ---${NC}"
+        echo -e "  [7] Step 5: Switch to Intel-only Graphics (disable NVIDIA dGPU — avoids the bug entirely)"
+        echo -e "  [8] Step 6: Kernel Parameter Fix (i915.enable_psr=0 + NVIDIA memory-preserve + force S3 sleep)"
         echo -e "  [0] Back\n"
 
         read -rp "  Choice: " ch < /dev/tty
@@ -973,16 +976,87 @@ menu_wayland() {
                 press_enter ;;
             6)
                 echo ""
-                log_warn "This disables real suspend on lid-close. Laptop will only lock + turn off the screen, never deep-sleep."
-                read -rp "  Apply this fallback setting? (y/N): " conf < /dev/tty
+                echo -e "  ${DIM}This edits /etc/systemd/logind.conf (the authoritative, most reliable${NC}"
+                echo -e "  ${DIM}method — more dependable than the GNOME Tweaks toggle, which many${NC}"
+                echo -e "  ${DIM}users report doesn't actually work). Sets HandleLidSwitch=lock, so${NC}"
+                echo -e "  ${DIM}closing the lid locks the screen WITHOUT ever suspending — no more blink.${NC}\n"
+                log_warn "This disables real suspend on lid-close entirely."
+                read -rp "  Apply this fix? (y/N): " conf < /dev/tty
                 if [[ "$conf" =~ ^[Yy]$ ]]; then
-                    if ! command -v gsettings &>/dev/null; then
-                        log_error "gsettings not found — GNOME desktop required for this step."
+                    local logind_conf="/etc/systemd/logind.conf"
+                    sudo cp "$logind_conf" "${logind_conf}.bak-$(date +%s)" 2>/dev/null
+                    if grep -q "^#*HandleLidSwitch=" "$logind_conf" 2>/dev/null; then
+                        sudo sed -i 's/^#*HandleLidSwitch=.*/HandleLidSwitch=lock/' "$logind_conf"
                     else
-                        gsettings set org.gnome.settings-daemon.plugins.power lid-close-ac-action 'blank' 2>/dev/null
-                        gsettings set org.gnome.settings-daemon.plugins.power lid-close-battery-action 'blank' 2>/dev/null
-                        log_ok "Lid-close now locks + turns off screen only (no suspend). No more blinking on wake."
+                        echo "HandleLidSwitch=lock" | sudo tee -a "$logind_conf" > /dev/null
                     fi
+                    sudo systemctl restart systemd-logind
+                    log_ok "Lid-close now locks the screen only — never suspends. No more blinking on wake."
+                    log_info "(Backup saved as ${logind_conf}.bak-*. To undo: set HandleLidSwitch=suspend and restart systemd-logind.)"
+                else
+                    log_info "Cancelled."
+                fi
+                press_enter ;;
+            7)
+                echo ""
+                echo -e "  ${DIM}HP Victus / hybrid-graphics laptops often fail to resume because the${NC}"
+                echo -e "  ${DIM}NVIDIA dGPU itself doesn't come back from sleep properly. Running on the${NC}"
+                echo -e "  ${DIM}Intel iGPU only sidesteps the bug entirely (you lose dGPU performance${NC}"
+                echo -e "  ${DIM}for gaming/rendering, but suspend/resume becomes reliable).${NC}\n"
+                log_warn "This disables the NVIDIA GPU for normal use. A reboot is required after."
+                read -rp "  Switch to Intel-only graphics? (y/N): " conf < /dev/tty
+                if [[ "$conf" =~ ^[Yy]$ ]]; then
+                    if ! command -v prime-select &>/dev/null; then
+                        log_info "Installing nvidia-prime..."
+                        sudo apt-get install -y nvidia-prime
+                    fi
+                    if command -v prime-select &>/dev/null; then
+                        sudo prime-select intel
+                        log_ok "Switched to Intel-only graphics. Reboot to apply. Run 'sudo prime-select nvidia' anytime to switch back."
+                    else
+                        log_error "prime-select not available — this system may not have NVIDIA Optimus/PRIME support."
+                    fi
+                else
+                    log_info "Cancelled."
+                fi
+                press_enter ;;
+            8)
+                echo ""
+                echo -e "  ${DIM}This applies 3 known fixes for HP Victus/hybrid-NVIDIA suspend bugs:${NC}"
+                echo -e "  ${DIM}  1. i915.enable_psr=0 — disables Intel Panel Self-Refresh (common blink cause)${NC}"
+                echo -e "  ${DIM}  2. mem_sleep_default=deep — forces real S3 sleep instead of buggy 'modern standby'${NC}"
+                echo -e "  ${DIM}  3. NVIDIA driver memory-preserve options — smoother dGPU resume${NC}\n"
+                log_warn "This edits GRUB boot settings. A reboot is required to take effect."
+                read -rp "  Apply these kernel parameter fixes? (y/N): " conf < /dev/tty
+                if [[ "$conf" =~ ^[Yy]$ ]]; then
+                    local grub_file="/etc/default/grub"
+                    if [ -f "$grub_file" ]; then
+                        sudo cp "$grub_file" "${grub_file}.bak-$(date +%s)"
+                        local current_val
+                        current_val=$(grep '^GRUB_CMDLINE_LINUX_DEFAULT=' "$grub_file" | sed -E 's/^GRUB_CMDLINE_LINUX_DEFAULT="(.*)"$/\1/')
+                        for p in "i915.enable_psr=0" "mem_sleep_default=deep"; do
+                            [[ "$current_val" != *"$p"* ]] && current_val="$current_val $p"
+                        done
+                        current_val=$(echo "$current_val" | xargs)
+                        local new_line="GRUB_CMDLINE_LINUX_DEFAULT=\"$current_val\""
+                        if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$grub_file"; then
+                            sudo sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|$new_line|" "$grub_file"
+                        else
+                            echo "$new_line" | sudo tee -a "$grub_file" > /dev/null
+                        fi
+                        sudo update-grub
+                        log_ok "Kernel parameters added (backup saved as ${grub_file}.bak-*)."
+                    else
+                        log_error "GRUB config not found at $grub_file — is this a GRUB-based system?"
+                    fi
+
+                    if lspci 2>/dev/null | grep -qi nvidia; then
+                        echo 'options nvidia NVreg_PreserveVideoMemoryAllocations=1 NVreg_TemporaryFilePath=/var/tmp' | \
+                            sudo tee /etc/modprobe.d/nvidia-power-management.conf > /dev/null
+                        sudo update-initramfs -u 2>/dev/null || true
+                        log_ok "NVIDIA memory-preserve driver options added."
+                    fi
+                    log_warn "Reboot now for these changes to take effect."
                 else
                     log_info "Cancelled."
                 fi
