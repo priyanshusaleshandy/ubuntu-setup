@@ -112,8 +112,9 @@ OPTIONS=(
     "Time Doctor"
     "GNOME Screen Blank Timeout (14 minutes)"
     "ESET PROTECT Agent (Antivirus/EDR)"
+    "Action1 Agent (RMM)"
 )
-SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
+SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
@@ -397,6 +398,25 @@ uninstall_clamav()          {
     sudo apt-get autoremove -y
 }
 
+install_action1_agent() {
+    log_info "Installing Action1 Agent (RMM)..."
+    local pkg="/tmp/action1_agent(Saleshandy).deb"
+    if curl -fsSL -o "$pkg" "https://app.action1.com/agent/6fc55c64-6a4c-11f1-9c44-05814ea2b314/Linux/agent(Saleshandy).deb"; then
+        export DEBIAN_FRONTEND=noninteractive
+        if sudo apt-get install -y "$pkg"; then
+            rm -f "$pkg"
+            log_ok "Action1 Agent installed & registered."
+        else
+            log_error "Action1 Agent installation failed."
+            rm -f "$pkg"
+            return 1
+        fi
+    else
+        log_error "Failed to download Action1 Agent installer (check internet connection)."
+        return 1
+    fi
+}
+
 uninstall_eset_protect() {
     log_info "Removing ESET PROTECT Agent..."
     local u
@@ -410,6 +430,18 @@ uninstall_eset_protect() {
     fi
     sudo rm -rf /opt/eset/RemoteAdministrator/Agent 2>/dev/null || true
     log_ok "ESET PROTECT Agent removed (or was not installed)."
+}
+
+uninstall_action1_agent() {
+    log_info "Removing Action1 Agent..."
+    local pkgname
+    pkgname=$(dpkg -l 2>/dev/null | awk '/action1/{print $2}' | head -1)
+    if [[ -n "$pkgname" ]]; then
+        sudo apt-get remove --purge -y "$pkgname"
+        log_ok "Action1 Agent removed."
+    else
+        log_warn "Action1 Agent package not found (already removed, or was never installed)."
+    fi
 }
 
 uninstall_timedoctor() {
@@ -449,6 +481,7 @@ is_installed() {
         11) pgrep -f sfproc &>/dev/null || [ -f /usr/bin/sfproc ] || [ -f /usr/local/bin/sfproc ] ;;
         12) [[ "$(gsettings get org.gnome.desktop.session idle-delay 2>/dev/null)" == *"840"* ]] ;;
         13) [ -x /opt/eset/RemoteAdministrator/Agent/Agent ] || systemctl is-active --quiet eraagent 2>/dev/null ;;
+        14) dpkg -l 2>/dev/null | grep -qi action1 ;;
         *) return 1 ;;
     esac
 }
@@ -469,6 +502,7 @@ install_component() {
         11) install_timedoctor ;;
         12) set_screen_time_14m ;;
         13) install_eset_protect ;;
+        14) install_action1_agent ;;
     esac
 }
 
@@ -488,6 +522,7 @@ uninstall_component() {
         11) uninstall_timedoctor ;;
         12) reset_screen_time ;;
         13) uninstall_eset_protect ;;
+        14) uninstall_action1_agent ;;
     esac
 }
 
@@ -528,6 +563,7 @@ check_status_all() {
         "GNOME Tweaks:dpkg -s gnome-tweaks:"
         "Time Doctor:pgrep -f sfproc || [ -f /usr/bin/sfproc ]:"
         "ESET PROTECT Agent:[ -x /opt/eset/RemoteAdministrator/Agent/Agent ] || systemctl is-active --quiet eraagent:"
+        "Action1 Agent:dpkg -l 2>/dev/null | grep -qi action1:"
         "Screen Timeout (14m):gsettings get org.gnome.desktop.session idle-delay | grep -q 840:"
     )
     for entry in "${checks[@]}"; do
