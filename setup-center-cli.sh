@@ -1066,7 +1066,89 @@ menu_wayland() {
         esac
     done
 }
+# ── [10] Diagnose WiFi ────────────────────────────────────────────────────────
+menu_wifi_diagnose() {
+    while true; do
+        clear
+        echo -e "${CYAN}${BOLD}=== [10] DIAGNOSE WIFI ===${NC}\n"
+        echo -e "  ${DIM}Fix the \"?\" / \"limited connectivity\" false warning on Wi-Fi icon.${NC}"
+        echo -e "  ${DIM}This is usually a NetworkManager connectivity-check bug, not real failure.${NC}\n"
 
+        # Show current status
+        local nm_conf="/etc/NetworkManager/NetworkManager.conf"
+        local check_status="${YELLOW}UNKNOWN${NC}"
+        if [ -f "$nm_conf" ]; then
+            if grep -A2 '^\[connectivity\]' "$nm_conf" 2>/dev/null | grep -q 'enabled=false'; then
+                check_status="${GREEN}DISABLED (Fixed)${NC}"
+            elif grep -A2 '^\[connectivity\]' "$nm_conf" 2>/dev/null | grep -q 'enabled=true'; then
+                check_status="${RED}ENABLED (causes ? mark)${NC}"
+            else
+                check_status="${YELLOW}NOT SET (default = enabled)${NC}"
+            fi
+        fi
+        echo -e "  Current connectivity check : ${check_status}"
+        echo -e "  Config file                : ${nm_conf}\n"
+
+        echo -e "  ${BOLD}[1]${NC} Disable connectivity check (recommended — removes ? permanently)"
+        echo -e "  ${BOLD}[2]${NC} Re-enable connectivity check (undo)"
+        echo -e "  ${BOLD}[3]${NC} Restart NetworkManager (apply changes)"
+        echo -e "  ${BOLD}[4]${NC} Show WiFi / NetworkManager status"
+        echo -e "  ${BOLD}[0]${NC} Back\n"
+
+        read -rp "  Choice: " ch < /dev/tty
+        case "$ch" in
+            1)
+                local nm_conf="/etc/NetworkManager/NetworkManager.conf"
+                if [ -f "$nm_conf" ]; then
+                    sudo cp "$nm_conf" "${nm_conf}.bak-$(date +%s)" 2>/dev/null
+                    if grep -q '^\[connectivity\]' "$nm_conf"; then
+                        if grep -A2 '^\[connectivity\]' "$nm_conf" | grep -q 'enabled='; then
+                            sudo sed -i '/^\[connectivity\]/,/^\[/ { s/^enabled=.*/enabled=false/; }' "$nm_conf"
+                        else
+                            sudo sed -i '/^\[connectivity\]/a enabled=false' "$nm_conf"
+                        fi
+                    else
+                        echo -e "\n[connectivity]\nenabled=false" | sudo tee -a "$nm_conf" > /dev/null
+                    fi
+                    log_ok "Connectivity check DISABLED. Wi-Fi ? mark will disappear after restart."
+                    log_info "Backup saved as ${nm_conf}.bak-*"
+                else
+                    log_error "NetworkManager.conf not found at $nm_conf"
+                fi
+                press_enter ;;
+            2)
+                local nm_conf="/etc/NetworkManager/NetworkManager.conf"
+                if [ -f "$nm_conf" ] && grep -q '^\[connectivity\]' "$nm_conf"; then
+                    sudo sed -i '/^\[connectivity\]/,/^\[/ { s/^enabled=.*/enabled=true/; }' "$nm_conf"
+                    log_ok "Connectivity check re-enabled."
+                else
+                    log_warn "No [connectivity] section found to re-enable."
+                fi
+                press_enter ;;
+            3)
+                log_info "Restarting NetworkManager..."
+                sudo systemctl restart NetworkManager
+                log_ok "NetworkManager restarted."
+                press_enter ;;
+            4)
+                log_section "WIFI / NETWORK STATUS"
+                log_info "NetworkManager service:"
+                systemctl is-active NetworkManager && echo "  Status: ACTIVE" || echo "  Status: INACTIVE"
+                echo ""
+                log_info "WiFi device state:"
+                nmcli device status 2>/dev/null | grep -i wifi || echo "  (no WiFi device found or nmcli unavailable)"
+                echo ""
+                log_info "Active connection:"
+                nmcli connection show --active 2>/dev/null | head -5 || true
+                echo ""
+                log_info "Connectivity check config:"
+                grep -A2 '^\[connectivity\]' /etc/NetworkManager/NetworkManager.conf 2>/dev/null || echo "  (not configured)"
+                press_enter ;;
+            0) return ;;
+            *) log_warn "Invalid choice." ;;
+        esac
+    done
+}
 # ── MAIN MENU ─────────────────────────────────────────────────────────────────
 while true; do
     clear
@@ -1085,6 +1167,7 @@ while true; do
     echo -e "  ${BOLD}[7]${NC} Create Onboarding User"
     echo -e "  ${BOLD}[8]${NC} Time Doctor Setup     — check, install, uninstall"
     echo -e "  ${BOLD}[9]${NC} Fix Suspend/Wake Blinking Screen — Wayland/GDM3/lid-close fixes"
+    echo -e "  ${BOLD}[10]${NC} Diagnose WiFi         — fix ? / limited connectivity false warning"
     echo -e "  ${BOLD}[0]${NC} Exit"
     echo -e "\n  ────────────────────────────────────────────────────────"
 
@@ -1099,6 +1182,7 @@ while true; do
         7) menu_create_user ;;
         8) menu_timedoctor ;;
         9) menu_wayland ;;
+        10) menu_wifi_diagnose ;;
         0) echo -e "\n  ${CYAN}Goodbye!${NC}\n"; exit 0 ;;
         *) log_warn "Invalid choice — enter 0-9."; sleep 1 ;;
     esac
