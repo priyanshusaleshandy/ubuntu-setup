@@ -13,13 +13,18 @@
 #   [0] Exit
 # =============================================================================
 # Usage:
-#   Right-click PowerShell -> Run as Administrator
-#   powershell -ExecutionPolicy Bypass -File setup-center-cli.ps1
+#   Just double-click RUN-SETUP.bat (handles everything automatically)
 # =============================================================================
 
 Set-StrictMode -Off
 $ErrorActionPreference = "Continue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# ── Tailscale Auto-Send Config ────────────────────────────────────────────────
+# Change these if you ever move to a different Admin channel or server.
+# No need to type it every time — the script uses this automatically.
+$NtfyServer = "http://192.168.126.101:8080"   # Private self-hosted ntfy (Mac Mini via Docker)
+$NtfyAdminChannel = "priyanshu-setup"
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 function Write-Sep  { param([string]$c="=",[int]$w=70) Write-Host ($c*$w) -ForegroundColor Cyan }
@@ -38,16 +43,42 @@ function Show-Header {
     Write-Host ""
 }
 
-# ─── Admin check ────────────────────────────────────────────────────────────
+# ─── Self-unblock (fixes "downloaded from internet" security block) ────────
+# Any .ps1 downloaded via a browser or curl/iwr gets a hidden "Mark of the Web"
+# tag, which makes Windows refuse to run it ("cannot be loaded... digitally
+# signed" or similar). This strips that tag from ourselves automatically,
+# every single time, so it never blocks execution again.
+try {
+    if ($PSCommandPath) { Unblock-File -Path $PSCommandPath -ErrorAction SilentlyContinue }
+} catch { }
+
+# ─── Self-elevate to Administrator (fixes "forgot Run as Administrator") ───
+# Instead of refusing to continue, the script relaunches itself elevated via
+# a UAC prompt — so you never have to remember to right-click > Run as Admin.
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    Write-Host ""
-    Write-Host "  This script must be run as Administrator." -ForegroundColor Yellow
-    Write-Host "  Right-click PowerShell -> Run as Administrator, then re-run." -ForegroundColor DarkGray
-    Write-Host ""
-    Read-Host "  Press Enter to exit"
-    exit 1
+    if ($PSCommandPath) {
+        Write-Host "  Requesting Administrator privileges (a UAC popup will appear — click Yes)..." -ForegroundColor Yellow
+        try {
+            Start-Process powershell -Verb RunAs -ArgumentList @(
+                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`""
+            )
+            exit 0
+        } catch {
+            Write-Host ""
+            Write-Host "  Could not elevate automatically (UAC was cancelled or blocked)." -ForegroundColor Red
+            Write-Host "  Please right-click RUN-SETUP.bat and choose 'Run as administrator'." -ForegroundColor DarkGray
+            Read-Host "  Press Enter to exit"
+            exit 1
+        }
+    } else {
+        Write-Host ""
+        Write-Host "  This must run as Administrator. Since it was launched inline (no file)," -ForegroundColor Yellow
+        Write-Host "  open PowerShell as Administrator first, then run the command again." -ForegroundColor DarkGray
+        Read-Host "  Press Enter to exit"
+        exit 1
+    }
 }
 
 # ─── Package manager check ──────────────────────────────────────────────────
@@ -607,6 +638,43 @@ function Set-PCHostname {
     Pause-Menu
 }
 
+function New-WorkUser {
+    Show-Header; Write-Host "  [8.3] CREATE WORK USER" -ForegroundColor Cyan; Write-Host ""
+    $uname = Read-Host "  Username (blank = cancel)"
+    if ([string]::IsNullOrWhiteSpace($uname)) { Write-WARN "Cancelled."; Pause-Menu; return }
+    $pass    = Read-Host "  Password" -AsSecureString
+    $full    = Read-Host "  Full name (optional)"
+    $isAdmin = Read-Host "  Administrator? (y/N)"
+    try {
+        $p = @{Name=$uname; Password=$pass; AccountNeverExpires=$true; PasswordNeverExpires=$true}
+        if ($full) { $p.FullName = $full }
+        New-LocalUser @p
+        Add-LocalGroupMember -Group "Users" -Member $uname -ErrorAction SilentlyContinue
+        if ($isAdmin -match '^[Yy]$') { Add-LocalGroupMember -Group "Administrators" -Member $uname; Write-OK "Admin user '$uname' created." }
+        else { Write-OK "Standard user '$uname' created." }
+    } catch { Write-ERR "$($_.Exception.Message)" }
+    Pause-Menu
+}
+
+function Show-SystemSetupMenu {
+    while ($true) {
+        Show-Header
+        Write-Host "  [8] SYSTEM SETUP" -ForegroundColor Yellow; Write-Host ""
+        Write-Host "  [1] Network Information"    -ForegroundColor White
+        Write-Host "  [2] Change PC Hostname"     -ForegroundColor White
+        Write-Host "  [3] Create Work User"       -ForegroundColor White
+        Write-Host "  [0] Back"                   -ForegroundColor DarkGray
+        Write-Host ""
+        $sub = (Read-Host "  Choice").Trim()
+        switch ($sub) {
+            '1' { Get-NetworkInfo }
+            '2' { Set-PCHostname }
+            '3' { New-WorkUser }
+            '0' { return }
+        }
+    }
+}
+
 # =============================================================================
 # [9] TAILSCALE VPN
 # =============================================================================
@@ -625,21 +693,52 @@ function Install-Tailscale {
 
 function Invoke-TailscaleLogin {
     Show-Header; Write-Host "  [9.2] TAILSCALE LOGIN / REGISTER" -ForegroundColor Cyan; Write-Host ""
-    Write-Host "  [1] Web Browser Login (Sends Auth URL to Admin)" -ForegroundColor White
+    Write-Host "  [1] Auto-send Login Link to Admin (no typing)" -ForegroundColor White
     Write-Host "  [2] Auth Key Login    (Use pre-authorized key from Admin)" -ForegroundColor Green
     Write-Host "  [0] Back" -ForegroundColor DarkGray
     Write-Host ""
-    $subChoice = (Read-Host "  Select Login Method").Trim()
-    
+    $subChoice = Read-Host "  Select Login Method"
+
     if ($subChoice -eq '1') {
-        Write-INFO "Opening browser login..."
-        Write-WARN "If browser does not open, COPY the URL printed below and send it to your Admin:"
+        $topic = $NtfyAdminChannel
+        # Auto-clean: strip any accidental full-URL prefix
+        $topic = $topic -replace [regex]::Escape("$NtfyServer/"), '' -replace '^https?://ntfy\.sh/', '' -replace '^ntfy\.sh/', '' -replace '/$', ''
+        Write-INFO "Requesting login link (will auto-send to '$topic')..."
+        Write-WARN "This forces a fresh login even if already connected."
+        $logFile = [System.IO.Path]::GetTempFileName()
+        $errFile = [System.IO.Path]::GetTempFileName()
         try {
-            tailscale login --login-server https://bifrost.saleshandy.com
+            $proc = Start-Process -FilePath "tailscale" -ArgumentList @(
+                "up","--login-server=https://bifrost.saleshandy.com","--accept-routes","--accept-dns","--force-reauth"
+            ) -NoNewWindow -RedirectStandardOutput $logFile -RedirectStandardError $errFile -PassThru
+
+            $loginUrl = $null
+            for ($i = 0; $i -lt 30; $i++) {
+                Start-Sleep -Seconds 1
+                $combined = (Get-Content $logFile -ErrorAction SilentlyContinue) + (Get-Content $errFile -ErrorAction SilentlyContinue) | Out-String
+                $match = [regex]::Match($combined, 'https://\S+')
+                if ($match.Success) { $loginUrl = $match.Value; break }
+                if ($proc.HasExited) { break }
+            }
+            Get-Content $logFile, $errFile -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+
+            if ($loginUrl) {
+                Write-INFO "Sending link to Admin channel '$topic'..."
+                try {
+                    Invoke-RestMethod -Uri "$NtfyServer/$topic" -Method Post -Body "New PC ($env:COMPUTERNAME) Tailscale login: $loginUrl" -TimeoutSec 10 | Out-Null
+                    Write-OK "Link sent! Admin should open $NtfyServer/$topic in a browser tab (once, keep it open) to see it arrive instantly."
+                } catch {
+                    Write-WARN "Auto-send failed (server unreachable — check VPN/Tailscale connection to $NtfyServer). Admin can still use the URL printed above."
+                }
+            } else {
+                Write-OK "Already logged in — no link needed."
+            }
+            if (-not $proc.HasExited) { $proc.WaitForExit() }
         } catch { Write-ERR "Login failed: $($_.Exception.Message)" }
+        finally { Remove-Item $logFile, $errFile -ErrorAction SilentlyContinue }
     }
     elseif ($subChoice -eq '2') {
-        $authKey = (Read-Host "  Enter Tailscale Auth Key (tskey-auth-...)").Trim()
+        $authKey = Read-Host "  Enter Tailscale Auth Key (tskey-auth-...)"
         if ([string]::IsNullOrWhiteSpace($authKey)) { Write-WARN "Cancelled."; Pause-Menu; return }
         Write-INFO "Registering node using Auth Key..."
         try {
@@ -714,7 +813,7 @@ function Show-TailscaleMenu {
         Write-Host "  Login Server: https://bifrost.saleshandy.com" -ForegroundColor DarkGray
         Write-Host ""
         Write-Host "  [1] Install Tailscale                   (via winget)"                        -ForegroundColor White
-        Write-Host "  [2] Login                               (open browser auth)"                  -ForegroundColor Cyan
+        Write-Host "  [2] Login                               (auto-sent to Admin)"                 -ForegroundColor Cyan
         Write-Host "  [3] Connect                             (--accept-routes)"                    -ForegroundColor Green
         Write-Host "  [4] Full Reset + Connect                (--reset --accept-dns --accept-routes)" -ForegroundColor Yellow
         Write-Host "  [5] Connect via Exit Node               (--exit-node=100.64.0.7)"             -ForegroundColor Magenta

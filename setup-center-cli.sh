@@ -871,6 +871,51 @@ menu_status() {
     press_enter
 }
 
+# ── Restart Display Driver / Graphics Context ──────────────────────────────────
+restart_display_driver() {
+    log_section "RESTART DISPLAY DRIVER / MANAGER"
+    local session_type="${XDG_SESSION_TYPE:-Unknown}"
+    
+    if [[ "$session_type" == "x11" ]]; then
+        echo -e "  X11 session detected."
+        read -rp "  Do you want to gracefully restart the GNOME Shell? (This won't close apps) (y/N): " conf < /dev/tty
+        if [[ "$conf" =~ ^[Yy]$ ]]; then
+            log_info "Sending restart signal to GNOME Shell..."
+            if busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'global.reinit_locale(); main.restart();' &>/dev/null; then
+                log_ok "GNOME Shell restart signal sent via busctl."
+            else
+                killall -3 gnome-shell 2>/dev/null
+                log_ok "GNOME Shell restart signal sent via killall."
+            fi
+        fi
+    else
+        echo -e "  Wayland session (or other non-X11 session) detected: ${YELLOW}${session_type}${NC}"
+        log_warn "Restarting graphics on Wayland requires restarting the Display Manager (which will log you out!)."
+    fi
+
+    # Check for NVIDIA GPU and offer nvidia system services restart
+    if lspci 2>/dev/null | grep -qi nvidia; then
+        echo ""
+        read -rp "  NVIDIA GPU detected. Restart NVIDIA & logind system services? (y/N): " nv_conf < /dev/tty
+        if [[ "$nv_conf" =~ ^[Yy]$ ]]; then
+            log_info "Restarting NVIDIA services..."
+            sudo systemctl restart nvidia-persistenced 2>/dev/null || true
+            sudo systemctl restart systemd-logind 2>/dev/null || true
+            log_ok "NVIDIA system services restarted."
+        fi
+    fi
+
+    echo ""
+    read -rp "  Restart GDM/Display Manager now? (Logs you out immediately) (y/N): " dm_conf < /dev/tty
+    if [[ "$dm_conf" =~ ^[Yy]$ ]]; then
+        log_info "Restarting display manager..."
+        sudo systemctl restart gdm3 2>/dev/null || \
+        sudo systemctl restart gdm 2>/dev/null || \
+        sudo systemctl restart lightdm 2>/dev/null || \
+        log_error "Failed to restart display manager. Please reboot manually."
+    fi
+}
+
 # ── [9] Suspend/Wake Blinking Screen Fix ──────────────────────────────────────
 menu_wayland() {
     while true; do
@@ -910,6 +955,7 @@ menu_wayland() {
         echo -e "  ${DIM}--- HP Victus / hybrid NVIDIA laptops (known unresolved kernel bug) ---${NC}"
         echo -e "  [7] Step 5: Switch to Intel-only Graphics (disable NVIDIA dGPU — avoids the bug entirely)"
         echo -e "  [8] Step 6: Kernel Parameter Fix (i915.enable_psr=0 + NVIDIA memory-preserve + force S3 sleep)"
+        echo -e "  [9] Restart Display Driver / Graphics Context (safe if X11, restarts manager if Wayland)"
         echo -e "  [0] Back\n"
 
         read -rp "  Choice: " ch < /dev/tty
@@ -993,6 +1039,12 @@ menu_wayland() {
                     sudo systemctl restart systemd-logind
                     log_ok "Lid-close now locks the screen only — never suspends. No more blinking on wake."
                     log_info "(Backup saved as ${logind_conf}.bak-*. To undo: set HandleLidSwitch=suspend and restart systemd-logind.)"
+                    
+                    echo ""
+                    read -rp "  Do you want to restart the display manager / graphics driver now to apply changes? (y/N): " r_conf < /dev/tty
+                    if [[ "$r_conf" =~ ^[Yy]$ ]]; then
+                        restart_display_driver
+                    fi
                 else
                     log_info "Cancelled."
                 fi
@@ -1060,6 +1112,9 @@ menu_wayland() {
                 else
                     log_info "Cancelled."
                 fi
+                press_enter ;;
+            9)
+                restart_display_driver
                 press_enter ;;
             0) return ;;
             *) log_warn "Invalid choice." ;;

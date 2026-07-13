@@ -1,2 +1,11 @@
 in_house_ai_cluster_proposal.md
 self_hosted_ai_architecture.html
+*.vmcz
+New Virtual Machine.vmcz
+*.exe
+*.msi
+*.deb
+*.zip
+*.dmg
+*.pkg
+offline-installers/
