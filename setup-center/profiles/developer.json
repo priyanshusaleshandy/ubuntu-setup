@@ -1,7 +1,0 @@
-{
-  "id": "developer",
-  "name": "Developer Workstation (i5/i7)",
-  "description": "Full dev stack: all basic office tools PLUS VS Code, Git, Node.js v15.14 (NVM), MySQL Workbench, DBeaver, Postman, Redis Insight, and MongoDB Compass.",
-  "windowsSoftware": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"],
-  "linuxSoftware": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
-}

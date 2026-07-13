@@ -1,7 +1,0 @@
-{
-  "id": "qa",
-  "name": "QA Engineer",
-  "description": "Standard QA verification bundle. Configures multiple browsers, API clients (Postman), and database inspection portals.",
-  "windowsSoftware": ["1", "2", "3", "4"],
-  "linuxSoftware": ["1", "3", "4", "8", "9", "10"]
-}

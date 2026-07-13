@@ -1,7 +1,0 @@
-{
-  "id": "basic",
-  "name": "i3 Basic Laptop",
-  "description": "Standard office setup: Chrome, Brave, Basecamp, Sprinto, ESET Antivirus, Time Doctor, Action1, Tailscale VPN, and RustDesk.",
-  "windowsSoftware": ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
-  "linuxSoftware": ["1", "3", "4", "11"]
-}
