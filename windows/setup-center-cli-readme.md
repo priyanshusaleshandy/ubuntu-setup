@@ -4,17 +4,17 @@
 
 | Platform | Script | One-liner |
 |----------|--------|-----------|
-| **Windows** | `setup-center-cli.ps1` | `irm https://raw.githubusercontent.com/priyanshusaleshandy/setup-center-cli/main/setup-center-cli.ps1 \| iex` |
+| **Windows** | `setup-center-cli.ps1` | `Set-ExecutionPolicy Bypass -Scope Process -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iex (irm https://raw.githubusercontent.com/Priyanshu8494/ubuntu-setup/main/setup-center-cli.ps1)` |
 | **Ubuntu/Linux** | `setup-center-cli.sh` | `bash <(curl -fsSL https://raw.githubusercontent.com/priyanshusaleshandy/setup-center-cli/main/setup-center-cli.sh)` |
 
 ---
 
 ## Windows — PowerShell
 
-> Run **PowerShell as Administrator** then paste:
+> Paste into any **PowerShell window** (handles auto-elevation & execution policy):
 
 ```powershell
-irm https://raw.githubusercontent.com/priyanshusaleshandy/setup-center-cli/main/setup-center-cli.ps1 | iex
+Set-ExecutionPolicy Bypass -Scope Process -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iex (irm https://raw.githubusercontent.com/Priyanshu8494/ubuntu-setup/main/setup-center-cli.ps1)
 ```
 
 ### Features

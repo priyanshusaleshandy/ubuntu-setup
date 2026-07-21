@@ -196,12 +196,37 @@ install_gnome_tools() {
 }
 
 install_clamav() {
-    log_info "Installing ClamAV..."
-    sudo apt-get update -y && sudo apt-get install -y clamav clamav-daemon clamav-freshclam
-    sudo systemctl stop clamav-freshclam || true
+    log_info "Installing & Configuring ClamAV Antivirus..."
+    log_info "Purging existing ClamAV packages..."
+    sudo systemctl stop clamav-freshclam clamav-daemon 2>/dev/null || true
+    sudo systemctl disable clamav-freshclam clamav-daemon 2>/dev/null || true
+    sudo apt-get remove --purge -y clamav clamav-daemon clamav-freshclam || true
+    sudo apt-get autoremove -y
+
+    log_info "Installing clamav and clamav-daemon..."
+    sudo apt-get update -y
+    sudo apt-get install -y clamav clamav-daemon
+
+    log_info "Configuring /etc/clamav/freshclam.conf..."
+    sudo mkdir -p /var/lib/clamav /var/log/clamav
+    sudo chown -R clamav:clamav /var/lib/clamav /var/log/clamav 2>/dev/null || true
+
+    cat << 'FRESHCLAM_EOF' | sudo tee /etc/clamav/freshclam.conf > /dev/null
+DatabaseDirectory /var/lib/clamav
+UpdateLogFile /var/log/clamav/freshclam.log
+DatabaseMirror database.clamav.net
+CompressLocalDatabase yes
+FRESHCLAM_EOF
+
+    log_info "Updating ClamAV virus database via freshclam..."
+    sudo systemctl stop clamav-freshclam 2>/dev/null || true
     sudo freshclam || true
-    sudo systemctl enable --now clamav-freshclam clamav-daemon
-    log_ok "ClamAV installed & services started."
+
+    log_info "Starting clamav-daemon service..."
+    sudo systemctl enable --now clamav-daemon
+    sudo systemctl start clamav-daemon
+    sudo systemctl status clamav-daemon --no-pager || true
+    log_ok "ClamAV installed, configured, & daemon started!"
 }
 
 install_timedoctor() {
@@ -1185,6 +1210,142 @@ menu_wifi_diagnose() {
         esac
     done
 }
+
+# ── [11] System Toolkit & Utilities ─────────────────────────────────────────
+menu_system_toolkit() {
+    while true; do
+        clear
+        echo -e "${CYAN}${BOLD}=== [11] SYSTEM TOOLKIT & UTILITIES ===${NC}\n"
+        echo -e "  ${BOLD}[1]${NC} Create / Resize Swap File (16GB or 18GB + /etc/fstab)"
+        echo -e "  ${BOLD}[2]${NC} Enable Docker Sudo-less Access (usermod -aG docker)"
+        echo -e "  ${BOLD}[3]${NC} Setup XAMPP Auto-Start Service (/etc/systemd/system/xampp.service)"
+        echo -e "  ${BOLD}[4]${NC} Setup OpenSSH Server (install & enable sshd)"
+        echo -e "  ${BOLD}[5]${NC} Switch PHP Default Version (update-alternatives)"
+        echo -e "  ${BOLD}[6]${NC} Check Disk Encryption (LUKS / crypto)"
+        echo -e "  ${BOLD}[7]${NC} Emergency Package Repair (\"Oh No! Something went wrong\")"
+        echo -e "  ${BOLD}[8]${NC} Install CPU Performance Tuner (cpupower-gui)"
+        echo -e "  ${BOLD}[9]${NC} Canon LBP2900 Printer Driver Setup"
+        echo -e "  ${BOLD}[0]${NC} Back\n"
+
+        read -rp "  Choice: " ch < /dev/tty
+        case "$ch" in
+            1)
+                log_section "SWAP FILE CONFIGURATION"
+                swapon --show || true
+                read -rp "  Enter desired swap size in GB (e.g. 16 or 18, blank=cancel): " sw_size < /dev/tty
+                if [[ -n "$sw_size" && "$sw_size" =~ ^[0-9]+$ ]]; then
+                    log_info "Turning off current swap..."
+                    sudo swapoff /swapfile 2>/dev/null || true
+                    log_info "Allocating ${sw_size}G swap file..."
+                    sudo fallocate -l "${sw_size}G" /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=$((sw_size*1024))
+                    sudo chmod 600 /swapfile
+                    sudo mkswap /swapfile
+                    sudo swapon /swapfile
+                    if ! grep -q '/swapfile' /etc/fstab 2>/dev/null; then
+                        echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab > /dev/null
+                        log_ok "Added /swapfile entry to /etc/fstab"
+                    fi
+                    log_ok "Swap successfully updated to ${sw_size}GB!"
+                    swapon --show
+                else
+                    log_info "Cancelled."
+                fi
+                press_enter ;;
+            2)
+                log_section "DOCKER SUDO-LESS ACCESS"
+                if command -v docker &>/dev/null; then
+                    sudo usermod -aG docker "$USER"
+                    log_ok "Added $USER to 'docker' group. Log out and log back in for changes to take effect."
+                else
+                    log_warn "Docker is not installed yet. Install Docker first."
+                fi
+                press_enter ;;
+            3)
+                log_section "XAMPP AUTO-START SERVICE"
+                if [ -d "/opt/lampp" ]; then
+                    cat << 'XAMPP_EOF' | sudo tee /etc/systemd/system/xampp.service > /dev/null
+[Unit]
+Description=XAMPP
+After=network.target
+
+[Service]
+ExecStart=/opt/lampp/lampp start
+ExecStop=/opt/lampp/lampp stop
+Type=forking
+
+[Install]
+WantedBy=multi-user.target
+XAMPP_EOF
+                    sudo systemctl daemon-reload
+                    sudo systemctl enable xampp.service
+                    log_ok "XAMPP auto-start service created & enabled at /etc/systemd/system/xampp.service!"
+                else
+                    log_error "/opt/lampp not found. Please install XAMPP first."
+                fi
+                press_enter ;;
+            4)
+                log_section "OPENSSH SERVER SETUP"
+                log_info "Installing openssh-server and openssh-client..."
+                sudo apt-get update -y && sudo apt-get install -y openssh-server openssh-client
+                sudo systemctl enable --now ssh
+                log_ok "OpenSSH server is active & enabled!"
+                log_info "Connect using: ssh $USER@$(hostname -I | awk '{print $1}')"
+                press_enter ;;
+            5)
+                log_section "PHP VERSION SWITCHER"
+                if command -v update-alternatives &>/dev/null; then
+                    log_info "Running update-alternatives --config php..."
+                    sudo update-alternatives --config php || true
+                else
+                    log_error "update-alternatives command not found."
+                fi
+                press_enter ;;
+            6)
+                log_section "DISK ENCRYPTION CHECK"
+                log_info "Checking for encrypted LUKS partitions (lsblk -f | grep crypto)..."
+                local crypto_output
+                crypto_output=$(lsblk -f | grep -i crypto || true)
+                if [[ -n "$crypto_output" ]]; then
+                    echo -e "${GREEN}Encrypted partitions detected:${NC}\n$crypto_output"
+                else
+                    echo -e "${YELLOW}No encrypted (crypto/LUKS) partitions found.${NC}"
+                fi
+                press_enter ;;
+            7)
+                log_section "EMERGENCY SYSTEM & PACKAGE REPAIR"
+                log_info "Fixing broken packages & upgrading system..."
+                sudo dpkg --configure -a
+                sudo apt-get clean
+                sudo apt-get update --fix-missing
+                sudo apt-get install -f -y
+                sudo apt-get dist-upgrade -y
+                log_ok "Package repair complete!"
+                press_enter ;;
+            8)
+                log_section "CPU PERFORMANCE TUNER"
+                log_info "Installing cpupower-gui..."
+                sudo apt-get update -y && sudo apt-get install -y cpupower-gui
+                log_ok "cpupower-gui installed. Launch it from app menu or terminal with: cpupower-gui"
+                press_enter ;;
+            9)
+                log_section "CANON PRINTER DRIVERS"
+                log_info "Canon LBP2900 / 2900B setup helper..."
+                log_info "Cloning printer driver installer script..."
+                local tmp_dir="/tmp/canon_printer"
+                rm -rf "$tmp_dir"
+                if git clone https://github.com/hieplpvip/ubuntu_canon_printer.git "$tmp_dir"; then
+                    log_ok "Driver repository cloned to $tmp_dir"
+                    log_info "Run: cd $tmp_dir && sudo ./canon_lbp2900.sh"
+                else
+                    log_error "Failed to clone driver repo."
+                fi
+                press_enter ;;
+            0) return ;;
+            *) log_warn "Invalid choice." ;;
+        esac
+    done
+}
+
 # ── MAIN MENU ─────────────────────────────────────────────────────────────────
 while true; do
     clear
@@ -1204,6 +1365,7 @@ while true; do
     echo -e "  ${BOLD}[8]${NC} Time Doctor Setup     — check, install, uninstall"
     echo -e "  ${BOLD}[9]${NC} Fix Suspend/Wake Blinking Screen — Wayland/GDM3/lid-close fixes"
     echo -e "  ${BOLD}[10]${NC} Diagnose WiFi         — fix ? / limited connectivity false warning"
+    echo -e "  ${BOLD}[11]${NC} System Toolkit        — swap, docker, xampp, ssh, php, repair, canon"
     echo -e "  ${BOLD}[0]${NC} Exit"
     echo -e "\n  ────────────────────────────────────────────────────────"
 
@@ -1219,7 +1381,8 @@ while true; do
         8) menu_timedoctor ;;
         9) menu_wayland ;;
         10) menu_wifi_diagnose ;;
+        11) menu_system_toolkit ;;
         0) echo -e "\n  ${CYAN}Goodbye!${NC}\n"; exit 0 ;;
-        *) log_warn "Invalid choice — enter 0-9."; sleep 1 ;;
+        *) log_warn "Invalid choice — enter 0-11."; sleep 1 ;;
     esac
 done

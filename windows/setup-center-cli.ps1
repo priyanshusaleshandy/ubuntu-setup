@@ -836,6 +836,39 @@ function Show-TailscaleMenu {
     }
 }
 
+function Show-BlockchainMenu {
+    while ($true) {
+        Show-Header
+        Write-Host "  [10] BLOCKCHAIN & ETHEREUM DEVELOPER TOOLKIT" -ForegroundColor Yellow; Write-Host ""
+        Write-Host "  [1] Install Node.js & npm (via winget)" -ForegroundColor White
+        Write-Host "  [2] Install Ganache CLI (npm install -g ganache-cli)" -ForegroundColor White
+        Write-Host "  [3] Install Truffle Framework (npm install -g truffle)" -ForegroundColor White
+        Write-Host "  [4] Open Geth Ethereum Client Download Page" -ForegroundColor White
+        Write-Host "  [0] Back" -ForegroundColor DarkGray; Write-Host ""
+        $ch = (Read-Host "  Choice").Trim()
+        switch ($ch) {
+            '1' { winget install --id OpenJS.NodeJS -e --source winget; Pause-Menu }
+            '2' { npm install -g ganache-cli; Write-OK "Ganache CLI installed."; Pause-Menu }
+            '3' { npm install -g truffle; Write-OK "Truffle installed."; Pause-Menu }
+            '4' { Start-Process "https://geth.ethereum.org/downloads"; Write-OK "Opened Geth download page."; Pause-Menu }
+            '0' { return }
+            default { Write-WARN "Invalid choice."; Start-Sleep -Seconds 1 }
+        }
+    }
+}
+
+function Show-Win11BypassMenu {
+    Show-Header
+    Write-Host "  [11] WINDOWS 11 SETUP & OOBE BYPASS HELPERS" -ForegroundColor Yellow; Write-Host ""
+    Write-Host "  1. Bypass Network Requirement during Windows 11 Initial Setup (OOBE):" -ForegroundColor Cyan
+    Write-Host "     Press Shift + F10 on setup screen, type:  oobe\BypassNRO  and press Enter." -ForegroundColor White
+    Write-Host ""
+    Write-Host "  2. Bypass Microsoft Account Requirement (Local Account Only):" -ForegroundColor Cyan
+    Write-Host "     Use Email: no@thanks.com  and Password: nothanks" -ForegroundColor White
+    Write-Host ""
+    Pause-Menu
+}
+
 # =============================================================================
 # MAIN MENU LOOP
 # =============================================================================
@@ -854,6 +887,8 @@ while ($true) {
         @{K="7";L="Office Software";            D="RabbitMQ & ElasticSearch install / repair"},
         @{K="8";L="System Setup";              D="Network info / Hostname / Create user"},
         @{K="9";L="Tailscale VPN";             D="Install / Login / Connect / Status / Remove"},
+        @{K="10";L="Blockchain Dev Toolkit";    D="Ganache CLI, Truffle, Geth & Node.js"},
+        @{K="11";L="Win 11 Setup & OOBE Bypass";D="BypassNRO & Microsoft Account bypass tips"},
         @{K="0";L="Exit";                       D=""}
     ) | ForEach-Object {
         Write-Host "  [" -NoNewline -ForegroundColor DarkGray
@@ -864,7 +899,7 @@ while ($true) {
     }
     Write-Host ""; Write-Sep "-"
 
-    $opt = (Read-Host "`n  Enter choice [0-9]").Trim()
+    $opt = (Read-Host "`n  Enter choice [0-11]").Trim()
     switch ($opt) {
         '1' { Install-NormalSoftware }
         '2' { Install-MSOffice }
@@ -875,7 +910,9 @@ while ($true) {
         '7' { Show-OfficeSoftwareMenu }
         '8' { Show-SystemSetupMenu }
         '9' { Show-TailscaleMenu }
+        '10' { Show-BlockchainMenu }
+        '11' { Show-Win11BypassMenu }
         '0' { Write-Host "`n  Goodbye!`n" -ForegroundColor Cyan; exit 0 }
-        default { Write-WARN "Invalid choice — enter 0-9."; Start-Sleep -Seconds 1 }
+        default { Write-WARN "Invalid choice — enter 0-11."; Start-Sleep -Seconds 1 }
     }
 }

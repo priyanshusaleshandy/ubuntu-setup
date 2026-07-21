@@ -9,3 +9,10 @@ New Virtual Machine.vmcz
 *.dmg
 *.pkg
 offline-installers/
+
+# Credentials & Secrets
+*credentials*.json
+*.json.json
+.env
+.env.*
+
