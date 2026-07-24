@@ -194,6 +194,7 @@ install_tailscale() {
 
 install_gnome_tools() {
     log_info "Installing GNOME Tweaks & Extension Manager..."
+    sudo add-apt-repository universe -y 2>/dev/null || true
     sudo apt-get update -y && sudo apt-get install -y gnome-tweaks gnome-shell-extension-manager
 }
 
@@ -753,11 +754,12 @@ menu_tailscale() {
         echo -e "${CYAN}${BOLD}=== [5] TAILSCALE VPN ===${NC}\n"
         echo -e "  [1] Install Tailscale"
         echo -e "  [2] Login  (auto-sent to Admin — no typing)"
-        echo -e "  [3] Connect (accept routes)"
+        echo -e "  [3] Connect (accept routes & DNS)"
         echo -e "  [4] Full Reset + Connect (reset + accept DNS & routes)"
-        echo -e "  [5] Connect with Exit Node (100.64.0.7)"
-        echo -e "  [6] Diagnose & Status"
-        echo -e "  [7] Uninstall Tailscale"
+        echo -e "  [5] Select Exit Node (ikigaihq-primary / node-1 / node-2 / custom)"
+        echo -e "  [6] Fix Ubuntu Exit Node Routing (sysctl rp_filter=2)"
+        echo -e "  [7] Diagnose & Status"
+        echo -e "  [8] Uninstall Tailscale"
         echo -e "  [0] Back\n"
 
         local server="https://bifrost.saleshandy.com"
@@ -774,7 +776,6 @@ menu_tailscale() {
                 if [[ "$subChoice" == "1" ]]; then
                     ensure_tailscale_service || { press_enter; continue; }
                     NTFY_TOPIC="$NTFY_ADMIN_CHANNEL"
-                    # Auto-clean: strip any accidental full-URL prefix
                     NTFY_TOPIC="${NTFY_TOPIC#$NTFY_SERVER/}"
                     NTFY_TOPIC="${NTFY_TOPIC#https://ntfy.sh/}"
                     NTFY_TOPIC="${NTFY_TOPIC#http://ntfy.sh/}"
@@ -789,16 +790,16 @@ menu_tailscale() {
                     for _ in $(seq 1 30); do
                         LOGIN_URL=$(grep -oE 'https://[^ ]+' "$TS_LOG" 2>/dev/null | head -1)
                         [[ -n "$LOGIN_URL" ]] && break
-                        kill -0 "$TS_PID" 2>/dev/null || break   # process already finished (e.g. already logged in)
+                        kill -0 "$TS_PID" 2>/dev/null || break
                         sleep 1
                     done
                     cat "$TS_LOG"
                     if [[ -n "$LOGIN_URL" ]]; then
                         log_info "Sending link to Admin channel '$NTFY_TOPIC'..."
                         if curl -fsSL --max-time 10 -d "New PC ($(hostname)) Tailscale login: $LOGIN_URL" "$NTFY_SERVER/$NTFY_TOPIC" &>/dev/null; then
-                            log_ok "Link sent! Admin should open: $NTFY_SERVER/$NTFY_TOPIC in a browser tab (once, keep it open) to see it arrive instantly."
+                            log_ok "Link sent! Admin should open: $NTFY_SERVER/$NTFY_TOPIC in a browser tab."
                         else
-                            log_warn "Auto-send failed (server unreachable — check VPN/Tailscale connection to $NTFY_SERVER). Admin can still use the URL printed above."
+                            log_warn "Auto-send failed. Admin can still use the URL printed above."
                         fi
                     else
                         log_ok "Already logged in — no link needed."
@@ -827,9 +828,61 @@ menu_tailscale() {
                 press_enter ;;
             5)
                 ensure_tailscale_service || { press_enter; continue; }
-                sudo tailscale up --login-server="$server" --accept-dns --accept-routes --exit-node=100.64.0.7
+                clear
+                echo -e "${CYAN}${BOLD}=== [5.5] SELECT EXIT NODE ===${NC}\n"
+                echo -e "  [1] ikigaihq-office-network-primary  (Primary Office Exit Node)"
+                echo -e "  [2] ikigai-office-network-node-1       (Office Exit Node 1)"
+                echo -e "  [3] ikigai-office-network-node-2       (Office Exit Node 2)"
+                echo -e "  [4] Custom Exit Node IP / Name        (e.g. 100.64.0.7)"
+                echo -e "  [5] Turn OFF Exit Node               (Use local Wi-Fi / Direct)"
+                echo -e "  [0] Back\n"
+                read -rp "  Select Exit Node: " exitChoice < /dev/tty
+                local target_node=""
+                case "$exitChoice" in
+                    1) target_node="ikigaihq-office-network-primary" ;;
+                    2) target_node="ikigai-office-network-node-1" ;;
+                    3) target_node="ikigai-office-network-node-2" ;;
+                    4)
+                        read -rp "  Enter Exit Node Name or IP [100.64.0.7]: " target_node < /dev/tty
+                        target_node="${target_node:-100.64.0.7}"
+                        ;;
+                    5)
+                        log_info "Disabling Exit Node..."
+                        sudo tailscale set --exit-node=""
+                        log_ok "Exit Node disabled."
+                        press_enter; continue ;;
+                    0) continue ;;
+                    *) log_warn "Invalid selection."; press_enter; continue ;;
+                esac
+
+                if [[ -n "$target_node" ]]; then
+                    log_info "Applying Ubuntu rp_filter routing fix..."
+                    sudo sysctl -w net.ipv4.conf.all.rp_filter=2 2>/dev/null || true
+                    sudo sysctl -w net.ipv4.conf.default.rp_filter=2 2>/dev/null || true
+
+                    log_info "Setting Exit Node to '$target_node'..."
+                    if sudo tailscale set --exit-node="$target_node" --exit-node-allow-lan-access 2>/dev/null; then
+                        log_ok "Exit Node active: $target_node"
+                    else
+                        log_info "Retrying with full tailscale up..."
+                        sudo tailscale up --login-server="$server" --accept-dns --accept-routes --exit-node="$target_node" --exit-node-allow-lan-access
+                    fi
+                    log_info "Current Public IP:"
+                    curl -s --max-time 5 https://ifconfig.me || true; echo ""
+                fi
                 press_enter ;;
             6)
+                log_section "FIX UBUNTU EXIT NODE ROUTING (SYSCTL)"
+                log_info "Configuring rp_filter=2 for loose reverse path filtering..."
+                sudo sysctl -w net.ipv4.conf.all.rp_filter=2
+                sudo sysctl -w net.ipv4.conf.default.rp_filter=2
+                if ! grep -q "rp_filter" /etc/sysctl.conf 2>/dev/null; then
+                    echo "net.ipv4.conf.all.rp_filter=2" | sudo tee -a /etc/sysctl.conf >/dev/null
+                    echo "net.ipv4.conf.default.rp_filter=2" | sudo tee -a /etc/sysctl.conf >/dev/null
+                fi
+                log_ok "sysctl rp_filter updated and saved to /etc/sysctl.conf."
+                press_enter ;;
+            7)
                 log_section "TAILSCALE DIAGNOSTICS"
                 if ! command -v tailscale &>/dev/null; then
                     log_warn "Tailscale is NOT installed."
@@ -840,7 +893,7 @@ menu_tailscale() {
                 fi
                 log_info "Service:";   systemctl is-active tailscaled 2>/dev/null && echo -e "  ${GREEN}tailscaled: ACTIVE${NC}" || echo -e "  ${RED}tailscaled: INACTIVE${NC}"
                 press_enter ;;
-            7)
+            8)
                 read -rp "  Confirm uninstall Tailscale? (y/N): " conf < /dev/tty
                 if [[ "$conf" =~ ^[Yy]$ ]]; then
                     uninstall_tailscale

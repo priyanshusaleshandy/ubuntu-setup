@@ -23,7 +23,7 @@ Write-Host "[2/4] Staging updated scripts..." -ForegroundColor Yellow
 git add .gitignore setup-center-cli.ps1 setup-center-cli.sh RUN-SETUP.bat push-ubuntu-setup.ps1 windows/ linux/ README.md
 
 Write-Host "[3/4] Committing changes..." -ForegroundColor Yellow
-git commit -m "fix(tailscale): fix tailscale options, service auto-start, complete uninstall cleanup, and sync linux script"
+git commit -m "feat(tailscale): add Exit Node selection menu (primary, node-1, node-2) & sysctl rp_filter routing fix"
 
 # 4. Push to GitHub
 Write-Host "[4/4] Pushing to GitHub (origin main)..." -ForegroundColor Yellow
