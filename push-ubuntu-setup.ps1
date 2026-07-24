@@ -23,7 +23,7 @@ Write-Host "[2/4] Staging updated scripts..." -ForegroundColor Yellow
 git add .gitignore setup-center-cli.ps1 setup-center-cli.sh RUN-SETUP.bat push-ubuntu-setup.ps1 windows/ linux/ README.md
 
 Write-Host "[3/4] Committing changes..." -ForegroundColor Yellow
-git commit -m "feat: embed ClamAV #16, System Toolkit [11], Blockchain Dev Toolkit [10], Win11 Bypass [11]"
+git commit -m "fix(tailscale): fix tailscale options, service auto-start, complete uninstall cleanup, and sync linux script"
 
 # 4. Push to GitHub
 Write-Host "[4/4] Pushing to GitHub (origin main)..." -ForegroundColor Yellow

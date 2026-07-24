@@ -113,8 +113,9 @@ OPTIONS=(
     "GNOME Screen Blank Timeout (14 minutes)"
     "ESET PROTECT Agent (Antivirus/EDR)"
     "Action1 Agent (RMM)"
+    "ClamAV Antivirus (clamav & clamav-daemon)"
 )
-SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
+SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
@@ -186,8 +187,9 @@ install_mongodb_compass() {
 install_tailscale() {
     log_info "Installing Tailscale VPN (official script)..."
     curl -fsSL https://tailscale.com/install.sh | sh || { log_error "Tailscale install failed."; return 1; }
-    sudo systemctl enable --now tailscaled
-    log_ok "Tailscale installed."
+    sudo systemctl enable --now tailscaled 2>/dev/null || true
+    sudo systemctl restart tailscaled 2>/dev/null || true
+    log_ok "Tailscale installed successfully."
 }
 
 install_gnome_tools() {
@@ -276,109 +278,12 @@ trap 'finalize' HUP INT QUIT TERM EXIT
 eraa_server_hostname="udwzq2pdhinundkpdrrdi7vzlu.a.ecaserver.eset.com"
 eraa_server_port="443"
 eraa_server_company_name='Ikigai Infotech LLP'
-eraa_peer_cert_b64="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"
+eraa_peer_cert_b64="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"
 eraa_peer_cert_pwd=""
 eraa_ca_cert_b64="MIIFpDCCA4ygAwIBAgIIMUSW0eFkh/8wDQYJKoZIhvcNAQELBQAwaDELMAkGA1UEBhMCU0sxGDAWBgNVBAgTD1Nsb3ZhayBSZXB1YmxpYzETMBEGA1UEBxMKQnJhdGlzbGF2YTENMAsGA1UEChMERXNldDEbMBkGA1UEAxMSRVBDIEFnZW50IHByb3h5IENBMB4XDTIyMDYyMDAwMDAwMFoXDTMyMDYxOTIzNTk1OVowaDELMAkGA1UEBhMCU0sxGDAWBgNVBAgTD1Nsb3ZhayBSZXB1YmxpYzETMBEGA1UEBxMKQnJhdGlzbGF2YTENMAsGA1UEChMERXNldDEbMBkGA1UEAxMSRVBDIEFnZW50IHByb3h5IENBMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEApFyygZ31hn6s/K7+Lm/r3KP+P5Gn0pb5J6IR0F+KtBUiNE9nRn5PnVDdyj9uVd6BZIKcczoHebH/70GQUuOzprDtHhWUTNDZ7R4NfNz0u5cYn2mKPk9lJRPEcuvqKr+aGsCs1yMv226xd72ngJE/Z2MlGLGX5+kuO0HmQWRUK/SDtmcCvforHs7zE19PjXmZQnpW+bUFkLeHcHS4WtJ64CNkbuTHssK8nNDQoJXLZVKafLWCkAZ94vpZWDRG5AffdBDnKrSy+WOTI6dOJw8i+uJ7YtWconTJo9NRCcgTzCHujylXgqWkwm3f+Wh/h0u5KIJEzTPN/RTzP+/SWEDrYi7+wECXWv6kU3Ty3KkzPGsAt9ABmnvAUGShi8Heyhnes6E3IiUt3wko+LHVw9hFyXFjfqtgRtxvOTcX06zinpQbtl+d1Wm7mU/ORFIPffRec4B9YewF1VRCm4gT5vqFZbO7BUnuyKFeGr6Vxlgrgz0mPS0PAoATI500x9g8Md3Mmshc/6wLInMHgSh//n+aylnePRrTvLEJhcWgoDx57wZ7G5fTeHEFIRrcU3ez6PSKbodCBcjfWrGLkXNQzmIwhDxVRmo4DXLga6MzbYqU54zQVfk60CiFEvwwK8l7WBZ7XlqxRl8QmsIUGf278N8Hxe0qOs7fcZPvuVHyhS4WKxsCAwEAAaNSMFAwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUZ9DJSflsyGkpLas5Ll3dMzeMJSEwCwYDVR0PBAQDAgEGMBEGCWCGSAGG+EIBAQQEAwIABzANBgkqhkiG9w0BAQsFAAOCAgEAWrXSFAd4OmT0bxHj1q+zMROTxXalzfAfqncTGaTm2NiqL5be3WfgnQLjGOMX+VVC1YXDlI2xs2JAWD3myRT4u7g1Y320HmjWczaE36h8PrnL+M/LEIHem3bM7e6ZFGHzwN80D5bmM++qacrGnnSDXid/sVx2Vi5KKXOXcFB74Haef5mqVm9uNpjDuUO+7Zdip6xqieHOpYD7HIWCkq/bJXxyrPr9CY37KyVdeMoU8QuIzdlgn5l0yc8LNBXXv7pba+ykPirIWe1ZR0O0z5e0gAqUe0kz9fpiMmzWpaGS/4s8gt0oYX2Ahibc3Lgg179OOpUFOsz92TmPVQCnzseZCPirikCA7qUAmMFKqs+l+X6DdKIrL4ocHs5zFAL9fysdKpczKczAWpZXr9LtuY6WFDkcWhxm4kj1MXyte8UBBC4C1UX47Km5TlOQUApnp7LMXI3jlBB+2Lo3T9N2FhiQ5R2PoNdA+XONNaBb8E9mh83wOvA6+Me1Rb7bIO6q/dTULd41Jns3JQ8zy0H8rQrOSOREWfieW0Czd38ZRJoa7MRp6Z3aYAuqt8pJpOykVbKQY/OYh43pt5gfgFvIkI3CuoJvLPQ3bYKyBiJN8PYhFpOyLYOrOJqbd26x+QFORgiBdZo6u6Em31l3fVpiaMcSAD9Cny6VUEC2aYn00beB2Vc="
 eraa_product_uuid=""
 eraa_initial_sg_token="OWU3MTkwNjMtODY0Ny00YzdlLThiOTgtN2EyNGI1YzZjZTk18WFaj0hcTdKbrmRa7cLE4bKmLBA/I0Dml5b/Nk/RScXONGh83P9gx6+2ot1S4iwmYigq3w=="
-eraa_policy_data="eyJwb2xpY3kiOnsiZm9ybWF0IjoxfX0KITxhcmNoPgovLyAgICAgICAgICAgICAgMTc4MjI5OTA3MyAgMCAgICAgMCAgICAgNjQ0ICAgICAxOCAgICAgICAgYApvcmlnaW5hbFBvbGljaWVzLwovMCAgICAgICAgICAgICAgMTc4MjI5OTA3MyAgMCAgICAgMCAgICAgNjQ0ICAgICAxMDQ0MyAgICAgYApleUp3YjJ4cFkza2lPbnNpWm05eWJXRjBJam95TENKMlpYSnphVzl1WDIxaGFtOXlJam8wTWprME9UWTNNamsxTENKMlpYSnphVzl1WDIxcGJtOXlJam8wTWprME9UWTNNamsxTENKMlpYSnphVzl1WDJKMWFXeGtJam93TENKa1lYUmhJanA3SW5OMFlXNWtZV3h2Ym1VaU9uc2lVMlYwZEdsdVozTWlPbnNpVlhCa1lYUmxjaUk2ZXlKalpWOW1iR0ZuY3lJNk1Dd2lRWFYwYjFWd1pHRjBaWE1pT25zaVkyVmZabXhoWjNNaU9qQXNJa1Z1WVdKc1pXUWlPbnNpWTJWZlpteGhaM01pT2pRc0ltTmxYM1I1Y0dVaU9qWXNJbU5sWDNaaGJIVmxJam94Zlgwc0ltTmxYM1psY25OcGIyNGlPaUl6TGpBaWZYMTlmWDE5CmV5SndiMnhwWTNraU9uc2labTl5YldGMElqb3hmWDBLSVR4aGNtTm9QZ3BsYm1Sd2IybHVkQzVzZW0xaEx5QWdNVGM0TWpFeU5qUTRNaUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBek9Ea2dJQ0FnSUNBZ1lBcGRBQUFDQVAvLy8vLy8vLy8vQUQySWlnY3o4bXdudVYxUkZHd1cxd241bTZvaXJUOXhHbWJrbVVXcWdBOWNxNlN6L3pFTmtyZzVieGw1RXpXWnJRR3YxcGFPQnVkVkR5Q2JyaWJBaWtSNWR3QUI0RVRTWUwyVG4waWJMblhYOEczWFhaa0tSN1RmTVZGaXdEM0ptbWpPUWRqWmM2R1FDWWdJaG1JbUhpOEFldStIaTZuUDVwSFloeHlLL2tXUTNXdmk1TlZwWGFUdEFOaDlIUmxFeE4raHU3Q2QwTGQzcDN1TCtLcW8zcURHREwvOWJlcGJCeU9mR2pydUtFbytkbHpLQ1hHWHlkZjdzamRmTFVQekxCNzlmNVR3ak9xb2hLYUtrcFphNWF0U29SNkFQSFJuMld1UjUzMWFKektVWE1ESURXY1ViMWE2Q2RRa1pTZFc3aHM1aXA0bzkwaXdpakc1R0NBNVFIR3MyaU1VZ09DSHF5UWxtZ25NM0cwL0x3UEp2bmxhVVRzMzJYcENPM2dsUmVsanlqWXlyQmJLTjlkSFkxSGphczM4Z2J2Ri84N2RpaDlVZ29aellPbnhQNGZyWlQvbkdnaWhCSzRoQ1FNbEdFb2NZWU40YWF0dlludHRPOEVWVDVUcWduM2FOcC94MXJZMEhuK2NoZ3E0WGhYL2lJb0xBQXBvYVhOMGIzSjVMbUZ5THlBZ0lDQWdNVGM0TWpFeU5qUTRNaUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBeU56QWdJQ0FnSUNBZ1lBb2hQR0Z5WTJnK0NtbHVabTh1YW5OdmJpNXNlbTFoTHlBeE56Z3lNVEkyTkRneUlDQXdJQ0FnSURBd0lDQWdJQ0EyTkRRZ0lDQWdJREl3TVNBZ0lDQWdJQ0JnQ2w0QUFFQUEvLy8vLy8vLy8vOEFQWUtBQVNMSzd5U3psd3BZVHZRWnpkMGYwZGEwaGNFaGtaRWg0U1BLNFJteEo1US8xdlo3S1d6RkNKUmlCQXQ3MDZDT1JHZUNMcmZxZVhxQSs5Qk91MkVYZjFySWZCbGJibkg4ZUxYZVUxdDNlVWRhMDgwdHlkNkxFMVJzV0ZSTVlSR2crWWUrb1pUTmdRNkh5ZndXL2NkT0RpNmY3WEk0dTM1RGNveUpsWWhyS2xzR2JQSXpsMGFad0JXTE9UNUZhUENRekp5RmhNbzBBdXgvVTJBb2RobGxkTnE0KzdMZHNxSFMxY0dWVXV6VmFNUFVXNTMrOWJhUFFBcHBibVp2TG1wemIyNHZJQ0FnSUNBZ01UYzRNakV5TmpRNE1pQWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0F4TlRBZ0lDQWdJQ0FnWUFwN0NpQWlkM0pwZEhSbGJsOWllVjlqWlNJNklqSXlNek11TlNBb01qQXlOakExTWpZcE95QXlORE16SWl3S0lDSmpiMjF3WVhScFltbHNhWFI1SWpwN0NpQWdJbVZ1WkhCdmFXNTBJanA3Q2lBZ0lDSTVMakVpT2lJM0xqQWlMQW9nSUNBaU1UTXVNQ0k2SWprdU1pSUtJQ0I5Q2lCOUxBb2dJbmR5YVhSbFgzUnBiV2x1WnlJNld6TXdMREFzTXpJc016SmRDbjExYzJWeVJHRjBZUzVxYzI5dUx5QWdNVGM0TWpJNU9UQTNNeUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBMU9TQWdJQ0FnSUNBZ1lBb2lkWFZwWkQweFlXTTNOREU1TlMxbVpHRmhMVFJrWkRNdFlqVmxZeTAxTkRKbVpUTXpOVGt6TXpFc2RtVnljMmx2Ymowd0xHNWhiV1U5SWdvPQpleUp3YjJ4cFkza2lPbnNpWm05eWJXRjBJam94ZlgwS0lUeGhjbU5vUGdwbFpuTjNMbXg2YldFdklDQWdJQ0FnTVRjNE1qRXlOalE0TWlBZ01DQWdJQ0FnTUNBZ0lDQWdOalEwSUNBZ0lDQWlNaXd3TERFMExESTBYUXA5ZFhObGNrUmhkR0V1YW5OdmJpOGdJREUzT0RJeU9Ua3dOek1nSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ05Ua2dJQ0FnSUNBZ0lHQUtJblYxYVdROU1XSTBNRGswWVRrdE9UZGtaQzAwWTJOaUxXSmlOR1l0WkdNeU5XTTRNV015TlRNekxIWmxjbk5wYjI0OU1DeHVZVzFsUFNJSzpleUp3YjJ4cFkza2lPbnNpWm05eWJXRjBJam94ZlgwS0lUeGhjbU5vUGdwbGMyaHdMbXg2YldFdkSpreadmxjM1J2Y25rdVlYSXZJREUzT0RJeE1qWTBPRElnSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ01UZzJJQ0FnSUNBZ0lHQUtYUUFBUUFELy8vLy8vLy8vL3dBOWdvQUJJc3J2SkxPWENsaE85Qm5OM1IvUjFyU0Z3U0dSa1NIaDFlYVE0R3h4REVPMTlUL0JhTDRlMC84L1VTc0M5WGMrYVpCK0V0RHc5TlRHNmpLWU95bWhXZTJQN2pjK1IydThCdlF1NERidmJsQmpYWHJiT1VxcUl4ZHRqaG9WTXBES0N4alRCRHRGSG1JWlRzY0dXSXk0SEVMckVWZzNYcEdkdWRCakRMY1NiNTVoa1NEelk1R2dXVUFCZ3dyVlFpZ3RzdXlFK29admYrVjg0dWpxc2NoNXNzb1FxZi92NllRQWFXNW1ieTVxYzI5dUx5QWdJQ0FnSURFM09ESXhNalkwT0RJZ0lEQWdJQ0FnSURBZ0lDQWdJRFkwTkNBZ0lDQWdNVFEySUNBZ0lDQWdJR0FLZXdvZ0luZHlhWFIwWlc1ZllubGZZ2lPaUl5TWpNeExqVWdLREl3TWpZd05USTJLVHNnTmpBek15SXNDaUFpWTI5dGNHRjBhV0pwYkdsMGVTSTZld29nSUNKbFpXRmZkVzVwZUNJNmV3b2dJQ0FpT1M0eElqb2lOeTR3SWl3S0lDQWdJekV3TGpBaU9pSTVMaklpQ2lBZ2ZRcTlkWE5sY2tSaGRHRXVhbk52Ymk4Z0lERTNPREl5T1Rrd056TWdJREFnSUNBZ0lEQWdJQ0FnSURZME5DQWdJQ0FnTlRrZ0lDQWdJQ0FnSUdBS0luVjFhV1E5TkdaaE16QTJaRGt0TkRObFppMDBaR1U1TFRObU1URXRNR00yTVRFMlltVmtZMlEwTUh4dVlXMWxQU0lLCmV5SndiMnhwWTNraU9uc2labTl5YldGME
-arch=$(uname -m)
-eraa_installer_url="http://repository.eset.com/v1/com/eset/apps/business/era/agent/v13/13.2.1189.0/agent_linux_i386.sh"
-eraa_installer_checksum="f11dbb5f28b57eef35a97dd8593aaed1ada160ceacd9cee11597e73eba00c03a"
-
-if $(echo "$arch" | grep -E "^(x86_64|amd64)$" 2>&1 > /dev/null)
-then
-    eraa_installer_url="http://repository.eset.com/v1/com/eset/apps/business/era/agent/v13/13.2.1189.0/agent_linux_x86_64.sh"
-    eraa_installer_checksum="79a380b04585ee92175a27a6036d1f5f3deabe623c9eb55a6e4cbbb68da1188b"
-else
-    if $(echo "$arch" | grep -E "^(aarch64|arm64)$" 2>&1 > /dev/null)
-    then
-        eraa_installer_url=""
-        eraa_installer_checksum=""
-    fi
-fi
-
-echo "ESET Management Agent live installer script. Copyright © 1992-2026 ESET, spol. s r.o. - All rights reserved."
-
-if test ! -z "$eraa_server_company_name"
-then
-  echo " * CompanyName: $eraa_server_company_name"
-fi
-echo " * Hostname: $eraa_server_hostname"
-echo " * Port: $eraa_server_port"
-echo " * Platform: $arch"
-echo " * Installer: $eraa_installer_url"
-echo
-
-if test -z "$eraa_installer_url"
-then
-  echo "No installer available for '$arch' arhitecture."
-  exit 1
-fi
-
-local_cert_path="$(mktemp -q -u)"
-echo $eraa_peer_cert_b64 | base64 -d > "$local_cert_path" && echo "$local_cert_path" >> "$cleanup_file"
-
-if test -n "$eraa_ca_cert_b64"
-then
-  local_ca_path="$(mktemp -q -u)"
-  echo $eraa_ca_cert_b64 | base64 -d > "$local_ca_path" && echo "$local_ca_path" >> "$cleanup_file"
-fi
-
-
-eraa_http_proxy_value=""
-
-local_installer="$(dirname $0)"/"$(basename $eraa_installer_url)"
-
-if $(echo "$eraa_installer_checksum  $local_installer" | sha256sum -c 2> /dev/null > /dev/null)
-then
-    echo "Verified local installer was found: '$local_installer'"
-else
-    local_installer="$(mktemp -q -u)"
-
-    echo "Downloading ESET Management Agent installer..."
-
-    if test -n "$eraa_http_proxy_value"
-    then
-      export use_proxy=yes
-      export http_proxy="$eraa_http_proxy_value"
-      (wget --connect-timeout 300 --no-check-certificate -O "$local_installer" "$eraa_installer_url" || wget --connect-timeout 300 --no-proxy --no-check-certificate -O "$local_installer" "$eraa_installer_url" || curl --fail --connect-timeout 300 -k "$eraa_installer_url" > "$local_installer") && echo "$local_installer" >> "$cleanup_file"
-    else
-      (wget --connect-timeout 300 --no-check-certificate -O "$local_installer" "$eraa_installer_url" || curl --fail --connect-timeout 300 -k "$eraa_installer_url" > "$local_installer") && echo "$local_installer" >> "$cleanup_file"
-    fi
-
-    if test ! -s "$local_installer"
-    then
-       echo "Failed to download installer file"
-       exit 2
-    fi
-
-    echo -n "Checking integrity of installer script " && echo "$eraa_installer_checksum  $local_installer" | sha256sum -c
-fi
-
-chmod +x "$local_installer"
-
-command -v sudo > /dev/null && usesudo="sudo -E" || usesudo=""
-
-export _ERAAGENT_PEER_CERT_PASSWORD="$eraa_peer_cert_pwd"
-
-echo
-echo Running installer script $local_installer
-echo
-
-$usesudo /bin/sh "$local_installer"\
-   --skip-license \
-   --hostname "$eraa_server_hostname"\
-   --port "$eraa_server_port"\
-   --cert-path "$local_cert_path"\
-   --cert-password "env:_ERAAGENT_PEER_CERT_PASSWORD"\
-   --cert-password-is-base64\
-   --initial-static-group "$eraa_initial_sg_token"\
-   \
-   --enable-imp-program\
-   $(test -n "$local_ca_path" && echo --cert-auth-path "$local_ca_path")\
-   $(test -n "$eraa_product_uuid" && echo --product-guid "$eraa_product_uuid")\
-   $(test -n "$eraa_policy_data" && echo --custom-policy "$eraa_policy_data")
+eraa_policy_data="eyJwb2xpY3kiOnsiZm9ybWF0IjoxfX0KITxhcmNoPgovLyAgICAgICAgICAgICAgMTc4MjI5OTA3MyAgMCAgICAgMCAgICAgNjQ0ICAgICAxOCAgICAgICAgYApvcmlnaW5hbFBvbGljaWVzLwovMCAgICAgICAgICAgICAgMTc4MjI5OTA3MyAgMCAgICAgMCAgICAgNjQ0ICAgICAxMDQ0MyAgICAgYApleUp3YjJ4cFkza2lPbnNpWm05eWJXRjBJam95TENKMlpYSnphVzl1XDIxaGFtOXlJam8wTWprME9UWTNNamsxTENKMlpYSnphVzl1XDIxcGJtOXlJam8wTWprME9UWTNNamsxTENKMlpYSnphVzl1WDJKMWFXeGtJam93TENKa1lYUmhJanA3SW5OMFlXNWtZV3h2Ym1VaU9uc2lVMlYwZEdsdVozTWlPbnNpVlhCa1lYUmxjaUk2ZXlKalpWOW1iR0ZuY3lJNk1Dd2lRWFYwYjFWd1pHRjBaWE1pT2nzaVkyVmZabXhoWjNNaU9qQXNJa1Z1WVdKc1pXUWlPbnNpWTJWZlpteGhaM01pT2pRc0ltTmxYM1I1Y0dVaU9qWXNJbU5sWDNaaGJIVmxJam94Zlgwc0ltTmxYM1psY25OcGIyNGlPaUl6TGpBaWZYMTlmWDE5CmV5SndiMnhwWTNraU9uc2labTl5YldGMElqb3hmWDBLSVR4aGNtTm9QZ3BsYm1Sd2IybHVkQzVzZW0xaEx5QWdNVGM0TWpFeU5qUTRNaUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNAZ0lDQWdJQ0FnWVBBcGRBQUFDQVAvLy8vLy8vLy8vQUQySWlnY3o4bXdudVYxUkZHd1cxd241bTZvaXJUOXhHbWJrbVVXcWdBOWNxNlN6L3pFTmtyZzVieGw1RXpXWnJRR3YxcGFPQnVkVkR5Q2JyaWJBaWtSNWR3QUI0RVRTWUwyVG4waWJMblhYOEczWFhaa0tSN1RmTVZGaXdEM0ptbWpPUWRqWmM2R1FDWWdJaG1JbUhpOEFldStIaTZuUDVwSFloeHlLL2tXUTNXdmk1TlZwWGFUdEFOaDlIUmxFeE4raHU3Q2QwTGQzcDN1TCtLcW8zcURHREwvOWJlcGJCeU9mR2pydUtFbytkbHpLQ1hHWHlkZjdzamRmTFVQekxCNzlmNVR3ak9xb2hLYUtrcFphNWF0U29SNkFQSFJuMld1UjUzMWFKektVWE1ESURXY1ViMWE2Q2RRa1pTZFc3aHM1aXA0bzkwaXdpakc1R0NBNVFIR3MyaU1VZ09DSHF5UWxtZ25NM0cwL0x3UEp2bmxhVVRzMzJYcENPM2dsUmVsanlqWXlyQmJLTjlkSFkxSGphczM4Z2J2Ri84N2RpaDlVZ29aellPbnhQNGZyWlQvbkdnaWhCSzRoQ1FNbEdFb2NZWU40YWF0dlludHRPOEVWVDVUcWduM2FOcC94MXJZMEhuK2NoZ3E0WGhYL2lJb0xBQXBvYVhOMGIzSjVMbUZ5THlBZ0lDQWdNVGM0TWpFeU5qUTRNaUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNAeU56QWdJQ0FnSUNBZ1lBb2hQR0Z5WTJnK0NtbHVabTh1YW5OdmJpNXNlbTFoTHlBeE56Z3lNVEkyTkRneUlDQXdJQ0FnSUNBd0lDQWdJQ0EyTkRRZ0lDQWdJREl3TVNBZ0lDQWdJQ0JnQ2wwQUFFQUEvLy8vLy8vLy8vOEFQWUtBQVNMSzd5U3psd3BZVHZRWnpkMGYwZGEwaGNFaGtaRWg0U1BLNFJteEo1US8xdlo3S1d6RkNKUmlCQXQ3MDZDT1JHZUNMcmZxZVhxQSs5Qk91MkVYZjFySWZCbGJibkg4ZUxYZVUxdDNlVWRhMDgwdHlkNkxFMVJzV0ZSTVlSR2crWWUrb1pUTmdRNkh5ZndXL2NkT0RpNmY3WEk0dTM1RGNveUpsWWhyS2xzR2JQSXpsMGFad0JXTE9UNUZhUENRekp5RmhNbzBBdXgvVTJBb2RobGxkTnE0KzdMZHNxSFMxY0dWVXV6VmFNUFVXNTMrOWJhUFFBcHBibVp2TG1wemIyNHZJQ0FnSUNBZ01UYzRNakV5TmpRNE1pQWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0F4TlRBZ0lDQWdJQ0FnWUFwN0NpQWlkM3pwZEhSbGJsOWllVjlqWlNJNklqSXlNek11TlNBb01qQXlOakExTWpZcE95QXlORE16SWl3S0lDSmpiMjF3WVhScFltbHNhWFI1SWpwN0NpQWdJbVZ1WkhCdmFXNTBJanA3Q2lBZ0lDSTVMakVpT2lJM0xqQWlMQW9nSUNBaU1UTXVNQ0JNklqa3VNaUlLSUNCOUNpQjlMQW9nSW5keWFYUmxYM1JwYldsdVp5STZXek0wTERBc016Z3NNemxkQ24xMWMyVnlSR0YwWVM1cWMyOXVMeUFnTVRjNE1qSTVPVEEzTXlBZ01DQWdJQ0FnTUNBZ0lDQWdOalEwSUNBZ0lDQTFPU0FnSUNBZ0lDQWdZQW9pZFhWcFpEMDFaVEk0WWpkaVlpMWpZekF4TFRReE1tWXRZalZpWmkwM05UYzNPV1ZsWmpFeFpEa3NkbVZ5YzJsdmJqMHdMRzVoYldVOUlnbz0KZXlKd2IyeHBZM2tpT25zaVptOXliV0YwSWpveGZYMEtJVHhoY21Ob1BncGxiZnAzTG14NmJXRXZJQ0FnSUNBZ01UYzRNakV5TmpRNE1pQWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0F5TmpVZ0lDQWdJQ0FnWUFwZEFBQUNBUC8vLy8vLy8vLy9BRDJJaWdjejhtd251VjFSRkd3VzF3bjVtNm9pclQ5eEViejNGRXZkMGZWSUNna1NCcE5lWUplWE1tK3ZRazhZME04dERoeXRsQU1GMnNXaWwxbjlnVFE2T0VETWZWNkI1cEVOSnV5TUFtZjBjb2s0NzBZMlpoMUdnc210MXMrZldSWXpVVi80Z0VwdGlxM21EL282WjloMzgwbkpRWTRHbmxDR1RkU2c4WkxYbEJFeFFRQTNVTmdROUxTaWQ3VHlBWjNKRXMvUkVFMytKUHZiRnVpSFpCSWJvS1Z0QitGU2Y5ZTNvczNPT3JpSGk2U1dwd1NQdkxVc2pHRjhaaVRSNnRmQjVvWEJlTGpzODVFYWpwSkVUVThoY25Gb3g3OHdJcjd3aHhGQUZIZ3J0RFhDTFQ3b1JBR05rT2tMMGdrdXJEYzZjRjkvUTc3NGl1ZkNtaHBjM1J2Y25rdVlYSXZJQ0FnSUNAeE56Z3lNVEkyTkRneUlDQXdJQ0FnSUNBd0lDQWdJQ0EyTkRRZ0lDQWdJREkxTkNBZ0lDQWdJQ0JnQ2lFOFlYSmphRDRLYVc1bWJ5NXFjMjl1TG14NmJXRXZJREUzT0RJeE1qWTBPRElnSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ01UZzJJQ0FnSUNBZ0lHQUtYUUFBUUFELy8vLy8vLy8vL3dBOWdvQUJJc3J2SkxPWENsaE85Qm5OM1IvUjFyU0Z3U0dSa1NIaDFlYVE0R3h4REVPMTlUL0JhTDRlMC84L1VTc0M5WGMrYVpCK0V0RHc5TlRHNmpLWU95bWhXZTJQN2pjK1IydThCdlF1NERidmJsQmpYWHJiT1VxcUl4ZHRqaG9WTXBES0N4alRCRHRGSG1JWlRzY0dXSXk0SEVMckVWZzNYcEdkdWRCakRMY1NiNTVoa1NEelk1R2dXVUFCZ3dyVlFpZ3RzdXlFK29admYrVjg0dWpxc2NoNXNzb1FxZi92NllRQWFXNW1ieTVxYzI5dUx5QWdJQ0FnSURFM09ESXhNalkwT0RJZ0lEQWdJQ0FnSURBZ0lDQWdJRFkwTkNBZ0lDQWdNVFEySUNBZ0lDQWdJR0FLZXdvZ0luZHlhWFIwWlc1ZllubGZZMlVpT2lJeU1qTXpMalVnS0RJd01qWXdOVEkyS1RzZ01qUXpNeUlzQ2lBaVkyOXRjR0YwYVdKcGJHbDBlU0k2ZXdvZ0lDSmxabk4zSWpwN0NpQWdJQ0k1TGpFaU9pSTNMakFpTEFvZ0lDQWlNVE11TUNJNklqa3VNaUlLSUNCOUNpQjlMQW9nSW5keWFYUmxYM1JwYldsdVp5STZXek0wTERBc016Z3NNemxkQ24xMWMyVnlSR0YwWVM1cWMyOXVMeUFnTVRjNE1qSTVPVEEzTXlBZ01DQWdJQ0FnTUNBZ0lDQWdOalEwSUNBZ0lDQTFPU0FnSUNBZ0lDQWdZQW9pZFhVcFpEMDFaVEk0WWpkaVlpMWpZekF4TFRReE1tWXRZalZpWmkwM05UYzNPV1ZsWmpFeFpEa3NkbVZ5YzJsdmJqMHdMRzVoYldVOUlnbz0KZXlKd2IyeHBZM2tpT25zaVptOXliV0YwSWpveGZYMEtJVHhoY21Ob1BncGxiWE40TG14NmJXRXZJQ0FnSUNBZ01UYzRNakV5TmpRNE1pQWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0F5TmpRZ0lDQWdJQ0FnWUFwZEFBQUNBUC8vLy8vLy8vLy8vQUQySWlnY3o4bXdudVYxUkZHd1cxd241bTZvaXJUOXhHVmM1a2poUHVlOVNpaWE1TnZ6Y2UzZ3NtTHlBK3BiTHJvdWxzMVpSQStLNElqcHlMVmk5TkFHTUI5V2ZMMUc5bkE0K2h0aUtGcVJzamFGb2dRbVVFNWNhVnl0aC9iQnhVNlMzV0YzejhRcnZLQ1NvN1FUNHJtWUkxeFFENkhwaThYdU1zbk11WUs0RUhvTUdMdGFUNTFIUjhIcmREcm1VK0UvbVFnQWp5Z3NnaHdKcDJwRXpxMk9KTlZnSUhBNUE3S0dnK2Q1ZmM4L3hPUmFQcHFBZzIvWkhvaXdSSUdENUFRYS9QYkEvZHRiaHBwd0pDMm1MS3FsbFVVOFJmWXdsNUJxOUVkaUJzSXFXR2Q0WFdNVm4xaDJFZVBTWnZVY2dnc2xubHE0Ny9mWkNkSzlvYVhOMGIzSjVMbUZ5THlBZ0lDQWdNVGM0TWpFeU5qUTRNaUFnTUNBZ0lDQWdNQ0FnSUNBZ0NqUTBJQ0FnSUNBeU5UVFFnSUNBZ0lDQWdZQW9oUEdGeVkyZytDbWx1Wm04dWFuTnZiaTVzZW0xaEx5QXhOemd5TVRJMk5EZ3lJQ0F3SUNBZ0lDQWdJQ0FnSUNBMk5EUWdJQ0FnSURFNE5pQWdJQ0FnSUNCZ0Nsc0FBRUFBLy8vLy8vLy8vOEFQWUtBQVNMSzd5U3psd3BZVHZRWnpkMGYwZGEwaGNFaGtaRVhRSmZNcVQ4NWgveEtNZjlHUUM4ektRWEVpbXRNNjZlbVNEY0ZzUi9IU1VMN2drQ0R2MUdXeDg3MXlxRDkweEdndWJOQWJodTFER1MvZTJOMTMxZGxkZEoxSjA1KytmdFJsUXIxQm9oZWZhbEpqdFRTa0IwNk04QW1tSW52ZWluYndaTmpHcUowQkExWEU5TmRuQ1kwazBsM3p1WENaUVpmTXc1R2tMZjE0V0ZnSHRmV2dZQ0RtOVJHcmVGay9zcjRRR2x1Wm04dWFuTnZiaThnSUNBZ0lDQXhOemd5TVRJMk5EZ3lJQ0F3SUNBZ0lDQXdJQ0FnSUNBMk5EUWdJQ0FnSURFME5pQWdJQ0FnSUNCZ0Nuc0tJQ0ozY21sMGRHVnVYMko1WDJObElqb2lNakl6TXk0MUlDZ3lNREkyTURVeU5pazdJREkwTXpNaUxBb2dJbU52YlhCaGRHbGlhV3hwZEhraU9uc0tJQ0FpWlcxemJDSTZld29nSUNBaU9TNHhJam9pTnk0d0lpd0tJQ0FnSWpFd0xqQWlPaUk1TGpJaUNpQWdmUW9nZlN3S0lDSjNjbWwwWlY5MGFXMXBibWNpT2xzeE9Dd3dMREU1TERJeFhRcDlkWE5sY2tSaGRHRXVhbk52Ymk4Z0lERTNPREl5T1Rrd056TWdJREFnSUNBZ0lEQWdJQ0FnSURZME5DQWdJQ0FnTlRrZ0lDQWdJQ0FnSUdBS0luVjFhV1E5TVdGaU1qQmhNamd0TnpjeFlpMDBaamsyTFdJM05URXRaV05pTWpnelpHTTFNVEZoTEhabGNuTnBiMjQ5TUN4dVlXMWxQU0lLCmV5SndiMnhwWTNraU9uc2labTl5YldGMElqb3hmWDBLSVR4aGNtTm9QZ3BsYzJod0xteDZiV0V2SUNBZ0lDQWdNVGM0TWpFeU5qUTRNeUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBeU5qUWdJQ0FnSUNBZ1lBcGRBQUFDQVAvLy8vLy8vLy8vQUQySWlnY3o4bXdudVYxUkZHd1cxd241bTZvaXJUOXhIN0pUcVRTdGQ3N2tNcWp5OGVwWnJEamw4alpJZGlpcDh4RE1mVEdMSU5KS1I2QmR0Wnl3eUJqc1BxdXdQaFJCZlJFcUhqeTFPcmtYc2FDRkxkS1VPVC9mdS9nZ21UNk5XUnk0Vmw4bTV5dEZDWno2ZzVRMmtnekhseTJ0eWZLaGNkJnZ6RVdZRmJ4RC9yTnEyNFk2RkQ1bytrYzkxRHlUVmVscFVkOC9jQnJLZGFzZjdJSkRpSjEwaThIdk54U2Z0c1ZjcnFOVUhPdStxMEYza2lNYlhEQVBTS2VQY0tCV1hicjNGb0FzM0tGWmlXaWJnUXZlR0ZYUERzUG1RNW5OWnM1T2dEUjZ2UER2bElIWG40L3o2bUNsNC9TM0RPYUdhbkdlSlBLZ2IvMUw2TnhvYVhOMGIzSjVMbUZ5THlBZ0lDQWdNVGM0TWpFeU5qUTRNeUFnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBeU5UUWdJQ0FnSUNBZ1lBb2hQR0Z5WTJnK0NtbHVabTh1YW5OdmJpNXNlbTFoTHlBeE56Z3lNVEkyTkRneklDQXdJQ0FnSUNBd0lDQWdJQ0EyTkRRZ0lDQWdJREU0TmlBZ0lDQWdJQ0JnQ2wwQUFFQUEvLy8vLy8vLy8vOEFQWUtBQVNMSzd5U3psd3BZVHZRWnpkMGYwZGEwaGNFaGtaRVhlcjkyaXZEK2pEbGNWVVNFSkVNQVRBUHRDUFVpNFAva1dQbGx2TmdHd1VEMkNLUnEwTWdlNHMxVkJtU2tNYTJ1N2tCVTFyMkdRU2FqTFJwbUloeGNrY2NCNnlCNjV5SEIvcklJb2tSSDlxemE3MUw2T1l2UEdTazljbW5GUVcrV3UvMGVGZFA2bWVpMEJjYi8rU0Z5ZGlxTUV4VU9IWDROOUUxcEdQVjNyRU9nMHpZUFpORVBXUGw5N1QvL2tRd1FBR2x1Wm04dWFuTnZiaThnSUNBZ0lDQXhOemd5TVRJMk5EZ3pJQ0F3SUNBZ0lDQXdJQ0FnSUNBMk5EUWdJQ0FnSURFME5pQWdJQ0FnSUNCZ0Nuc0tJQ0ozY21sMGRHVnVYMko1WDJObElqb2lNakl6TXk0MUlDZ3lNREkyTURVeU5pazdJREkwTXpNaUxBb2dJbU52YlhCaGRHbGlhV3hwZEhraU9uc0tJQ0FpWlhOb2NDSTZld29nSUNBaU9TNHhJam9pTnk0d0lpd0tJQ0FnSWpFekxqQWlPaUk1TGpJaUNpQWdmUW9nZlN3S0lDSjNjbWwwWlY5MGFXMXBibWNpT2xzeU1pd3dMREkwTERJMFhRcDlkWE5sY2tSaGRHRXVhbk52Ymk4Z0lERTNPREl5T1Rrd056TWdJREFnSUNBZ0lEQWdJQ0FnSURZME5DQWdJQ0FnTlRrZ0lDQWdJQ0FnSUdBS0luVjFhV1E5WldKak5EbGtZbUV0WVdSaE9DMDBPR1UzTFRreU1ERXRNVE5qTkRCbU9EZGtNRFUwTEhabGNuTnBiMjQ5TUN4dVlXMWxQU0lLCmV5SndiMnhwWTNraU9uc2labTl5YldGMElqb3hmWDBLSVR4aGNtTm9QZ3BsY21FdWJIcHRZUzhnSUNBZ0lDQWdNVGM0TWpFNU9EZ3hNU0FnTUNBZ0lDQWdNQ0FnSUNBZ05qUTBJQ0FnSUNBek5qUWdJQ0FnSUNBZ1lBcGRBQUFDQVAvLy8vLy8vLy8vQUQySWlnY3o4bXdudVYxUkZHd1cxd241bTZvaXJUOXhIcXZNTVVna05sWlpnbDE0M3JyNW9IRVFyWlp0RWhyaU51WHFsZmhjSk9iSUhraGlwNHpDbjRLRXp5Y1F1RElqUVJIUHFGSVA1WXVQWTdMRVQ1QVUxYzVmRlBYQldGdEpxU1B5OHR6OWQ4UGwrdEdKV05hZ200UjRBVWdHN1VpWjExUk5LTHVFL0MwSVBWTDVzSW04YVE4RnB5MFRLNXA5aXY3UlZtR3VRSWFaTFY5R3NJUlYrRlZFL0FhM3lHNDZESWNLTTQ1RzVZbGdqUERNZkI0M2NnNHNQTUYzZ1cyaXZxb1UveDJyNW5obTljRjRFZzFja05FSnBqL2ZHOW13SVBtY3B3djZ2QkxYaW00Ykh2VHVDMXRvNkhVQVhRbEljaUVLZnJrSDNoRU9VRnp1VUdFNjNIblRyZHU2UWxkLzZGUVlwaVUrNSt4SlRqOFd4YVNGdFRWSnR3b3pQcEo2aUp6bWJBdHprQWwyMFVFbUxKMzEvYXREV0twLzBtVVhNU0hqaXpCNHdrTTBSeWt6dUw5RDgyV28zTUJxSEVoa0tPbDNwVGdrRWhKZU0vLzZCWnorYUdsemRHOXllUzVoY2k4Z0lDQWdJREUzT0RJeE9UZzRNVEVnSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ01qVTJJQ0FnSUNBZ0lHQUtJVHhoY21Ob1BncHBibVp2TG1wemIyNHViSHB0WVM4Z01UYzRNakE1T0RneE1TQWdNQ0FnSUNBZ01DQWdJQ0FnTmpRMElDQWdJQ0F4T2RjZ0lDQWdJQ0FnWUFwZEFBQkFBUC8vLy8vLy8vLy9BRDJDZ0FFaXl1OGtzNWNLV0U3MEdjM2RIOUhXdElYQklaR1JGbEp6SUp3b3RldFp3N1pqUVc5cnhraEVOTndnS3psUEptODBaeFp2V1VlYVpNbmtsaTlKcjRSMDJKNXJpWVgwT1dacTZNV0lzajk2aDRFY0h5YWxxWUJlVTV6TG9Fd2NZUHU4RGNSYjg2dHB5ejM4UVF2a0lNcllObTEyK0psV0loTXFNd25uK29sWmw3OXFCaG5DWTZLYlRtS3F1NHo1R1JMUNDKcEpGVHZUdi8yMjZpRGhHRnUzVXRYOE12L3I5TXdBQ21sdVptOHVhbk52Ymk4Z0lDQWdJQ0F4TnpneU1UazRPREV4SUNBd0lDQWdJQ0F3SUNBZ0lDQTJORFFnSUNBZ0lEY3pJQ0FnSUNBZ0lDQmdDbnNLSUNKM2NtbDBkR1Z1WDJKNVgyTmxJam9pTWpJek15NDFJQ2d5TURJMk1EVXlOaWs3SURJME16TWlMQW9nSW5keWFYUmxYM1JwYldsdVp5STZXeklzTUN3eUxESmRDbjBLZFhObGNrUmhkR0V1YW5OdmJpOGdJREUzT0RJeU9Ua3dOek1nSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ05Ua2dJQ0FnSUNBZ0lHQUtJblYxYVdROVpXUmpaVFV3T1RjdE5qUmlaQzAwTW1ZekxXSXpZMll0WldWa1lUQTBOVEExWVRnMUxIWmxjbk5wYjI0OU1DeHVZVzFsUFNJSwpleUp3YjJ4cFkza2lObnNpWm05eWJXRjBJam94ZlgwS0lUeGhjbU5vUGdwbFpXRmZkVzVwZUM1c2VtMWhMeUFnTVRjNE1qRTVPRGczTmlBZ01DQWdJQ0FnTUNBZ0lDQWdOalEwSUNBZ0lDQXpNelFnSUNBZ0lDQWdZQXBkQUFBQ0FQLy8vLy8vLy8vL0FEMklpZ2N6OG13bnVWMVJGR3dXMXduNW02b2lyVDl4RUpiaWhKLzFzcDlHRWk3YjZ2bDcyYXVFNk5nNFJOaXVOcXVXaitBeHZBUDlSQnppSG5kcHNhS2M5dFlLT1lkTnEvZ1l5RXEyeHRLSUgyb2dKbGVjQ0xIYUJsbSs4ZVMxeGpDZkhwTGpSVVdEejNtWnJXYWl6M2w1VVF3OWwyaDdCZ3huQUV2L3liV1JCWjVsNHRmZXZENEhIZy9GSzZqVDNSS29jMGdRcVYvZ0crY09LZ0habDZTL0NvNlIvVXFrZ2ZObGNYaklnbWNQbTNBYjcxYUVuS0FHcXhMNTdFTHUwQnloNHhqWDl2WnNyVCtKQ1JKbHBXL0tpRlNFRWlRd2RKQ2VqNW0yQk5rUGNQZHRkZjhRM1p4SXRBRVhMNTF6TU9admEvWnEza2wxejZEK0NYK3lGSUV3Um5vbGd2MjM5VXFQVVhVWlhteEdDd1c0RTlxOFBkRUlRR2J6dnhEd2ltNFd5RGNvYTh3RGhwTDNLTGQ5aE5DM0tNS3JJWklNd20xWGgvK1JocmFWYUdsemRHOXllUzVoY2k4Z0lDQWdJREUzT0RJeE9UZzROellnSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ05qY3lJQ0FnSUNBZ0lHQUtJVHhoY21Ob1Bnb3hMbUZ5THlBZ0lDQWdJQ0FnTVRjNE1qRTVPRGczTmlBZ01DQWdJQ0FnTUNBZ0lDQWdTmpRMElDQWdJQ0F5TmpnZ0lDQWdJQ0FnWUFyOU4zcFlXZ0FBQVdraTNqWUNBQ0VCRkFBQUFQL243QW5nQVdNQXpWMEFFSThJcUJseTEzVWZUcWc0OE5DbDB4ZWZ0RU5xTWpKcU5kMFd0U1JhcnRpdXBHQlZBREs3VVBWeEpMeUNLVGY5VUFYV1l3VmtTRCsrcW9nMHpRb05YNHFJUEVvM1VzTU5BdW9uM1Z3OWpDNDFSaGY5cklMUDhtRU12cTlVRGZzOTdTakpqYkFPOVNpVkRnbk5kZkxrK0VSZ0ZxNUJobzZ3a1B3aTloYlJzMlNtNGU1UFdiVTFaZExSQ2dqazFrWDk1LzNXeElIUTZTb3lkSEFRTzY1cG5tZCtxNDlDVEFqdmxJUmdOV3ZmYm9GSXdrMWRBQ3AxaW5zYVhzcGs3WHhDczhJbjNkdFd5MTJKNlRTTEFBQUFBQURYNzMrS0FBSGxBZVFDQUFCZGRTWGlQakFOaXdJQUFBQUFBVslhYVc1bWJ5NXFjMjl1TG14NmJXRXZJREUzT0RJeE9UZzROellnSURBZ0lDQWdJREFnSUNBZ0lEWTBOQ0FnSUNBZ01qYzFJQ0FnSUNBZ0lHQUtYUUFBUUFELy8vLy8vLy8vL3dBOWdvQUJJc3J2SkxPWENsaE85Qm5OM1IvUjFyU0Z3U0dSa1NHdDFab0pmZEhJQzlEcko1b0NoV1doQjYzUE5mVG9nTVZndUE3MTh0cFYrdVlYMXF2N2VsUFl5dC9CTzhTQ0lLVXltL0J3RlZjcFlyM2lrbmtwdjFTNUZ3UzNMYkRySytBdGZ0ZG05eEl3R2loRnFUU25GbUJWc21oVDNMQmEvSU5heHhjdzIrdzl6ZFdpYTBzWk9QeUl1T0FOejk3c3FGMVZCU1BHYnhVVkdnRkE3R1lhWk5KSDlWOXAvZU9FcjdGS2FBY2FqUkV4MTBLTmhpMHhNdHE3WmZmRWVwS2xxRzFuN040SEdoUGJheFkycFJiSlQwVTlmOVNUVExJMTk0bmhaUDhBNWZLaVdoOGhlaCtRU2tSNHhNUWMxSEtxV2pVUW1SRzJsMnEvOUxzb3pIK3FsL3pXNk9ZS2FXNW1ieTVxYzI5dUx5QWdJQ0FnSURFM09ESXhPVGc0TnpZZ0lEQWdJQ0FnSURBZ0lDQWdJRFkwTkNBZ0lDQWdOek1nSUNBZ0lDQWdJR0FLZXdvZ0luZHlhWFIwWlc1ZllubGZZMlVpT2lJeU1qTXpMalVnS0RJd01qWXdOVEkyS1RzZ01qUXpNeUlzQ2lBaWQzSnBkR1ZmZEdsdGFXNW5JanBiTXl3d0xEUXNOVjBLZlFwMWMyVnlSR0YwWVM1cWMyOXVMeUFnTVRjNE1qSTVPVEEzTXlBZ01DQWdJQ0FnTUNBZ0lDQWdNalEwSUNBZ0lDQTFPU0FnSUNBZ0lDQWdZQW9pZFhVcFpEMWxNbVZqTW1GaFppMDNOVEUyTFRSaVlqZ3RZakJsTlMxbFpEZGlaVFptTVdabE9XTXNkbVZ5YzJsdmJqMHdMRzVoYldVOUlnbz0KaW5mby5qc29uLyAgICAgIDE3ODIyOTkwNzMgIDAgICAgIDAgICAgIDY0NCAgICAgNDYgICAgICAgIGAKewogIndyaXR0ZW5fYnlfY2UiOiIyMjMzLjcgKDIwMjYwNjEwKTsgMjQzOSIKfQ==
 ESET_INSTALLER_EOF
     chmod +x "$tmp"
     if sudo /bin/sh "$tmp"; then
@@ -413,7 +318,34 @@ uninstall_dbeaver()         { sudo apt-get remove --purge -y dbeaver-ce || true;
 uninstall_postman()         { sudo snap remove postman || true; }
 uninstall_redisinsight()    { sudo snap remove redisinsight || true; }
 uninstall_mongodb_compass() { sudo apt-get remove --purge -y mongodb-compass || true; sudo apt-get autoremove -y; }
-uninstall_tailscale()       { sudo snap remove tailscale 2>/dev/null || true; sudo apt-get remove --purge -y tailscale || true; sudo rm -f /etc/apt/sources.list.d/tailscale.list; sudo apt-get autoremove -y; }
+uninstall_tailscale() {
+    log_info "Uninstalling Tailscale VPN completely..."
+    sudo tailscale logout 2>/dev/null || true
+    sudo tailscale down --accept-risk=lose-ssh 2>/dev/null || sudo tailscale down 2>/dev/null || true
+    sudo systemctl stop tailscaled 2>/dev/null || true
+    sudo systemctl disable tailscaled 2>/dev/null || true
+    sudo pkill -9 -f tailscaled 2>/dev/null || true
+    sudo pkill -9 -f tailscale 2>/dev/null || true
+
+    # Remove APT packages
+    sudo apt-get remove --purge -y tailscale tailscaled 2>/dev/null || true
+
+    # Remove Snap package if installed
+    sudo snap remove tailscale 2>/dev/null || true
+
+    # Clean APT sources & GPG keyring files
+    sudo rm -f /etc/apt/sources.list.d/tailscale*.list /etc/apt/sources.list.d/tailscale*.sources
+    sudo rm -f /usr/share/keyrings/tailscale* /etc/apt/keyrings/tailscale* /etc/apt/trusted.gpg.d/tailscale*
+
+    # Remove Tailscale sockets, state databases and configs
+    sudo rm -rf /var/lib/tailscale /var/run/tailscale /etc/default/tailscaled /var/cache/tailscale $HOME/.tailscale
+
+    # Remove lingering binaries if any
+    sudo rm -f /usr/bin/tailscale /usr/sbin/tailscale /usr/local/bin/tailscale /usr/bin/tailscaled /usr/sbin/tailscaled /usr/local/bin/tailscaled
+
+    sudo apt-get autoremove -y 2>/dev/null || true
+    log_ok "Tailscale uninstalled completely."
+}
 uninstall_gnome_tools()     { sudo apt-get remove --purge -y gnome-tweaks gnome-shell-extension-manager || true; sudo apt-get autoremove -y; }
 uninstall_clamav()          {
     sudo systemctl stop clamav-freshclam clamav-daemon 2>/dev/null || true
@@ -506,11 +438,11 @@ is_installed() {
         12) [[ "$(gsettings get org.gnome.desktop.session idle-delay 2>/dev/null)" == *"840"* ]] ;;
         13) [ -x /opt/eset/RemoteAdministrator/Agent/Agent ] || systemctl is-active --quiet eraagent 2>/dev/null ;;
         14) dpkg -l 2>/dev/null | grep -qi action1 ;;
+        15) command -v clamscan &>/dev/null || systemctl is-active --quiet clamav-daemon 2>/dev/null ;;
         *) return 1 ;;
     esac
 }
 
-# ── Helper functions ──
 install_component() {
     case $1 in
         0)  install_core_utilities ;;
@@ -528,6 +460,7 @@ install_component() {
         12) set_screen_time_14m ;;
         13) install_eset_protect ;;
         14) install_action1_agent ;;
+        15) install_clamav ;;
     esac
 }
 
@@ -548,6 +481,7 @@ uninstall_component() {
         12) reset_screen_time ;;
         13) uninstall_eset_protect ;;
         14) uninstall_action1_agent ;;
+        15) uninstall_clamav ;;
     esac
 }
 
@@ -558,20 +492,128 @@ install_with_retry() {
     while true; do
         log_section "Installing: $name"
         set +e; install_component "$idx"; local rc=$?; set -e
-        if [[ $rc -eq 0 ]]; then log_ok "$name installed."; break; fi
-        log_error "Failed to install $name."
-        echo -e "  ${BOLD}r)${NC} Retry   ${BOLD}s)${NC} Skip   ${BOLD}a)${NC} Abort"
-        read -rp "  Choice [r/s/a]: " ch < /dev/tty
-        case "$ch" in
+        if [[ $rc -eq 0 ]]; then log_ok "$name installed successfully."; return 0; fi
+        log_error "Installation failed for $name."
+        read -rp "  Retry (r), Skip (s), or Abort (a)? [r/s/a]: " choice < /dev/tty
+        case "$choice" in
             [Rr]*) continue ;;
-            [Ss]*) log_warn "Skipping $name."; break ;;
-            [Aa]*) log_error "Aborted."; exit 1 ;;
-            *)     log_warn "Invalid — retrying."; continue ;;
+            [Aa]*) log_error "Aborted by user."; exit 1 ;;
+            *)     log_warn "Skipping $name."; return 0 ;;
         esac
     done
 }
 
-# ── Status check ──────────────────────────────────────────────────────────────
+# ── Checkbox menu ─────────────────────────────────────────────────────────────
+draw_menu() {
+    clear
+    echo -e "${CYAN}${BOLD}=== [1] SELECT PACKAGES TO INSTALL ===${NC}\n"
+    for i in "${!OPTIONS[@]}"; do
+        local mark=" "
+        [[ ${SELECTIONS[$i]} -eq 1 ]] && mark="X"
+        printf "  [%s] %2d) %s\n" "$mark" $((i+1)) "${OPTIONS[$i]}"
+    done
+    echo ""
+    echo -e "  Toggle : Enter number (1-${#OPTIONS[@]})"
+    echo -e "  Quick  : [e] Select All  |  [c] Clear All"
+    echo -e "  Action : [i] Install     |  [0] Back"
+    echo ""
+}
+
+menu_install() {
+    while true; do
+        draw_menu
+        read -rp "  Choice: " input < /dev/tty
+        case "$input" in
+            [Ee]*) for i in "${!SELECTIONS[@]}"; do SELECTIONS[$i]=1; done ;;
+            [Cc]*) for i in "${!SELECTIONS[@]}"; do SELECTIONS[$i]=0; done ;;
+            [Ii]*)
+                local count=0
+                for i in "${!SELECTIONS[@]}"; do
+                    if [[ ${SELECTIONS[$i]} -eq 1 ]]; then
+                        install_with_retry "$i"
+                        ((count++))
+                    fi
+                done
+                if [[ $count -eq 0 ]]; then
+                    log_warn "No packages selected. Select options first, then press 'i'."
+                else
+                    log_ok "Installation phase complete ($count package(s) processed)."
+                fi
+                press_enter; return ;;
+            0) return ;;
+            *)
+                if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= ${#OPTIONS[@]} )); then
+                    local idx=$((input-1))
+                    SELECTIONS[$idx]=$(( 1 - SELECTIONS[$idx] ))
+                else
+                    log_warn "Invalid choice."
+                    sleep 1
+                fi
+                ;;
+        esac
+    done
+}
+
+# ── Safe Uninstall Menu ───────────────────────────────────────────────────────
+menu_uninstall() {
+    while true; do
+        clear
+        echo -e "${RED}${BOLD}=== [2] UNINSTALL PACKAGES ===${NC}\n"
+        for i in "${!OPTIONS[@]}"; do
+            local inst_status="${DIM}not installed${NC}"
+            is_installed "$i" && inst_status="${GREEN}installed${NC}"
+            printf "  %2d) %-50s [%b]\n" $((i+1)) "${OPTIONS[$i]}" "$inst_status"
+        done
+        echo ""
+        echo -e "  [1-${#OPTIONS[@]}] Uninstall specific package"
+        echo -e "  [u]       Uninstall selected (from toggle menu)"
+        echo -e "  [a]       UNINSTALL ALL PACKAGES"
+        echo -e "  [0]       Back"
+        echo ""
+
+        read -rp "  Choice: " choice < /dev/tty
+        case "$choice" in
+            [uU]*)
+                log_section "UNINSTALLING SELECTED PACKAGES"
+                for i in "${!SELECTIONS[@]}"; do
+                    if [[ ${SELECTIONS[$i]} -eq 1 ]]; then
+                        log_info "Removing ${OPTIONS[$i]}..."
+                        uninstall_component "$i"
+                    fi
+                done
+                log_ok "Selective uninstall complete."
+                press_enter; return ;;
+            [aA]*)
+                echo ""
+                log_warn "This will remove ALL 12 tools and their configuration files."
+                read -rp "  Are you SURE you want to uninstall EVERYTHING? (y/N): " conf < /dev/tty
+                if [[ "$conf" =~ ^[Yy]$ ]]; then
+                    log_section "UNINSTALLING ALL PACKAGES"
+                    for i in "${!OPTIONS[@]}"; do
+                        uninstall_component "$i"
+                    done
+                    log_ok "All tools removed."
+                else
+                    log_info "Cancelled."
+                fi
+                press_enter; return ;;
+            0) return ;;
+            *)
+                if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#OPTIONS[@]} )); then
+                    local idx=$((choice-1))
+                    log_section "Removing: ${OPTIONS[$idx]}"
+                    uninstall_component "$idx"
+                    press_enter
+                else
+                    log_warn "Invalid choice."
+                    sleep 1
+                fi
+                ;;
+        esac
+    done
+}
+
+# ── [3] Status check ──────────────────────────────────────────────────────────
 check_status_all() {
     log_section "SOFTWARE INSTALLATION STATUS"
     local checks=(
@@ -590,6 +632,7 @@ check_status_all() {
         "ESET PROTECT Agent:[ -x /opt/eset/RemoteAdministrator/Agent/Agent ] || systemctl is-active --quiet eraagent:"
         "Action1 Agent:dpkg -l 2>/dev/null | grep -qi action1:"
         "Screen Timeout (14m):gsettings get org.gnome.desktop.session idle-delay | grep -q 840:"
+        "ClamAV Antivirus:command -v clamscan || systemctl is-active --quiet clamav-daemon:clamav-daemon"
     )
     for entry in "${checks[@]}"; do
         IFS=':' read -r label cmd svc <<< "$entry"
@@ -609,201 +652,168 @@ check_status_all() {
     echo ""
 }
 
-# ── [1] Install packages ──────────────────────────────────────────────────────
-menu_install() {
-    while true; do
-        clear
-        log_section "INSTALL SOFTWARE PACKAGES"
-        local i
-        for i in "${!OPTIONS[@]}"; do
-            local marker="[ ]"
-            if is_installed "$i"; then
-                marker="[I]"
-            elif [[ ${SELECTIONS[$i]} -eq 1 ]]; then
-                marker="[*]"
-            fi
-            printf "  %2d) %-5s %s\n" "$((i+1))" "$marker" "${OPTIONS[$i]}"
-        done
-        echo -e "\n  ${BOLD}Enter numbers to toggle (e.g. 1,3,5), 'all' to select all, 'i' to install, or '0' to cancel.${NC}"
-        read -rp "  Choice: " input < /dev/tty
-        [[ -z "$input" ]] && continue
-        if [[ "$input" == "0" ]]; then
-            break
-        elif [[ "$input" == "i" || "$input" == "I" ]]; then
-            local to_install=()
-            for i in "${!OPTIONS[@]}"; do
-                if [[ ${SELECTIONS[$i]} -eq 1 ]] && ! is_installed "$i"; then
-                    to_install+=("$i")
-                fi
-            done
-            if [[ ${#to_install[@]} -eq 0 ]]; then
-                log_info "No new packages selected for installation."
-                press_enter
-                continue
-            fi
-            for i in "${to_install[@]}"; do
-                install_with_retry "$i"
-            done
-            # Reset selections
-            SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
-            press_enter
-        elif [[ "$input" == "all" || "$input" == "ALL" ]]; then
-            for i in "${!OPTIONS[@]}"; do
-                if ! is_installed "$i"; then
-                    SELECTIONS[$i]=1
-                fi
-            done
-        else
-            IFS=',' read -r -a array <<< "$input"
-            for item in "${array[@]}"; do
-                local val
-                val=$(echo "$item" | xargs)
-                if [[ "$val" =~ ^[0-9]+$ ]] && [[ "$val" -ge 1 && "$val" -le ${#OPTIONS[@]} ]]; then
-                    local idx=$((val-1))
-                    if is_installed "$idx"; then
-                        log_info "${OPTIONS[$idx]} is already installed."
-                        sleep 1
-                    else
-                        if [[ ${SELECTIONS[$idx]} -eq 1 ]]; then
-                            SELECTIONS[$idx]=0
-                        else
-                            SELECTIONS[$idx]=1
-                        fi
-                    fi
-                fi
-            done
-        fi
-    done
+# ── [4] Update system ─────────────────────────────────────────────────────────
+menu_update() {
+    log_section "SYSTEM UPDATE"
+    log_info "Running apt update + upgrade..."
+    sudo apt-get update -y && sudo apt-get upgrade -y
+    log_ok "System updated."
+    press_enter
 }
 
-# ── [2] Uninstall packages ────────────────────────────────────────────────────
-menu_uninstall() {
-    while true; do
-        clear
-        log_section "UNINSTALL SOFTWARE PACKAGES"
-        local i installed_list=()
-        for i in "${!OPTIONS[@]}"; do
-            if is_installed "$i"; then
-                printf "  %2d) [Installed] %s\n" "$((i+1))" "${OPTIONS[$i]}"
-                installed_list+=("$i")
-            fi
-        done
-        if [[ ${#installed_list[@]} -eq 0 ]]; then
-            log_info "No packages are currently installed."
-            press_enter
-            break
-        fi
-        echo -e "\n  ${BOLD}Enter number to uninstall, 'all' to remove everything, or '0' to return.${NC}"
-        read -rp "  Choice: " input < /dev/tty
-        [[ -z "$input" ]] && continue
-        if [[ "$input" == "0" ]]; then
-            break
-        elif [[ "$input" == "all" || "$input" == "ALL" ]]; then
-            read -rp "  Are you absolutely sure you want to uninstall ALL packages? (y/N): " conf < /dev/tty
-            if [[ "$conf" =~ ^[Yy]$ ]]; then
-                for i in "${installed_list[@]}"; do
-                    log_info "Uninstalling ${OPTIONS[$i]}..."
-                    uninstall_component "$i"
-                done
-                log_ok "All selected packages uninstalled."
-                press_enter
-            fi
-            break
-        else
-            if [[ "$input" =~ ^[0-9]+$ ]] && [[ "$input" -ge 1 && "$input" -le ${#OPTIONS[@]} ]]; then
-                local idx=$((input-1))
-                if is_installed "$idx"; then
-                    read -rp "  Uninstall ${OPTIONS[$idx]}? (y/N): " conf < /dev/tty
-                    if [[ "$conf" =~ ^[Yy]$ ]]; then
-                        uninstall_component "$idx"
-                        log_ok "${OPTIONS[$idx]} uninstalled."
-                        press_enter
-                    fi
-                else
-                    log_warn "${OPTIONS[$idx]} is not installed."
-                    sleep 1
-                fi
-            else
-                log_warn "Invalid selection."
-                sleep 1
-            fi
-        fi
-    done
+# ── [5] Tailscale VPN ─────────────────────────────────────────────────────────
+ensure_tailscale_service() {
+    if ! command -v tailscale &>/dev/null; then
+        log_warn "Tailscale is not installed yet. Installing Tailscale now..."
+        install_tailscale || return 1
+    fi
+    if ! systemctl is-active --quiet tailscaled 2>/dev/null; then
+        log_info "Starting tailscaled service..."
+        sudo systemctl enable --now tailscaled 2>/dev/null || true
+        sudo systemctl restart tailscaled 2>/dev/null || true
+    fi
+    return 0
 }
 
-# ── [6] System Config ─────────────────────────────────────────────────────────
-menu_sysconfig() {
+menu_tailscale() {
     while true; do
         clear
-        log_section "SYSTEM CONFIGURATION (Git & Hostname)"
-        echo -e "  [1] Set Git Global Config (Name & Email)"
-        echo -e "  [2] Change Hostname"
-        echo -e "  [3] Show Current Configuration"
+        echo -e "${CYAN}${BOLD}=== [5] TAILSCALE VPN ===${NC}\n"
+        echo -e "  [1] Install Tailscale"
+        echo -e "  [2] Login  (auto-sent to Admin — no typing)"
+        echo -e "  [3] Connect (accept routes)"
+        echo -e "  [4] Full Reset + Connect (reset + accept DNS & routes)"
+        echo -e "  [5] Connect with Exit Node (100.64.0.7)"
+        echo -e "  [6] Diagnose & Status"
+        echo -e "  [7] Uninstall Tailscale"
         echo -e "  [0] Back\n"
+
+        local server="https://bifrost.saleshandy.com"
         read -rp "  Choice: " ch < /dev/tty
         case "$ch" in
-            1)
-                read -rp "  Enter Git User Name: " gname < /dev/tty
-                read -rp "  Enter Git Email: " gemail < /dev/tty
-                if [[ -n "$gname" && -n "$gemail" ]]; then
-                    git config --global user.name "$gname"
-                    git config --global user.email "$gemail"
-                    log_ok "Git configuration updated."
-                else
-                    log_warn "Git config inputs cannot be empty."
-                fi
-                press_enter ;;
+            1) install_tailscale; press_enter ;;
             2)
-                read -rp "  Enter new Hostname: " new_host < /dev/tty
-                if [[ -n "$new_host" ]]; then
-                    sudo hostnamectl set-hostname "$new_host"
-                    sudo sed -i "s/127.0.1.1.*/127.0.1.1\t$new_host/" /etc/hosts
-                    log_ok "Hostname changed to '$new_host'."
-                else
-                    log_warn "Hostname cannot be empty."
+                clear
+                echo -e "${CYAN}${BOLD}=== [5.2] TAILSCALE LOGIN / REGISTER ===${NC}\n"
+                echo -e "  [1] Auto-send Login Link to Admin (no typing, no QR)"
+                echo -e "  [2] Auth Key Login    (Use pre-authorized key from Admin)"
+                echo -e "  [0] Back\n"
+                read -rp "  Select Login Method: " subChoice < /dev/tty
+                if [[ "$subChoice" == "1" ]]; then
+                    ensure_tailscale_service || { press_enter; continue; }
+                    NTFY_TOPIC="$NTFY_ADMIN_CHANNEL"
+                    # Auto-clean: strip any accidental full-URL prefix
+                    NTFY_TOPIC="${NTFY_TOPIC#$NTFY_SERVER/}"
+                    NTFY_TOPIC="${NTFY_TOPIC#https://ntfy.sh/}"
+                    NTFY_TOPIC="${NTFY_TOPIC#http://ntfy.sh/}"
+                    NTFY_TOPIC="${NTFY_TOPIC#ntfy.sh/}"
+                    NTFY_TOPIC="${NTFY_TOPIC%/}"
+                    log_info "Requesting login link (will auto-send to '$NTFY_TOPIC')..."
+                    log_warn "This forces a fresh login even if already connected — if you're SSH'd in over Tailscale right now, that session may drop."
+                    TS_LOG="$(mktemp)"
+                    sudo tailscale up --login-server="$server" --accept-routes --accept-dns --force-reauth > "$TS_LOG" 2>&1 &
+                    TS_PID=$!
+                    LOGIN_URL=""
+                    for _ in $(seq 1 30); do
+                        LOGIN_URL=$(grep -oE 'https://[^ ]+' "$TS_LOG" 2>/dev/null | head -1)
+                        [[ -n "$LOGIN_URL" ]] && break
+                        kill -0 "$TS_PID" 2>/dev/null || break   # process already finished (e.g. already logged in)
+                        sleep 1
+                    done
+                    cat "$TS_LOG"
+                    if [[ -n "$LOGIN_URL" ]]; then
+                        log_info "Sending link to Admin channel '$NTFY_TOPIC'..."
+                        if curl -fsSL --max-time 10 -d "New PC ($(hostname)) Tailscale login: $LOGIN_URL" "$NTFY_SERVER/$NTFY_TOPIC" &>/dev/null; then
+                            log_ok "Link sent! Admin should open: $NTFY_SERVER/$NTFY_TOPIC in a browser tab (once, keep it open) to see it arrive instantly."
+                        else
+                            log_warn "Auto-send failed (server unreachable — check VPN/Tailscale connection to $NTFY_SERVER). Admin can still use the URL printed above."
+                        fi
+                    else
+                        log_ok "Already logged in — no link needed."
+                    fi
+                    wait "$TS_PID" 2>/dev/null
+                    rm -f "$TS_LOG"
+                elif [[ "$subChoice" == "2" ]]; then
+                    ensure_tailscale_service || { press_enter; continue; }
+                    read -rp "  Enter Tailscale Auth Key (tskey-auth-...): " authKey < /dev/tty
+                    if [[ -z "$authKey" ]]; then
+                        log_warn "Cancelled."
+                    else
+                        log_info "Registering node using Auth Key..."
+                        sudo tailscale up --authkey="$authKey" --login-server="$server" --accept-routes --accept-dns --force-reauth
+                        log_ok "Node successfully registered with Auth Key!"
+                    fi
                 fi
                 press_enter ;;
             3)
-                log_section "CURRENT CONFIGURATION"
-                echo "  Hostname   : $(hostname)"
-                echo "  Git Name   : $(git config --global user.name || echo 'Not Set')"
-                echo "  Git Email  : $(git config --global user.email || echo 'Not Set')"
-                echo "  OS Version : $(lsb_release -ds 2>/dev/null || echo 'Linux')"
+                ensure_tailscale_service || { press_enter; continue; }
+                sudo tailscale up --accept-routes --accept-dns --login-server="$server"
                 press_enter ;;
-            0) break ;;
-            *) log_warn "Invalid choice."; sleep 1 ;;
+            4)
+                ensure_tailscale_service || { press_enter; continue; }
+                sudo tailscale up --login-server="$server" --reset --accept-dns --accept-routes
+                press_enter ;;
+            5)
+                ensure_tailscale_service || { press_enter; continue; }
+                sudo tailscale up --login-server="$server" --accept-dns --accept-routes --exit-node=100.64.0.7
+                press_enter ;;
+            6)
+                log_section "TAILSCALE DIAGNOSTICS"
+                if ! command -v tailscale &>/dev/null; then
+                    log_warn "Tailscale is NOT installed."
+                else
+                    log_info "Status:";    sudo tailscale status 2>/dev/null || log_warn "tailscale not running / not logged in"
+                    log_info "IP:";        sudo tailscale ip 2>/dev/null || true
+                    log_info "Ping test:"; sudo tailscale ping 100.64.0.1 2>/dev/null || log_warn "Ping failed"
+                fi
+                log_info "Service:";   systemctl is-active tailscaled 2>/dev/null && echo -e "  ${GREEN}tailscaled: ACTIVE${NC}" || echo -e "  ${RED}tailscaled: INACTIVE${NC}"
+                press_enter ;;
+            7)
+                read -rp "  Confirm uninstall Tailscale? (y/N): " conf < /dev/tty
+                if [[ "$conf" =~ ^[Yy]$ ]]; then
+                    uninstall_tailscale
+                fi
+                press_enter ;;
+            0) return ;;
+            *) log_warn "Invalid choice." ;;
         esac
     done
 }
 
-# ── [7] Onboarding User ───────────────────────────────────────────────────────
+# ── [6] System config ─────────────────────────────────────────────────────────
+configure_system_settings() {
+    log_section "SYSTEM HOSTNAME & GIT SETUP"
+    local cur_host; cur_host=$(hostname)
+    echo "  Current hostname: $cur_host"
+    read -rp "  New hostname (leave blank to keep): " new_host < /dev/tty
+    read -rp "  Git user name  (leave blank to skip): " git_name < /dev/tty
+    read -rp "  Git email      (leave blank to skip): " git_email < /dev/tty
+
+    if [[ -n "$new_host" ]]; then
+        sudo hostnamectl set-hostname "$new_host"
+        sudo sed -i "s/127.0.1.1.*/127.0.1.1\t$new_host/g" /etc/hosts
+        log_ok "Hostname set to: $new_host"
+    fi
+    [[ -n "$git_name" ]]  && git config --global user.name "$git_name"  && log_ok "Git name: $git_name"
+    [[ -n "$git_email" ]] && git config --global user.email "$git_email" && log_ok "Git email: $git_email"
+}
+
+menu_sysconfig() {
+    log_section "SYSTEM CONFIGURATION"
+    configure_system_settings
+    press_enter
+}
+
+# ── [7] Onboarding user creation ──────────────────────────────────────────────
 menu_create_user() {
-    clear
-    log_section "CREATE ONBOARDING USER"
-    local NEW_USER="onboarding"
-    local NEW_PASS="Saleshandy@123"
+    log_section "ONBOARDING USER CREATION"
+    read -rp "  New username: " NEW_USER < /dev/tty
+    [[ -z "$NEW_USER" ]] && log_warn "Cancelled." && press_enter && return
 
-    read -rp "  Create default user '$NEW_USER' with password '$NEW_PASS'? (y/N): " conf < /dev/tty
-    if [[ ! "$conf" =~ ^[Yy]$ ]]; then
-        log_info "Cancelled."
-        press_enter
-        return
-    fi
+    read -rsp "  Password for '$NEW_USER': " NEW_PASS < /dev/tty; echo ""
+    [[ -z "$NEW_PASS" ]] && log_warn "Password cannot be empty." && press_enter && return
 
-    if id "$NEW_USER" &>/dev/null; then
-        log_warn "User '$NEW_USER' already exists."
-        read -rp "  Delete existing user '$NEW_USER' and recreate? (y/N): " del_conf < /dev/tty
-        if [[ "$del_conf" =~ ^[Yy]$ ]]; then
-            sudo userdel -r "$NEW_USER" 2>/dev/null || true
-            log_ok "Old user removed."
-        else
-            log_info "Cancelled."
-            press_enter
-            return
-        fi
-    fi
-
-    read -rp "  Give this user admin/sudo privileges? (y/N): " is_admin < /dev/tty
+    read -rp "  Grant sudo/admin? (y/N): " is_admin < /dev/tty
 
     log_info "Creating user '$NEW_USER'..."
     sudo useradd -m -s /bin/bash "$NEW_USER"
@@ -1166,7 +1176,7 @@ menu_wifi_diagnose() {
                         if grep -A2 '^\[connectivity\]' "$nm_conf" | grep -q 'enabled='; then
                             sudo sed -i '/^\[connectivity\]/,/^\[/ { s/^enabled=.*/enabled=false/; }' "$nm_conf"
                         else
-                            sudo sed -i '/^\[connectivity\]/,/^\[/ { s/^enabled=.*/enabled=false/; }' "$nm_conf"
+                            sudo sed -i '/^\[connectivity\]/a enabled=false' "$nm_conf"
                         fi
                     else
                         echo -e "\n[connectivity]\nenabled=false" | sudo tee -a "$nm_conf" > /dev/null

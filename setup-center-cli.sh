@@ -187,8 +187,9 @@ install_mongodb_compass() {
 install_tailscale() {
     log_info "Installing Tailscale VPN (official script)..."
     curl -fsSL https://tailscale.com/install.sh | sh || { log_error "Tailscale install failed."; return 1; }
-    sudo systemctl enable --now tailscaled
-    log_ok "Tailscale installed."
+    sudo systemctl enable --now tailscaled 2>/dev/null || true
+    sudo systemctl restart tailscaled 2>/dev/null || true
+    log_ok "Tailscale installed successfully."
 }
 
 install_gnome_tools() {
@@ -415,7 +416,34 @@ uninstall_dbeaver()         { sudo apt-get remove --purge -y dbeaver-ce || true;
 uninstall_postman()         { sudo snap remove postman || true; }
 uninstall_redisinsight()    { sudo snap remove redisinsight || true; }
 uninstall_mongodb_compass() { sudo apt-get remove --purge -y mongodb-compass || true; sudo apt-get autoremove -y; }
-uninstall_tailscale()       { sudo snap remove tailscale 2>/dev/null || true; sudo apt-get remove --purge -y tailscale || true; sudo rm -f /etc/apt/sources.list.d/tailscale.list; sudo apt-get autoremove -y; }
+uninstall_tailscale() {
+    log_info "Uninstalling Tailscale VPN completely..."
+    sudo tailscale logout 2>/dev/null || true
+    sudo tailscale down --accept-risk=lose-ssh 2>/dev/null || sudo tailscale down 2>/dev/null || true
+    sudo systemctl stop tailscaled 2>/dev/null || true
+    sudo systemctl disable tailscaled 2>/dev/null || true
+    sudo pkill -9 -f tailscaled 2>/dev/null || true
+    sudo pkill -9 -f tailscale 2>/dev/null || true
+
+    # Remove APT packages
+    sudo apt-get remove --purge -y tailscale tailscaled 2>/dev/null || true
+
+    # Remove Snap package if installed
+    sudo snap remove tailscale 2>/dev/null || true
+
+    # Clean APT sources & GPG keyring files
+    sudo rm -f /etc/apt/sources.list.d/tailscale*.list /etc/apt/sources.list.d/tailscale*.sources
+    sudo rm -f /usr/share/keyrings/tailscale* /etc/apt/keyrings/tailscale* /etc/apt/trusted.gpg.d/tailscale*
+
+    # Remove Tailscale sockets, state databases and configs
+    sudo rm -rf /var/lib/tailscale /var/run/tailscale /etc/default/tailscaled /var/cache/tailscale $HOME/.tailscale
+
+    # Remove lingering binaries if any
+    sudo rm -f /usr/bin/tailscale /usr/sbin/tailscale /usr/local/bin/tailscale /usr/bin/tailscaled /usr/sbin/tailscaled /usr/local/bin/tailscaled
+
+    sudo apt-get autoremove -y 2>/dev/null || true
+    log_ok "Tailscale uninstalled completely."
+}
 uninstall_gnome_tools()     { sudo apt-get remove --purge -y gnome-tweaks gnome-shell-extension-manager || true; sudo apt-get autoremove -y; }
 uninstall_clamav()          {
     sudo systemctl stop clamav-freshclam clamav-daemon 2>/dev/null || true
@@ -706,6 +734,19 @@ menu_update() {
 }
 
 # ── [5] Tailscale VPN ─────────────────────────────────────────────────────────
+ensure_tailscale_service() {
+    if ! command -v tailscale &>/dev/null; then
+        log_warn "Tailscale is not installed yet. Installing Tailscale now..."
+        install_tailscale || return 1
+    fi
+    if ! systemctl is-active --quiet tailscaled 2>/dev/null; then
+        log_info "Starting tailscaled service..."
+        sudo systemctl enable --now tailscaled 2>/dev/null || true
+        sudo systemctl restart tailscaled 2>/dev/null || true
+    fi
+    return 0
+}
+
 menu_tailscale() {
     while true; do
         clear
@@ -730,7 +771,8 @@ menu_tailscale() {
                 echo -e "  [2] Auth Key Login    (Use pre-authorized key from Admin)"
                 echo -e "  [0] Back\n"
                 read -rp "  Select Login Method: " subChoice < /dev/tty
-                if [[ "$subChoice" -eq 1 ]]; then
+                if [[ "$subChoice" == "1" ]]; then
+                    ensure_tailscale_service || { press_enter; continue; }
                     NTFY_TOPIC="$NTFY_ADMIN_CHANNEL"
                     # Auto-clean: strip any accidental full-URL prefix
                     NTFY_TOPIC="${NTFY_TOPIC#$NTFY_SERVER/}"
@@ -763,30 +805,46 @@ menu_tailscale() {
                     fi
                     wait "$TS_PID" 2>/dev/null
                     rm -f "$TS_LOG"
-                elif [[ "$subChoice" -eq 2 ]]; then
+                elif [[ "$subChoice" == "2" ]]; then
+                    ensure_tailscale_service || { press_enter; continue; }
                     read -rp "  Enter Tailscale Auth Key (tskey-auth-...): " authKey < /dev/tty
                     if [[ -z "$authKey" ]]; then
                         log_warn "Cancelled."
                     else
                         log_info "Registering node using Auth Key..."
-                        sudo tailscale up --authkey="$authKey" --login-server="$server" --accept-routes --accept-dns
+                        sudo tailscale up --authkey="$authKey" --login-server="$server" --accept-routes --accept-dns --force-reauth
                         log_ok "Node successfully registered with Auth Key!"
                     fi
                 fi
                 press_enter ;;
-            3) sudo tailscale up --accept-routes --login-server="$server"; press_enter ;;
-            4) sudo tailscale up --login-server="$server" --reset --accept-dns --accept-routes; press_enter ;;
-            5) sudo tailscale up --login-server="$server" --accept-dns --accept-routes --exit-node=100.64.0.7; press_enter ;;
+            3)
+                ensure_tailscale_service || { press_enter; continue; }
+                sudo tailscale up --accept-routes --accept-dns --login-server="$server"
+                press_enter ;;
+            4)
+                ensure_tailscale_service || { press_enter; continue; }
+                sudo tailscale up --login-server="$server" --reset --accept-dns --accept-routes
+                press_enter ;;
+            5)
+                ensure_tailscale_service || { press_enter; continue; }
+                sudo tailscale up --login-server="$server" --accept-dns --accept-routes --exit-node=100.64.0.7
+                press_enter ;;
             6)
                 log_section "TAILSCALE DIAGNOSTICS"
-                log_info "Status:";    sudo tailscale status 2>/dev/null || log_warn "tailscale not running"
-                log_info "IP:";        sudo tailscale ip 2>/dev/null || true
-                log_info "Ping test:"; sudo tailscale ping 100.64.0.1 2>/dev/null || log_warn "Ping failed"
-                log_info "Service:";   systemctl is-active tailscaled && echo "tailscaled: ACTIVE" || echo "tailscaled: INACTIVE"
+                if ! command -v tailscale &>/dev/null; then
+                    log_warn "Tailscale is NOT installed."
+                else
+                    log_info "Status:";    sudo tailscale status 2>/dev/null || log_warn "tailscale not running / not logged in"
+                    log_info "IP:";        sudo tailscale ip 2>/dev/null || true
+                    log_info "Ping test:"; sudo tailscale ping 100.64.0.1 2>/dev/null || log_warn "Ping failed"
+                fi
+                log_info "Service:";   systemctl is-active tailscaled 2>/dev/null && echo -e "  ${GREEN}tailscaled: ACTIVE${NC}" || echo -e "  ${RED}tailscaled: INACTIVE${NC}"
                 press_enter ;;
             7)
                 read -rp "  Confirm uninstall Tailscale? (y/N): " conf < /dev/tty
-                [[ "$conf" =~ ^[Yy]$ ]] && uninstall_tailscale && log_ok "Tailscale removed."
+                if [[ "$conf" =~ ^[Yy]$ ]]; then
+                    uninstall_tailscale
+                fi
                 press_enter ;;
             0) return ;;
             *) log_warn "Invalid choice." ;;
