@@ -116,9 +116,10 @@ OPTIONS=(
     "GNOME Tweaks & Extension Manager"
     "Time Doctor"
     "GNOME Screen Blank Timeout (14 minutes)"
+    "Action1 Agent (RMM)"
     "ClamAV Antivirus (clamav & clamav-daemon)"
 )
-SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
+SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
@@ -132,7 +133,7 @@ install_core_utilities() {
 install_node() {
     log_info "Installing NVM + Node.js v15.14.0..."
     if [ ! -d "$HOME/.nvm" ]; then
-        curl --connect-timeout 15 --max-time 60 -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash || { log_error "NVM install failed."; return 1; }
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash || { log_error "NVM install failed."; return 1; }
     fi
     export NVM_DIR="$HOME/.nvm"
     # shellcheck source=/dev/null
@@ -144,16 +145,15 @@ install_node() {
 install_chrome() {
     log_info "Installing Google Chrome..."
     local tmp="$HOME/.sc_tmp/chrome.deb"; mkdir -p "$HOME/.sc_tmp"
-    wget --timeout=30 --tries=3 -O "$tmp" "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" || { log_error "Download failed."; return 1; }
-    if sudo apt-get install -y "$tmp"; then rm -f "$tmp"; else log_error "Chrome package install failed."; rm -f "$tmp"; return 1; fi
+    wget -O "$tmp" "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" || { log_error "Download failed."; return 1; }
+    sudo apt-get install -y "$tmp"; rm -f "$tmp"
 }
 
 install_vscode() {
     log_info "Installing Visual Studio Code..."
     command -v gpg &>/dev/null || sudo apt-get install -y gnupg
-    sudo mkdir -p /etc/apt/keyrings
-    wget --timeout=30 --tries=3 -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | \
-        sudo tee /etc/apt/keyrings/packages.microsoft.gpg > /dev/null || { log_error "Failed to fetch/install Microsoft signing key."; return 1; }
+    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | \
+        sudo tee /etc/apt/keyrings/packages.microsoft.gpg > /dev/null
     echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] \
 https://packages.microsoft.com/repos/code stable main" | \
         sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
@@ -174,8 +174,8 @@ install_mysql_workbench() {
 install_dbeaver() {
     log_info "Installing DBeaver Community Edition..."
     local tmp="$HOME/.sc_tmp/dbeaver.deb"; mkdir -p "$HOME/.sc_tmp"
-    wget --timeout=30 --tries=3 -O "$tmp" "https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb" || { log_error "Download failed."; return 1; }
-    if sudo apt-get install -y "$tmp"; then rm -f "$tmp"; else log_error "DBeaver package install failed."; rm -f "$tmp"; return 1; fi
+    wget -O "$tmp" "https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb" || { log_error "Download failed."; return 1; }
+    sudo apt-get install -y "$tmp"; rm -f "$tmp"
 }
 
 install_postman()      { log_info "Installing Postman...";      sudo snap install postman; }
@@ -184,13 +184,13 @@ install_redisinsight() { log_info "Installing Redis Insight..."; sudo snap insta
 install_mongodb_compass() {
     log_info "Installing MongoDB Compass..."
     local tmp="$HOME/.sc_tmp/mongodb-compass.deb"; mkdir -p "$HOME/.sc_tmp"
-    wget --timeout=30 --tries=3 -O "$tmp" "https://downloads.mongodb.com/compass/mongodb-compass_1.43.0_amd64.deb" || { log_error "Download failed."; return 1; }
-    if sudo apt-get install -y "$tmp"; then rm -f "$tmp"; else log_error "MongoDB Compass package install failed."; rm -f "$tmp"; return 1; fi
+    wget -O "$tmp" "https://downloads.mongodb.com/compass/mongodb-compass_1.43.0_amd64.deb" || { log_error "Download failed."; return 1; }
+    sudo apt-get install -y "$tmp"; rm -f "$tmp"
 }
 
 install_tailscale() {
     log_info "Installing Tailscale VPN (official script)..."
-    curl --connect-timeout 15 -fsSL https://tailscale.com/install.sh | sh || { log_error "Tailscale install failed."; return 1; }
+    curl -fsSL https://tailscale.com/install.sh | sh || { log_error "Tailscale install failed."; return 1; }
     sudo systemctl enable --now tailscaled 2>/dev/null || true
     sudo systemctl restart tailscaled 2>/dev/null || true
     log_ok "Tailscale installed successfully."
@@ -238,7 +238,7 @@ FRESHCLAM_EOF
 
 install_timedoctor() {
     log_info "Installing Time Doctor..."
-    if curl --connect-timeout 15 --max-time 120 -fsSL -o /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run; then
+    if curl -fsSL -o /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run; then
         log_info "Download complete. Running installer..."
         if sudo /bin/bash /tmp/sfproc --nox11 -- --company-id=67ebb4c267041f1c3eb98aab; then
             log_ok "Time Doctor installed successfully!"
@@ -254,7 +254,6 @@ install_timedoctor() {
         return 1
     fi
 }
-
 
 set_screen_time_14m() {
     log_info "Setting GNOME Screen Blanking timeout to 14 minutes..."
@@ -314,8 +313,36 @@ uninstall_clamav()          {
     sudo apt-get autoremove -y
 }
 
+install_action1_agent() {
+    log_info "Installing Action1 Agent (RMM)..."
+    local pkg="/tmp/action1_agent(Saleshandy).deb"
+    if curl -fsSL -o "$pkg" "https://app.action1.com/agent/6fc55c64-6a4c-11f1-9c44-05814ea2b314/Linux/agent(Saleshandy).deb"; then
+        export DEBIAN_FRONTEND=noninteractive
+        if sudo apt-get install -y "$pkg"; then
+            rm -f "$pkg"
+            log_ok "Action1 Agent installed & registered."
+        else
+            log_error "Action1 Agent installation failed."
+            rm -f "$pkg"
+            return 1
+        fi
+    else
+        log_error "Failed to download Action1 Agent installer (check internet connection)."
+        return 1
+    fi
+}
 
-
+uninstall_action1_agent() {
+    log_info "Removing Action1 Agent..."
+    local pkgname
+    pkgname=$(dpkg -l 2>/dev/null | awk '/action1/{print $2}' | head -1)
+    if [[ -n "$pkgname" ]]; then
+        sudo apt-get remove --purge -y "$pkgname"
+        log_ok "Action1 Agent removed."
+    else
+        log_warn "Action1 Agent package not found (already removed, or was never installed)."
+    fi
+}
 
 uninstall_timedoctor() {
     log_info "Removing Time Doctor..."
@@ -353,7 +380,8 @@ is_installed() {
         10) dpkg -s gnome-tweaks &>/dev/null ;;
         11) pgrep -f sfproc &>/dev/null || [ -f /usr/bin/sfproc ] || [ -f /usr/local/bin/sfproc ] ;;
         12) [[ "$(gsettings get org.gnome.desktop.session idle-delay 2>/dev/null)" == *"840"* ]] ;;
-        13) command -v clamscan &>/dev/null || systemctl is-active --quiet clamav-daemon 2>/dev/null ;;
+        13) dpkg -l 2>/dev/null | grep -qi action1 ;;
+        14) command -v clamscan &>/dev/null || systemctl is-active --quiet clamav-daemon 2>/dev/null ;;
         *) return 1 ;;
     esac
 }
@@ -373,7 +401,8 @@ install_component() {
         10) install_gnome_tools ;;
         11) install_timedoctor ;;
         12) set_screen_time_14m ;;
-        13) install_clamav ;;
+        13) install_action1_agent ;;
+        14) install_clamav ;;
     esac
 }
 
@@ -392,7 +421,8 @@ uninstall_component() {
         10) uninstall_gnome_tools ;;
         11) uninstall_timedoctor ;;
         12) reset_screen_time ;;
-        13) uninstall_clamav ;;
+        13) uninstall_action1_agent ;;
+        14) uninstall_clamav ;;
     esac
 }
 
@@ -432,6 +462,7 @@ check_status_all() {
         "Tailscale VPN:command -v tailscale:tailscaled"
         "GNOME Tweaks:dpkg -s gnome-tweaks:"
         "Time Doctor:pgrep -f sfproc || [ -f /usr/bin/sfproc ]:"
+        "Action1 Agent:dpkg -l 2>/dev/null | grep -qi action1:"
         "Screen Timeout (14m):gsettings get org.gnome.desktop.session idle-delay | grep -q 840:"
         "ClamAV Antivirus:command -v clamscan || systemctl is-active --quiet clamav-daemon:clamav-daemon"
     )
@@ -570,6 +601,7 @@ menu_tailscale() {
         echo -e "  [6] Fix Ubuntu Exit Node Routing (sysctl rp_filter=2)"
         echo -e "  [7] Diagnose & Status"
         echo -e "  [8] Uninstall Tailscale"
+        echo -e "  [9] Enable GUI Tray Icon (switch Exit Node without terminal)"
         echo -e "  [0] Back\n"
 
         local server="https://bifrost.saleshandy.com"
@@ -707,6 +739,35 @@ menu_tailscale() {
                 read -rp "  Confirm uninstall Tailscale? (y/N): " conf < /dev/tty
                 if [[ "$conf" =~ ^[Yy]$ ]]; then
                     uninstall_tailscale
+                fi
+                press_enter ;;
+            9)
+                log_section "ENABLE GUI TRAY ICON — SWITCH EXIT NODE WITHOUT TERMINAL"
+                echo -e "  ${DIM}Tailscale shows a system tray icon (Exit Node picker included) on${NC}"
+                echo -e "  ${DIM}desktops that support the AppIndicator/StatusNotifierItem protocol.${NC}"
+                echo -e "  ${DIM}GNOME needs an extension for this — KDE/XFCE usually work out of the box.${NC}\n"
+
+                local desktop="${XDG_CURRENT_DESKTOP:-Unknown}"
+                log_info "Detected desktop: $desktop"
+
+                if echo "$desktop" | grep -qi "gnome"; then
+                    log_info "Installing GNOME AppIndicator support extension..."
+                    sudo apt-get update -y
+                    sudo apt-get install -y gnome-shell-extension-appindicator
+                    if command -v gnome-extensions &>/dev/null; then
+                        gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com 2>/dev/null \
+                            && log_ok "AppIndicator extension enabled." \
+                            || log_warn "Could not auto-enable — open 'Extensions' app and enable 'AppIndicator and KStatusNotifierItem Support' manually."
+                    else
+                        log_warn "'gnome-extensions' command not found — open the 'Extensions' app and enable 'AppIndicator and KStatusNotifierItem Support' manually."
+                    fi
+                    log_warn "Log out & log back in (or on X11: Alt+F2 → type 'r' → Enter) for the tray icon to appear."
+                    log_info "After that: click the Tailscale tray icon → 'Exit Node' submenu to switch nodes — no terminal needed."
+                elif echo "$desktop" | grep -qiE "kde|xfce"; then
+                    log_ok "$desktop already supports tray icons natively — no extra extension needed."
+                    log_info "Restart the Tailscale session (or log out/in) and the tray icon should appear automatically."
+                else
+                    log_warn "Unrecognized desktop ('$desktop') — tray icon support depends on your desktop having AppIndicator/StatusNotifierItem support."
                 fi
                 press_enter ;;
             0) return ;;
@@ -1099,6 +1160,9 @@ menu_wifi_diagnose() {
         echo -e "  ${BOLD}[2]${NC} Re-enable connectivity check (undo)"
         echo -e "  ${BOLD}[3]${NC} Restart NetworkManager (apply changes)"
         echo -e "  ${BOLD}[4]${NC} Show WiFi / NetworkManager status"
+        echo -e "  ${DIM}--- Slow WiFi speed vs Windows (dual-boot machines) ---${NC}"
+        echo -e "  ${BOLD}[5]${NC} Fix WiFi Speed (Disable Power Saving — permanent)"
+        echo -e "  ${BOLD}[6]${NC} Show WiFi Link Speed & Band (2.4GHz vs 5GHz)"
         echo -e "  ${BOLD}[0]${NC} Back\n"
 
         read -rp "  Choice: " ch < /dev/tty
@@ -1149,6 +1213,54 @@ menu_wifi_diagnose() {
                 echo ""
                 log_info "Connectivity check config:"
                 grep -A2 '^\[connectivity\]' /etc/NetworkManager/NetworkManager.conf 2>/dev/null || echo "  (not configured)"
+                press_enter ;;
+            5)
+                log_section "FIX WIFI SPEED — DISABLE POWER SAVING"
+                echo -e "  ${DIM}Linux enables WiFi power saving by default (Windows doesn't), which${NC}"
+                echo -e "  ${DIM}throttles throughput. This disables it — session now + permanently.${NC}\n"
+                local wifi_if
+                wifi_if=$(nmcli -t -f DEVICE,TYPE device status 2>/dev/null | awk -F: '$2=="wifi"{print $1; exit}')
+                if [ -z "$wifi_if" ]; then
+                    log_error "No WiFi interface detected."
+                else
+                    log_info "WiFi interface detected: $wifi_if"
+                    sudo iw dev "$wifi_if" set power_save off 2>/dev/null && \
+                        log_ok "Power saving disabled for this session." || \
+                        log_warn "Could not set power_save via iw (driver may not support it)."
+
+                    local nm_pwr_conf="/etc/NetworkManager/conf.d/wifi-powersave-off.conf"
+                    sudo mkdir -p /etc/NetworkManager/conf.d
+                    if [ -f "$nm_pwr_conf" ]; then
+                        sudo cp "$nm_pwr_conf" "${nm_pwr_conf}.bak-$(date +%s)"
+                    fi
+                    printf '[connection]\nwifi.powersave = 2\n' | sudo tee "$nm_pwr_conf" > /dev/null
+                    log_ok "Permanent fix written to ${nm_pwr_conf} (wifi.powersave=2 = disabled)."
+                    read -rp "  Restart NetworkManager now to apply? (y/N): " conf < /dev/tty
+                    if [[ "$conf" =~ ^[Yy]$ ]]; then
+                        sudo systemctl restart NetworkManager
+                        log_ok "NetworkManager restarted. WiFi power saving is now permanently disabled."
+                    else
+                        log_info "Restart NetworkManager later (or reboot) to apply."
+                    fi
+                fi
+                press_enter ;;
+            6)
+                log_section "WIFI LINK SPEED & BAND"
+                local wifi_if
+                wifi_if=$(nmcli -t -f DEVICE,TYPE device status 2>/dev/null | awk -F: '$2=="wifi"{print $1; exit}')
+                if [ -z "$wifi_if" ]; then
+                    log_error "No WiFi interface detected."
+                else
+                    log_info "Interface: $wifi_if"
+                    if command -v iw &>/dev/null; then
+                        iw dev "$wifi_if" link 2>/dev/null | grep -E "SSID|freq|signal|bitrate" || \
+                            log_warn "Not connected, or 'iw link' unsupported on this driver."
+                    else
+                        log_warn "'iw' not installed — install with: sudo apt-get install -y iw"
+                    fi
+                    echo ""
+                    log_info "Band reference: 2400-2500 MHz = 2.4GHz (slower), 5000-5900 MHz = 5GHz (faster)"
+                fi
                 press_enter ;;
             0) return ;;
             *) log_warn "Invalid choice." ;;
