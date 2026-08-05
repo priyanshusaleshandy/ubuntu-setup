@@ -60,11 +60,6 @@ if [[ "$EUID" -eq 0 ]]; then
 fi
 
 # ── Sudo keep-alive ───────────────────────────────────────────────────────────
-if [[ ! -t 0 ]] && ! sudo -n true 2>/dev/null; then
-    log_error "No TTY available and passwordless sudo isn't configured — can't prompt for a sudo password."
-    log_error "Run this script from an interactive terminal, or grant NOPASSWD sudo first."
-    exit 1
-fi
 log_info "Acquiring sudo privileges..."
 sudo -v
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
