@@ -596,6 +596,7 @@ menu_tailscale() {
         echo -e "  [6] Fix Ubuntu Exit Node Routing (sysctl rp_filter=2)"
         echo -e "  [7] Diagnose & Status"
         echo -e "  [8] Uninstall Tailscale"
+        echo -e "  [9] Enable GUI Tray Icon (switch Exit Node without terminal)"
         echo -e "  [0] Back\n"
 
         local server="https://bifrost.saleshandy.com"
@@ -733,6 +734,35 @@ menu_tailscale() {
                 read -rp "  Confirm uninstall Tailscale? (y/N): " conf < /dev/tty
                 if [[ "$conf" =~ ^[Yy]$ ]]; then
                     uninstall_tailscale
+                fi
+                press_enter ;;
+            9)
+                log_section "ENABLE GUI TRAY ICON — SWITCH EXIT NODE WITHOUT TERMINAL"
+                echo -e "  ${DIM}Tailscale shows a system tray icon (Exit Node picker included) on${NC}"
+                echo -e "  ${DIM}desktops that support the AppIndicator/StatusNotifierItem protocol.${NC}"
+                echo -e "  ${DIM}GNOME needs an extension for this — KDE/XFCE usually work out of the box.${NC}\n"
+
+                local desktop="${XDG_CURRENT_DESKTOP:-Unknown}"
+                log_info "Detected desktop: $desktop"
+
+                if echo "$desktop" | grep -qi "gnome"; then
+                    log_info "Installing GNOME AppIndicator support extension..."
+                    sudo apt-get update -y
+                    sudo apt-get install -y gnome-shell-extension-appindicator
+                    if command -v gnome-extensions &>/dev/null; then
+                        gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com 2>/dev/null \
+                            && log_ok "AppIndicator extension enabled." \
+                            || log_warn "Could not auto-enable — open 'Extensions' app and enable 'AppIndicator and KStatusNotifierItem Support' manually."
+                    else
+                        log_warn "'gnome-extensions' command not found — open the 'Extensions' app and enable 'AppIndicator and KStatusNotifierItem Support' manually."
+                    fi
+                    log_warn "Log out & log back in (or on X11: Alt+F2 → type 'r' → Enter) for the tray icon to appear."
+                    log_info "After that: click the Tailscale tray icon → 'Exit Node' submenu to switch nodes — no terminal needed."
+                elif echo "$desktop" | grep -qiE "kde|xfce"; then
+                    log_ok "$desktop already supports tray icons natively — no extra extension needed."
+                    log_info "Restart the Tailscale session (or log out/in) and the tray icon should appear automatically."
+                else
+                    log_warn "Unrecognized desktop ('$desktop') — tray icon support depends on your desktop having AppIndicator/StatusNotifierItem support."
                 fi
                 press_enter ;;
             0) return ;;
