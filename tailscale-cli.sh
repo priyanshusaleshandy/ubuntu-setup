@@ -100,6 +100,62 @@ ensure_tailscale_service() {
     fi
 }
 
+# ── Full tailscaled Repair ────────────────────────────────────────────────────
+# Fixes: "Job for tailscaled.service failed because of unavailable resources
+#         or another system error." — root cause is usually a missing
+#         /etc/default/tailscaled defaults file, which the systemd unit
+#         requires to even attempt starting the daemon.
+repair_tailscaled_service() {
+    log_section "REPAIRING TAILSCALED SYSTEMD CONFIGURATION"
+
+    # 1. Ensure expected directories exist
+    sudo mkdir -p /etc/default /var/lib/tailscale /run/tailscale /var/cache/tailscale
+
+    # 2. Recreate the defaults file if missing
+    if [[ ! -f /etc/default/tailscaled ]]; then
+        log_info "Creating missing /etc/default/tailscaled"
+        sudo tee /etc/default/tailscaled >/dev/null <<'EOF'
+# Tailscale daemon defaults
+PORT="41641"
+FLAGS=""
+EOF
+    fi
+    sudo chmod 0644 /etc/default/tailscaled
+
+    # 3. Reinstall the binary if it's missing
+    if [[ ! -x /usr/sbin/tailscaled ]]; then
+        log_warn "tailscaled binary missing; reinstalling package..."
+        sudo apt-get update
+        sudo apt-get install --reinstall -y tailscale
+    fi
+
+    # 4. Clear systemd rate-limit lockout
+    sudo systemctl daemon-reload
+    sudo systemctl reset-failed tailscaled.service 2>/dev/null || true
+
+    # 5. Start
+    log_info "Starting tailscaled..."
+    sudo systemctl enable tailscaled
+    sudo systemctl start tailscaled
+    sleep 3
+
+    # 6. Verify
+    if systemctl is-active --quiet tailscaled; then
+        log_ok "tailscaled is running."
+        tailscale version
+        echo ""
+        log_info "Starting login..."
+        sudo tailscale login --login-server="${HEADSCALE_SERVER}"
+    else
+        log_error "tailscaled still failed to start."
+        echo ""
+        sudo systemctl status tailscaled --no-pager -l
+        echo ""
+        log_info "--- Last 100 log lines ---"
+        sudo journalctl -u tailscaled --no-pager -n 100
+    fi
+}
+
 # ── Kernel Routing & System Optimization Fixes ────────────────────────────────
 apply_kernel_routing_fixes() {
     log_info "Applying Ubuntu sysctl Kernel Routing & IP Forwarding fixes..."
@@ -366,6 +422,7 @@ menu_quick_actions() {
         echo -e "  [3] Reset Connection & Flags      (tailscale up --reset)"
         echo -e "  [4] Logout Current Account        (tailscale logout)"
         echo -e "  [5] Restart Tailscaled Service    (systemctl restart tailscaled)"
+        echo -e "  [6] Repair Tailscaled Service     (Full fix: config, binary, service + login)"
         echo -e "  [0] Back to Main Menu\n"
 
         read -rp "  Select Action: " actionChoice < /dev/tty
@@ -396,6 +453,9 @@ menu_quick_actions() {
                 log_info "Restarting tailscaled system service..."
                 sudo systemctl restart tailscaled
                 log_ok "tailscaled service restarted."
+                press_enter ;;
+            6)
+                repair_tailscaled_service
                 press_enter ;;
             0) return ;;
             *) log_warn "Invalid choice." ;;
