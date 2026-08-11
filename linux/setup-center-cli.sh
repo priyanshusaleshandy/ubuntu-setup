@@ -222,13 +222,37 @@ FRESHCLAM_EOF
 
     log_info "Updating ClamAV virus database via freshclam..."
     sudo systemctl stop clamav-freshclam 2>/dev/null || true
-    sudo freshclam || true
+
+    # clamav-daemon refuses to start without a virus database present, so
+    # freshclam must actually succeed before we try starting it. The public
+    # mirror is often slow/rate-limited on the first hit, so retry a few times.
+    local attempt
+    for attempt in 1 2 3; do
+        sudo freshclam && break
+        log_warn "freshclam attempt $attempt failed, retrying in 10s..."
+        sleep 10
+    done
+
+    if ! compgen -G "/var/lib/clamav/main.c?d" >/dev/null || ! compgen -G "/var/lib/clamav/daily.c?d" >/dev/null; then
+        log_error "Virus database never downloaded — clamav-daemon cannot start without it."
+        log_error "Check network access to database.clamav.net, then run: sudo freshclam"
+        return 1
+    fi
 
     log_info "Starting clamav-daemon service..."
-    sudo systemctl enable --now clamav-daemon
-    sudo systemctl start clamav-daemon
-    sudo systemctl status clamav-daemon --no-pager || true
-    log_ok "ClamAV installed, configured, & daemon started!"
+    sudo systemctl daemon-reload
+    sudo systemctl reset-failed clamav-daemon 2>/dev/null || true
+    sudo systemctl enable clamav-daemon
+    sudo systemctl restart clamav-daemon
+    sleep 2
+
+    if systemctl is-active --quiet clamav-daemon; then
+        log_ok "ClamAV installed, configured, & daemon started!"
+    else
+        log_error "clamav-daemon failed to start. Last 30 log lines:"
+        sudo journalctl -u clamav-daemon --no-pager -n 30
+        return 1
+    fi
 }
 
 install_timedoctor() {
