@@ -6,7 +6,7 @@
 {% if results %}
   {% for r in results %}
   {% if r.success %}
-  <div class="alert success">✅ {{ r.device_name }}: copied ({{ r.total_copied }}/{{ r.slots_found }} finger(s)).</div>
+  <div class="alert success">✅ {{ r.device_name }}: copied ({{ r.total_copied }}/{{ r.slots_found }} finger(s)){% if r.name %}, name set to "{{ r.name }}"{% endif %}.</div>
   {% else %}
   <div class="alert error">❌ {{ r.device_name }}: {{ r.error if r.error else "copy failed" }}</div>
   {% endif %}

@@ -204,7 +204,7 @@ def list_device_logs(device_ip, read_mark=0, timeout=120):
     return {"success": True, "logs": logs, "raw_output": output}
 
 
-def copy_fingerprint(source_ip, target_ip, enroll_number, timeout=60):
+def copy_fingerprint(source_ip, target_ip, enroll_number, name=None, timeout=60):
     """Copy a person's enrolled fingerprint(s) from one device to another via
     FK623Attend.dll, so they don't have to physically re-enroll at every
     device. Uses the _StringID enrollment-data functions - the plain numeric
@@ -216,10 +216,34 @@ def copy_fingerprint(source_ip, target_ip, enroll_number, timeout=60):
     back ~98% byte-identical (the small diff is localized to one region,
     consistent with an internal checksum/metadata field, not corruption) -
     but this only verifies the API round-trip, not an actual physical finger
-    match, which can't be checked remotely. Returns a dict describing what
-    happened."""
+    match, which can't be checked remotely.
+
+    Also pushes the person's name to the target (via push_user, same as
+    Create User) - the enrollment-data functions only move the biometric
+    template, not identity, so without this the copied fingerprint would sit
+    on the target under a blank/"-" name. Best-effort: if no name is found,
+    or the name-push fails, the fingerprint copy itself still counts as
+    successful - that's the main ask.
+
+    Every Wine invocation has a fixed ~4.6s cold-start cost (measured) on top
+    of the actual work, so each extra one is expensive. Pass `name` in
+    directly (e.g. from the caller's own cached DB) to skip a whole separate
+    live lookup call - if not given, falls back to querying the source
+    device's live user list (slower, but correct even for someone enrolled
+    by walking up to a device directly, who won't be in any local cache).
+
+    Returns a dict describing what happened."""
     if not re.match(r"^[A-Za-z0-9_/\-]{1,20}$", enroll_number):
         return {"success": False, "error": "Invalid enrollNumber format"}
+
+    if name == "-":
+        name = None
+    if name is None:
+        users_result = list_device_users(source_ip)
+        if users_result["success"]:
+            match = next((u for u in users_result["users"] if u["code"] == enroll_number), None)
+            if match and match["name"] and match["name"] != "-":
+                name = match["name"]
 
     remote_cmd = (
         f"cd {_sq(WORKDIR)} && "
@@ -243,6 +267,12 @@ def copy_fingerprint(source_ip, target_ip, enroll_number, timeout=60):
     slots_found = len(re.findall(r"SRC_SLOT\|", output))
     total_copied_match = re.search(r"TOTAL_COPIED (\d+)", output)
     total_copied = int(total_copied_match.group(1)) if total_copied_match else 0
+    fingerprint_ok = src_connect_ok and dst_connect_ok and total_copied > 0 and total_copied == slots_found
+
+    name_pushed = False
+    if fingerprint_ok and name:
+        name_result = push_user(target_ip, enroll_number, name)
+        name_pushed = name_result["success"]
 
     if not src_connect_ok:
         error = "Could not connect to source device"
@@ -252,13 +282,21 @@ def copy_fingerprint(source_ip, target_ip, enroll_number, timeout=60):
         error = "Could not connect to target device"
     elif total_copied < slots_found:
         error = f"Only {total_copied}/{slots_found} finger(s) copied successfully"
+    elif name and not name_pushed:
+        error = f"Fingerprint copied OK, but couldn't set the name (\"{name}\") on the target — will show blank until fixed"
     else:
         error = None
 
     return {
-        "success": src_connect_ok and dst_connect_ok and total_copied > 0 and total_copied == slots_found,
+        # fingerprint working is the main ask, but if we found a name on the
+        # source and failed to also set it on the target, don't call it a
+        # clean success - that's exactly the "blank name" gap this was meant
+        # to close, and it should surface as a visible warning, not silently.
+        "success": fingerprint_ok and (not name or name_pushed),
         "slots_found": slots_found,
         "total_copied": total_copied,
+        "name": name,
+        "name_pushed": name_pushed,
         "error": error,
         "raw_output": output,
         "stderr": result.stderr,

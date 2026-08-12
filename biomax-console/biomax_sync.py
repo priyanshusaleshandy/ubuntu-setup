@@ -84,8 +84,13 @@ CREATE TABLE IF NOT EXISTS device_users (
 
 
 def get_db():
-    conn = sqlite3.connect(DB_FILE)
+    # timeout=10 + WAL: this loop and the console (console.py) hit the same
+    # file concurrently - without these, a console click while this loop is
+    # mid-sync fails outright with "database is locked" instead of just
+    # waiting a moment (hit this for real, 2026-08-12).
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
     return conn
 
@@ -133,7 +138,10 @@ def sync_attendance(conn):
             "UPDATE devices SET last_log_download_date=?, last_ping=? WHERE device_id=?",
             (now, now, device["device_id"]),
         )
-    conn.commit()
+        # commit per-device rather than once at the end - keeps the write lock
+        # window short (just this device's inserts) instead of holding it across
+        # all devices' worth of work.
+        conn.commit()
     return new_count
 
 
