@@ -1,0 +1,14 @@
+[Unit]
+Description=BioMax Console (Phase 1 web UI - devices/logs/users)
+After=network.target
+
+[Service]
+Type=simple
+User=saleshandy
+WorkingDirectory=/home/saleshandy/biomax-sync
+ExecStart=/home/saleshandy/biomax-sync/venv/bin/python3 /home/saleshandy/biomax-sync/console.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

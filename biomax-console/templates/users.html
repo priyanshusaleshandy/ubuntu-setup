@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Users</h1>
+<form class="filters" method="get">
+  <input type="text" name="q" placeholder="Search name or code..." value="{{ search }}">
+  <select name="device" onchange="this.form.submit()">
+    <option value="">All Employees</option>
+    {% for d in devices %}
+    <option value="{{ d.device_id }}" {{ 'selected' if device_filter==d.device_id }}>{{ '🟢' if d.online else '🔴' }} On Device: {{ d.name }} ({{ d.ip_address }})</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Search</button>
+</form>
+
+{% if device_filter %}
+<form method="post" action="/sync-users" style="margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+  <input type="hidden" name="device_id" value="{{ device_filter }}">
+  <button type="submit" class="btn-primary" {% if device_online == false %}disabled{% endif %}>🔄 Sync Users from This Device</button>
+  <span class="badge {{ 'online' if device_online else 'offline' }}"><span class="dot {{ 'online' if device_online else 'offline' }}"></span>{{ 'Online' if device_online else 'Offline' }}</span>
+  {% if device_sync_info %}
+  <span class="muted" style="font-size:12px;">Last synced: {{ device_sync_info }}</span>
+  {% else %}
+  <span class="muted" style="font-size:12px;">Never synced yet — click to pull the live list from the device.</span>
+  {% endif %}
+</form>
+{% endif %}
+
+{% if employees %}
+<table>
+  {% if device_filter %}
+  <tr><th>Code</th><th>Name</th><th>Enabled</th><th>Fingers Enrolled</th></tr>
+  {% for e in employees %}
+  <tr>
+    <td>{{ e.employee_code }}</td>
+    <td><strong>{{ e.employee_name or '—' }}</strong></td>
+    <td><span class="badge {{ 'working' if e.enabled=='1' else 'left' }}">{{ 'Enabled' if e.enabled=='1' else 'Disabled' }}</span></td>
+    <td class="muted">{{ e.backup_number }}</td>
+  </tr>
+  {% endfor %}
+  {% else %}
+  <tr><th>Code</th><th>Name</th><th>Status</th><th>Designation</th><th>DOJ</th></tr>
+  {% for e in employees %}
+  <tr>
+    <td>{{ e.employee_code }}</td>
+    <td><strong>{{ e.employee_name or '—' }}</strong></td>
+    <td><span class="badge {{ 'working' if e.status=='Working' else 'left' }}">{{ e.status }}</span></td>
+    <td>{{ e.designation or '—' }}</td>
+    <td class="muted">{{ e.doj or '—' }}</td>
+  </tr>
+  {% endfor %}
+  {% endif %}
+</table>
+{% else %}
+<div class="empty">
+  {% if device_filter %}No users found on this device yet — try "Sync Users" above.{% else %}No users found.{% endif %}
+</div>
+{% endif %}
+{% endblock %}

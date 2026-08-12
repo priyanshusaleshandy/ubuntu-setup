@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Copy Fingerprint</h1>
+<p class="muted" style="margin-top:-10px; margin-bottom:20px;">Copies an already-enrolled fingerprint from one device straight to others, over the network — no need to physically re-enroll the person at every device. Overwrites whatever's already at that ID on the target(s).</p>
+
+{% if results %}
+  {% for r in results %}
+  {% if r.success %}
+  <div class="alert success">✅ {{ r.device_name }}: copied ({{ r.total_copied }}/{{ r.slots_found }} finger(s)).</div>
+  {% else %}
+  <div class="alert error">❌ {{ r.device_name }}: {{ r.error if r.error else "copy failed" }}</div>
+  {% endif %}
+  {% if r.raw_output %}
+  <pre class="log">{{ r.raw_output }}</pre>
+  {% endif %}
+  {% endfor %}
+{% endif %}
+
+<form method="post" style="margin-top:10px;">
+  <div class="field">
+    <label>Copy From (source device)</label>
+    <select name="source_device_id" required>
+      <option value="">Select device...</option>
+      {% for d in devices %}
+      <option value="{{ d.device_id }}" {{ 'selected' if form_values.source_device_id==d.device_id }}>{{ '🟢' if d.online else '🔴' }} {{ d.name }} ({{ d.ip_address }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Employee</label>
+    <input type="text" list="employee-list" name="enroll_number" value="{{ form_values.enroll_number }}" placeholder="Type name or ID..." required>
+    <datalist id="employee-list">
+      {% for e in employees %}
+      <option value="{{ e.employee_code }}">{{ e.employee_name }}</option>
+      {% endfor %}
+    </datalist>
+  </div>
+
+  {% if selected_employee %}
+  <div class="employee-preview">
+    <strong>{{ selected_employee.employee_name }}</strong><br>
+    <span class="muted">Code: {{ selected_employee.employee_code }} · Status: {{ selected_employee.status }}</span>
+  </div>
+  {% endif %}
+
+  <div class="field">
+    <label>Copy To (target devices)</label>
+    {% for d in devices %}
+    <div class="checkbox-row">
+      <input type="checkbox" name="target_device_ids" value="{{ d.device_id }}" id="target-{{ d.device_id }}"
+        {{ 'checked' if d.device_id in form_values.target_device_ids }}>
+      <label for="target-{{ d.device_id }}">{{ '🟢' if d.online else '🔴' }} {{ d.name }} ({{ d.ip_address }})</label>
+    </div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn-primary">Copy Fingerprint</button>
+</form>
+{% endblock %}

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔐</text></svg>">
+<title>{% block title %}BioMax Console{% endblock %}</title>
+<style>
+  :root { --bg:#0f1420; --panel:#161d2e; --border:#26304a; --text:#e6e9f0; --muted:#8b93a7;
+          --accent:#4f8cff; --green:#3ecf8e; --red:#ff5d6c; --amber:#ffb454; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+  .layout { display:flex; min-height:100vh; }
+  nav { width:210px; background:var(--panel); border-right:1px solid var(--border); padding:20px 0; flex-shrink:0; }
+  nav .brand { font-weight:700; font-size:18px; padding:0 20px 20px; color:var(--accent); }
+  nav a { display:block; padding:10px 20px; color:var(--muted); text-decoration:none; font-size:14px; }
+  nav a:hover, nav a.active { color:var(--text); background:#1c2438; }
+  main { flex:1; padding:28px 32px; max-width:1200px; }
+  h1 { font-size:22px; margin:0 0 20px; }
+  .cards { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px 20px; min-width:150px; }
+  .card .num { font-size:26px; font-weight:700; }
+  .card .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.5px; margin-top:4px; }
+  table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  th, td { text-align:left; padding:10px 14px; font-size:13px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; text-transform:uppercase; font-size:11px; letter-spacing:.5px; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:#1a2236; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+  .badge.working { background:rgba(62,207,142,.15); color:var(--green); }
+  .badge.left { background:rgba(255,93,108,.15); color:var(--red); }
+  .badge.in { background:rgba(62,207,142,.15); color:var(--green); }
+  .badge.out { background:rgba(255,180,84,.15); color:var(--amber); }
+  .badge.online { background:rgba(62,207,142,.15); color:var(--green); }
+  .badge.offline { background:rgba(255,93,108,.15); color:var(--red); }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .dot.online { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .dot.offline { background:var(--red); }
+  form.filters { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  form.filters input, form.filters select { background:var(--panel); border:1px solid var(--border); color:var(--text);
+    padding:8px 12px; border-radius:6px; font-size:13px; }
+  form.filters button { background:var(--accent); color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:13px; }
+  .muted { color:var(--muted); }
+  .empty { padding:40px; text-align:center; color:var(--muted); }
+  .alert { padding:14px 18px; border-radius:8px; margin-bottom:18px; font-size:14px; }
+  .alert.success { background:rgba(62,207,142,.12); border:1px solid rgba(62,207,142,.35); color:var(--green); }
+  .alert.error { background:rgba(255,93,108,.12); border:1px solid rgba(255,93,108,.35); color:var(--red); }
+  .field { margin-bottom:16px; }
+  .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.5px; }
+  .field input, .field select { width:100%; max-width:360px; background:var(--panel); border:1px solid var(--border); color:var(--text);
+    padding:10px 14px; border-radius:6px; font-size:14px; }
+  .btn-primary { background:var(--accent); color:white; border:none; padding:10px 22px; border-radius:6px; cursor:pointer; font-size:14px; font-weight:600; }
+  .btn-danger { background:var(--red); color:white; border:none; padding:10px 22px; border-radius:6px; cursor:pointer; font-size:14px; font-weight:600; }
+  .checkbox-row { display:flex; align-items:flex-start; gap:8px; margin-bottom:18px; max-width:420px; }
+  .checkbox-row input { margin-top:3px; }
+  .checkbox-row label { font-size:13px; color:var(--text); }
+  .employee-preview { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; max-width:360px; }
+  pre.log { background:#0a0e17; border:1px solid var(--border); border-radius:8px; padding:14px; font-size:12px; color:var(--muted); overflow-x:auto; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav>
+    <div class="brand">🔐 BioMax Console</div>
+    <a href="/" class="{{ 'active' if active=='dashboard' }}">📊 Dashboard</a>
+    <a href="/devices" class="{{ 'active' if active=='devices' }}">🖥️ Devices</a>
+    <a href="/logs" class="{{ 'active' if active=='logs' }}">📋 Logs</a>
+    <a href="/users" class="{{ 'active' if active=='users' }}">👤 Users</a>
+    <a href="/create-user" class="{{ 'active' if active=='create_user' }}">➕ Create User</a>
+    <a href="/delete-user" class="{{ 'active' if active=='delete_user' }}">🗑️ Delete User</a>
+    <a href="/copy-fingerprint" class="{{ 'active' if active=='copy_fingerprint' }}">🧬 Copy Fingerprint</a>
+  </nav>
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div class="alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script>
+  // Device round-trips go over SSH -> Wine -> the device itself, so pushes/deletes/syncs
+  // can take several seconds to tens of seconds. Give clicked buttons a "Working..." state
+  // so it's clear the click registered instead of looking frozen or inviting a double-click.
+  document.querySelectorAll("form").forEach(function (f) {
+    f.addEventListener("submit", function () {
+      if (f.checkValidity && !f.checkValidity()) return;
+      var btn = f.querySelector("button[type=submit]");
+      if (btn) {
+        btn.disabled = true;
+        btn.dataset.orig = btn.textContent;
+        btn.textContent = "Working…";
+      }
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Devices</h1>
+{% if devices %}
+<table>
+  <tr><th>Status</th><th>ID</th><th>Name</th><th>IP Address</th><th>Serial No.</th><th>Connection</th><th>Users</th><th>Last Sync</th></tr>
+  {% for d in devices %}
+  <tr>
+    <td><span class="badge {{ 'online' if d.online else 'offline' }}"><span class="dot {{ 'online' if d.online else 'offline' }}"></span>{{ 'Online' if d.online else 'Offline' }}</span></td>
+    <td>{{ d.device_id }}</td>
+    <td><strong>{{ d.name }}</strong></td>
+    <td>{{ d.ip_address }}</td>
+    <td>{{ d.serial_number }}</td>
+    <td>{{ d.connection_type }}</td>
+    <td>{{ d.user_count or '—' }}</td>
+    <td class="muted">{{ d.last_log_download_date }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="empty">No devices synced yet.</div>
+{% endif %}
+{% endblock %}

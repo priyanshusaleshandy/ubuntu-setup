@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Attendance Logs</h1>
+<form class="filters" method="get">
+  <input type="text" name="user" placeholder="User ID or name..." value="{{ user_filter }}">
+  <input type="date" name="date" value="{{ date_filter }}">
+  <select name="device">
+    <option value="">All devices</option>
+    {% for d in devices %}
+    <option value="{{ d.device_id }}" {{ 'selected' if device_filter==d.device_id }}>{{ d.name }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Filter</button>
+</form>
+{% if logs %}
+<table>
+  <tr><th>Log ID</th><th>User ID</th><th>Name</th><th>Date/Time</th><th>Direction</th><th>Device</th><th>Status</th></tr>
+  {% for r in logs %}
+  <tr>
+    <td class="muted">{{ r.device_log_id }}</td>
+    <td>{{ r.user_id }}</td>
+    <td>{{ r.employee_name or '—' }}</td>
+    <td>{{ r.log_date }}</td>
+    <td><span class="badge {{ r.direction }}">{{ r.direction }}</span></td>
+    <td>{{ r.device_id }}</td>
+    <td class="muted">{{ r.employee_status or '' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted">Showing up to 500 most recent matching rows.</p>
+{% else %}
+<div class="empty">No logs match this filter.</div>
+{% endif %}
+{% endblock %}
