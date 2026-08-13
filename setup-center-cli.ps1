@@ -143,6 +143,18 @@ function Install-UltraViewerDirectly {
     } catch { Write-ERR "UltraViewer: $($_.Exception.Message)" }
 }
 
+function Install-Action1Agent {
+    $dir = "C:\Action1"; $msi = "$dir\Action1Agent.msi"
+    Write-INFO "Installing Action1 Agent (RMM)..."
+    try {
+        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        Invoke-WebRequest -Uri "https://app.action1.com/agent/6fc55c64-6a4c-11f1-9c44-05814ea2b314/Windows/agent(Saleshandy).msi" -OutFile $msi -UseBasicParsing -ErrorAction Stop
+        $p = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$msi`" /qn /norestart" -Wait -PassThru -NoNewWindow
+        if ($p.ExitCode -eq 0) { Write-OK "Action1 Agent installed & registered." }
+        else { Write-ERR "Action1 Agent install failed (msiexec exit code $($p.ExitCode))." }
+    } catch { Write-ERR "Action1 Agent: $($_.Exception.Message)" }
+}
+
 function Install-NormalSoftware {
     Show-Header
     Write-Host "  [1] INSTALL ESSENTIAL SOFTWARE" -ForegroundColor Yellow
@@ -154,7 +166,8 @@ function Install-NormalSoftware {
         @{N="VLC Player";           ID="VideoLAN.VLC";           Choco="vlc"},
         @{N="PDF Reader (Sumatra)"; ID="SumatraPDF.SumatraPDF"; Choco="sumatrapdf"},
         @{N="AnyDesk";             ID="custom-anydesk"},
-        @{N="UltraViewer";         ID="custom-ultraviewer"}
+        @{N="UltraViewer";         ID="custom-ultraviewer"},
+        @{N="Action1 Agent (RMM)"; ID="custom-action1"}
     )
     for ($i=0;$i -lt $list.Count;$i++) { Write-Host "  [$($i+1)] $($list[$i].N)" -ForegroundColor White }
     Write-Host ""
@@ -177,6 +190,7 @@ function Install-NormalSoftware {
         switch ($app.ID) {
             "custom-anydesk"     { Install-AnyDeskDirectly }
             "custom-ultraviewer" { Install-UltraViewerDirectly }
+            "custom-action1"     { Install-Action1Agent }
             default {
                 $installed = $false
                 if ($hasWinget) {
