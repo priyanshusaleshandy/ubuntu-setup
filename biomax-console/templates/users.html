@@ -33,17 +33,20 @@
 <div class="table-wrap">
 <table>
   {% if device_filter %}
-  <tr><th>Code</th><th>Name</th><th>Enabled</th><th>Fingers Enrolled</th></tr>
+  <tr><th>Code</th><th class="flex">Name</th><th>Enabled</th><th>Fingers Enrolled</th><th class="actions-col"></th></tr>
   {% for e in employees %}
   <tr>
     <td class="muted">{{ e.employee_code }}</td>
     <td><strong>{{ e.employee_name or '—' }}</strong></td>
     <td><span class="badge {{ 'working' if e.enabled=='1' else 'left' }}">{{ 'Enabled' if e.enabled=='1' else 'Disabled' }}</span></td>
     <td class="muted">{{ e.backup_number }}</td>
+    <td class="actions-col">
+      <button type="button" class="row-action delete-trigger" data-code="{{ e.employee_code }}" data-name="{{ e.employee_name or e.employee_code }}" title="Delete this user">🗑️</button>
+    </td>
   </tr>
   {% endfor %}
   {% else %}
-  <tr><th>Code</th><th>Name</th><th>Status</th><th>Designation</th><th>DOJ</th></tr>
+  <tr><th>Code</th><th class="flex">Name</th><th>Status</th><th>Designation</th><th>DOJ</th><th class="actions-col"></th></tr>
   {% for e in employees %}
   <tr>
     <td class="muted">{{ e.employee_code }}</td>
@@ -51,6 +54,9 @@
     <td><span class="badge {{ 'working' if e.status=='Working' else 'left' }}">{{ e.status }}</span></td>
     <td class="muted">{{ e.designation or '—' }}</td>
     <td class="muted">{{ e.doj or '—' }}</td>
+    <td class="actions-col">
+      <button type="button" class="row-action delete-trigger" data-code="{{ e.employee_code }}" data-name="{{ e.employee_name or e.employee_code }}" title="Delete this user">🗑️</button>
+    </td>
   </tr>
   {% endfor %}
   {% endif %}
@@ -62,4 +68,55 @@
   {% if device_filter %}No users found on this device yet — try "Sync Users" above.{% else %}No users found.{% endif %}
 </div>
 {% endif %}
+
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box">
+    <h2>🗑️ Delete User</h2>
+    <p class="modal-sub" id="deleteModalWho">—</p>
+    <form method="post" action="/delete-user">
+      <input type="hidden" name="enroll_number" id="deleteModalCode">
+      <div class="field">
+        <label>Delete From</label>
+        <select name="device_id" required>
+          <option value="">Select device...</option>
+          <option value="all">All Devices</option>
+          {% for d in devices %}
+          <option value="{{ d.device_id }}">{{ '🟢' if d.online else '🔴' }} {{ d.name }} ({{ d.ip_address }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" name="confirm" value="yes" id="deleteModalConfirm" required>
+        <label for="deleteModalConfirm">I understand this permanently deletes this employee's fingerprint data from the device and cannot be undone.</label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="deleteModalCancel">Cancel</button>
+        <button type="submit" class="btn-danger">Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  (function () {
+    var modal = document.getElementById("deleteModal");
+    var who = document.getElementById("deleteModalWho");
+    var codeField = document.getElementById("deleteModalCode");
+
+    function openModal(code, name) {
+      codeField.value = code;
+      who.textContent = name + "  ·  Code: " + code;
+      modal.classList.add("open");
+    }
+    function closeModal() { modal.classList.remove("open"); }
+
+    document.querySelectorAll(".delete-trigger").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        openModal(this.dataset.code, this.dataset.name);
+      });
+    });
+    document.getElementById("deleteModalCancel").addEventListener("click", closeModal);
+    modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeModal(); });
+  })();
+</script>
 {% endblock %}

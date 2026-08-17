@@ -26,7 +26,7 @@
 {% if devices %}
 <div class="table-wrap">
 <table>
-  <tr><th>Status</th><th>Name</th><th>IP</th><th>Serial</th><th>Last Sync</th></tr>
+  <tr><th>Status</th><th class="flex">Name</th><th>IP</th><th>Serial</th><th>Last Sync</th></tr>
   {% for d in devices %}
   <tr>
     <td><span class="badge {{ 'online' if d.online else 'offline' }}"><span class="dot {{ 'online' if d.online else 'offline' }}"></span>{{ 'Online' if d.online else 'Offline' }}</span></td>
@@ -46,7 +46,7 @@
 {% if recent %}
 <div class="table-wrap">
 <table>
-  <tr><th>User</th><th>Name</th><th>Time</th><th>Direction</th><th>Device</th></tr>
+  <tr><th>User</th><th class="flex">Name</th><th>Time</th><th>Direction</th><th>Device</th></tr>
   {% for r in recent %}
   <tr>
     <td class="muted">{{ r.user_id }}</td>

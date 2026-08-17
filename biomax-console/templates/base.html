@@ -122,12 +122,22 @@
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     overflow: hidden; box-shadow: var(--shadow-sm);
   }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 11px 16px; font-size: 13px; border-bottom: 1px solid var(--border-soft); white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; table-layout: auto; }
+  th, td { text-align: left; padding: 11px 16px; font-size: 13px; border-bottom: 1px solid var(--border-soft); white-space: nowrap; width: 1%; }
   th {
     color: var(--text-faint); font-weight: 600; text-transform: uppercase; font-size: 10.5px;
     letter-spacing: .6px; background: var(--bg-elevated); position: sticky; top: 0;
   }
+  /* one column per table (marked .flex, usually Name) absorbs the leftover
+     width instead of it stretching awkwardly across the short-value columns */
+  th.flex, td.flex { width: auto; }
+  th.actions-col, td.actions-col { width: 1%; text-align: right; }
+  .row-action {
+    background: transparent; border: 1px solid var(--border); color: var(--text-faint);
+    padding: 5px 9px; border-radius: var(--radius-sm); cursor: pointer; font-size: 12.5px;
+    transition: all .12s ease; line-height: 1;
+  }
+  .row-action:hover { color: var(--red); border-color: var(--red); background: var(--red-dim); }
   tbody tr { transition: background .1s ease; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover td { background: var(--panel-hover); }
@@ -228,6 +238,26 @@
     white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     margin-top: 4px; line-height: 1.6;
   }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(6,9,16,.6); backdrop-filter: blur(2px);
+    align-items: center; justify-content: center; z-index: 100; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); width: 100%; max-width: 420px; padding: 22px;
+  }
+  .modal-box h2 { font-size: 16px; margin: 0 0 4px; }
+  .modal-box .modal-sub { color: var(--text-dim); font-size: 12.5px; margin-bottom: 16px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .btn-ghost {
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    padding: 10px 18px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13.5px; font-weight: 600;
+    transition: all .12s ease;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text-faint); }
 
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }

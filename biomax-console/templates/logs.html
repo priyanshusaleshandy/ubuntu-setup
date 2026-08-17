@@ -17,7 +17,7 @@
 {% if logs %}
 <div class="table-wrap">
 <table>
-  <tr><th>Log ID</th><th>User ID</th><th>Name</th><th>Date/Time</th><th>Direction</th><th>Device</th><th>Status</th></tr>
+  <tr><th>Log ID</th><th>User ID</th><th class="flex">Name</th><th>Date/Time</th><th>Direction</th><th>Device</th><th>Status</th></tr>
   {% for r in logs %}
   <tr>
     <td class="muted">{{ r.device_log_id }}</td>
