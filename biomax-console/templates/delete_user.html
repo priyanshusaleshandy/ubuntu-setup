@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Delete User</h1>
-<p class="muted" style="margin-top:-10px; margin-bottom:20px;">Permanently removes an employee's fingerprint/enrollment data from the device. This is irreversible — they'll need to physically re-enroll if done by mistake.</p>
+<div class="page-head">
+  <h1>🗑️ Delete User</h1>
+</div>
+<p class="subtitle">Permanently removes an employee's fingerprint/enrollment data from the device. This is irreversible — they'll need to physically re-enroll if done by mistake.</p>
 
 {% if results %}
   {% for r in results %}
@@ -16,7 +18,8 @@
   {% endfor %}
 {% endif %}
 
-<form method="post" style="margin-top:10px;">
+<div class="form-card">
+<form method="post">
   <div class="field">
     <label>Device</label>
     <select name="device_id" required>
@@ -39,8 +42,11 @@
 
   {% if selected_employee %}
   <div class="employee-preview">
-    <strong>{{ selected_employee.employee_name }}</strong><br>
-    <span class="muted">Code: {{ selected_employee.employee_code }} · Status: {{ selected_employee.status }}</span>
+    <div class="avatar">{{ (selected_employee.employee_name or "?")[0]|upper }}</div>
+    <div>
+      <strong>{{ selected_employee.employee_name }}</strong><br>
+      <span class="muted">Code: {{ selected_employee.employee_code }} · Status: {{ selected_employee.status }}</span>
+    </div>
   </div>
   {% endif %}
 
@@ -51,4 +57,5 @@
 
   <button type="submit" class="btn-danger">Delete from Device</button>
 </form>
+</div>
 {% endblock %}

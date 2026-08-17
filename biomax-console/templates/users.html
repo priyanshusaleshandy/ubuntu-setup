@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Users</h1>
+<div class="page-head">
+  <h1>Users</h1>
+</div>
 <form class="filters" method="get">
-  <input type="text" name="q" placeholder="Search name or code..." value="{{ search }}">
+  <input type="text" name="q" placeholder="🔍 Search name or code..." value="{{ search }}">
   <select name="device" onchange="this.form.submit()">
     <option value="">All Employees</option>
     {% for d in devices %}
@@ -13,25 +15,28 @@
 </form>
 
 {% if device_filter %}
-<form method="post" action="/sync-users" style="margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-  <input type="hidden" name="device_id" value="{{ device_filter }}">
-  <button type="submit" class="btn-primary" {% if device_online == false %}disabled{% endif %}>🔄 Sync Users from This Device</button>
+<div class="device-picker" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
+  <form method="post" action="/sync-users" style="display:contents;">
+    <input type="hidden" name="device_id" value="{{ device_filter }}">
+    <button type="submit" class="btn-primary" {% if device_online == false %}disabled{% endif %}>🔄 Sync Users from This Device</button>
+  </form>
   <span class="badge {{ 'online' if device_online else 'offline' }}"><span class="dot {{ 'online' if device_online else 'offline' }}"></span>{{ 'Online' if device_online else 'Offline' }}</span>
   {% if device_sync_info %}
   <span class="muted" style="font-size:12px;">Last synced: {{ device_sync_info }}</span>
   {% else %}
   <span class="muted" style="font-size:12px;">Never synced yet — click to pull the live list from the device.</span>
   {% endif %}
-</form>
+</div>
 {% endif %}
 
 {% if employees %}
+<div class="table-wrap">
 <table>
   {% if device_filter %}
   <tr><th>Code</th><th>Name</th><th>Enabled</th><th>Fingers Enrolled</th></tr>
   {% for e in employees %}
   <tr>
-    <td>{{ e.employee_code }}</td>
+    <td class="muted">{{ e.employee_code }}</td>
     <td><strong>{{ e.employee_name or '—' }}</strong></td>
     <td><span class="badge {{ 'working' if e.enabled=='1' else 'left' }}">{{ 'Enabled' if e.enabled=='1' else 'Disabled' }}</span></td>
     <td class="muted">{{ e.backup_number }}</td>
@@ -41,17 +46,19 @@
   <tr><th>Code</th><th>Name</th><th>Status</th><th>Designation</th><th>DOJ</th></tr>
   {% for e in employees %}
   <tr>
-    <td>{{ e.employee_code }}</td>
+    <td class="muted">{{ e.employee_code }}</td>
     <td><strong>{{ e.employee_name or '—' }}</strong></td>
     <td><span class="badge {{ 'working' if e.status=='Working' else 'left' }}">{{ e.status }}</span></td>
-    <td>{{ e.designation or '—' }}</td>
+    <td class="muted">{{ e.designation or '—' }}</td>
     <td class="muted">{{ e.doj or '—' }}</td>
   </tr>
   {% endfor %}
   {% endif %}
 </table>
+</div>
 {% else %}
 <div class="empty">
+  <span class="empty-icon">👤</span>
   {% if device_filter %}No users found on this device yet — try "Sync Users" above.{% else %}No users found.{% endif %}
 </div>
 {% endif %}

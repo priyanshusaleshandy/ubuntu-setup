@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Copy Fingerprint</h1>
-<p class="muted" style="margin-top:-10px; margin-bottom:20px;">Copies an already-enrolled fingerprint from one device straight to others, over the network — no need to physically re-enroll the person at every device. Overwrites whatever's already at that ID on the target(s).</p>
+<div class="page-head">
+  <h1>🧬 Copy Fingerprint</h1>
+</div>
+<p class="subtitle">Copies an already-enrolled fingerprint from one device straight to others, over the network — no need to physically re-enroll the person at every device. Overwrites whatever's already at that ID on the target(s).</p>
 
 {% if results %}
   {% for r in results %}
@@ -16,7 +18,8 @@
   {% endfor %}
 {% endif %}
 
-<form method="post" style="margin-top:10px;">
+<div class="form-card">
+<form method="post">
   <div class="field">
     <label>Copy From (source device)</label>
     <select name="source_device_id" required>
@@ -38,13 +41,17 @@
 
   {% if selected_employee %}
   <div class="employee-preview">
-    <strong>{{ selected_employee.employee_name }}</strong><br>
-    <span class="muted">Code: {{ selected_employee.employee_code }} · Status: {{ selected_employee.status }}</span>
+    <div class="avatar">{{ (selected_employee.employee_name or "?")[0]|upper }}</div>
+    <div>
+      <strong>{{ selected_employee.employee_name }}</strong><br>
+      <span class="muted">Code: {{ selected_employee.employee_code }} · Status: {{ selected_employee.status }}</span>
+    </div>
   </div>
   {% endif %}
 
   <div class="field">
     <label>Copy To (target devices)</label>
+    <div class="device-picker">
     {% for d in devices %}
     <div class="checkbox-row">
       <input type="checkbox" name="target_device_ids" value="{{ d.device_id }}" id="target-{{ d.device_id }}"
@@ -52,8 +59,10 @@
       <label for="target-{{ d.device_id }}">{{ '🟢' if d.online else '🔴' }} {{ d.name }} ({{ d.ip_address }})</label>
     </div>
     {% endfor %}
+    </div>
   </div>
 
   <button type="submit" class="btn-primary">Copy Fingerprint</button>
 </form>
+</div>
 {% endblock %}

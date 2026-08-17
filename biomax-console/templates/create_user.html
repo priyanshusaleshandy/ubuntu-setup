@@ -1,24 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Create User</h1>
-<p class="muted" style="margin-top:-10px; margin-bottom:20px;">Pushes an Employee ID + Name directly to the device. Fingerprint enrollment still needs to be done by the person at the device itself.</p>
+<div class="page-head">
+  <h1>➕ Create User</h1>
+</div>
+<p class="subtitle">Pushes an Employee ID + Name directly to the device. Fingerprint enrollment still needs to be done by the person at the device itself.</p>
 
 {% if result %}
   {% if result.success %}
-  <div class="alert success">
-    ✅ Pushed to {{ result.device_name }} successfully. Verified on-device name: <strong>{{ form_values.name }}</strong>. Ask the employee to go enroll their fingerprint on the device now.
-  </div>
+  <div class="alert success">✅ Pushed to {{ result.device_name }} successfully. Verified on-device name: <strong>{{ form_values.name }}</strong>. Ask the employee to go enroll their fingerprint on the device now.</div>
   {% else %}
-  <div class="alert error">
-    ❌ {{ result.error if result.error else "Push failed — see details below." }}
-  </div>
+  <div class="alert error">❌ {{ result.error if result.error else "Push failed — see details below." }}</div>
   {% endif %}
   {% if result.raw_output %}
   <pre class="log">{{ result.raw_output }}</pre>
   {% endif %}
 {% endif %}
 
-<form method="post" style="margin-top:10px;">
+<div class="form-card">
+<form method="post">
   <div class="field">
     <label>Device</label>
     <select name="device_id" required>
@@ -38,4 +37,5 @@
   </div>
   <button type="submit" class="btn-primary">Push to Device</button>
 </form>
+</div>
 {% endblock %}
