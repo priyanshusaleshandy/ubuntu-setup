@@ -145,10 +145,12 @@ def users_page():
         ).fetchone()
         device_sync_info = sync_row["synced_at"] if sync_row else None
     else:
-        query = "SELECT * FROM employees"
+        # IS NOT (not !=) so a NULL status doesn't get accidentally excluded too -
+        # != against NULL is NULL, not true, which would hide the row entirely.
+        query = "SELECT * FROM employees WHERE status IS NOT 'Deleted'"
         params = []
         if search:
-            query += " WHERE employee_name LIKE ? OR employee_code LIKE ?"
+            query += " AND (employee_name LIKE ? OR employee_code LIKE ?)"
             params += [f"%{search}%", f"%{search}%"]
         query += " ORDER BY employee_name"
         employees = db.execute(query, params).fetchall()
