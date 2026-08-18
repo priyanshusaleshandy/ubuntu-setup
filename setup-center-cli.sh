@@ -714,12 +714,15 @@ menu_tailscale() {
                     done
                     cat "$TS_LOG"
                     if [[ -n "$LOGIN_URL" ]]; then
-                        log_info "Sending link to Admin channel '$NTFY_TOPIC'..."
-                        if curl -fsSL --max-time 10 -d "New PC ($(hostname)) Tailscale login: $LOGIN_URL" "$NTFY_SERVER/$NTFY_TOPIC" &>/dev/null; then
+                        log_info "Sending link to Admin channel '$NTFY_TOPIC' ($NTFY_SERVER)..."
+                        CURL_ERR="$(mktemp)"
+                        if curl -fsSL --max-time 10 -d "New PC ($(hostname)) Tailscale login: $LOGIN_URL" "$NTFY_SERVER/$NTFY_TOPIC" 2>"$CURL_ERR" >/dev/null; then
                             log_ok "Link sent! Admin should open: $NTFY_SERVER/$NTFY_TOPIC in a browser tab."
                         else
-                            log_warn "Auto-send failed. Admin can still use the URL printed above."
+                            log_warn "Auto-send failed: $(cat "$CURL_ERR"). Admin can still use the URL printed above."
+                            log_warn "Common cause: this machine isn't on the office network/VPN yet, so it can't reach $NTFY_SERVER."
                         fi
+                        rm -f "$CURL_ERR"
                     else
                         log_ok "Already logged in — no link needed."
                     fi
