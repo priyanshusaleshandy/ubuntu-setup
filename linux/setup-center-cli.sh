@@ -32,11 +32,17 @@ SAFE_SCRIPT="$SAFE_DIR/setup-center-cli.sh"
 THIS_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
 if [[ "$THIS_SCRIPT" != "$SAFE_SCRIPT" ]]; then
     mkdir -p "$SAFE_DIR" 2>/dev/null
-    if cp -f "$THIS_SCRIPT" "$SAFE_SCRIPT" 2>/dev/null; then
-        chmod +x "$SAFE_SCRIPT" 2>/dev/null
+    cp -f "$THIS_SCRIPT" "$SAFE_SCRIPT" 2>/dev/null
+    chmod +x "$SAFE_SCRIPT" 2>/dev/null
+    # Verify the copy actually landed (non-empty, same size as source) before
+    # jumping into it — if it's missing or got wiped by something else after
+    # a previous run, don't exec into a broken/nonexistent path, just keep
+    # running the copy we already have in hand.
+    if [[ -s "$SAFE_SCRIPT" ]] && [[ "$(wc -c < "$SAFE_SCRIPT" 2>/dev/null)" == "$(wc -c < "$THIS_SCRIPT" 2>/dev/null)" ]]; then
         exec bash "$SAFE_SCRIPT" "$@"
     fi
-    # If copy failed (e.g. read-only $HOME), just continue running from here.
+    # If copy failed or didn't verify (e.g. read-only $HOME, or the cache
+    # directory got cleaned mid-run), just continue running from here.
 fi
 
 # ── Colors ────────────────────────────────────────────────────────────────────
