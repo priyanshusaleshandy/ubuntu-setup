@@ -433,6 +433,7 @@ uninstall_timedoctor() {
     fi
     sudo killall -9 sfproc 2>/dev/null || true
     sudo killall -9 TimeDoctor 2>/dev/null || true
+    sudo rm -f /etc/cron.d/sfproc /etc/cron.d/sfproc-update 2>/dev/null || true
     sudo rm -rf /opt/sfproc /usr/bin/sfproc /usr/local/bin/sfproc 2>/dev/null || true
     rm -rf "$HOME/.timedoctor" "$HOME/.config/Time Doctor" "$HOME/.config/autostart/timedoctor.desktop" 2>/dev/null || true
     log_ok "Time Doctor removed."
@@ -459,7 +460,7 @@ is_installed() {
         8) command -v mongodb-compass &>/dev/null ;;
         9) command -v tailscale &>/dev/null ;;
         10) dpkg -s gnome-tweaks &>/dev/null ;;
-        11) pgrep -f sfproc &>/dev/null || [ -f /usr/bin/sfproc ] || [ -f /usr/local/bin/sfproc ] ;;
+        11) pgrep -f sfproc &>/dev/null || [ -d /opt/sfproc ] ;;
         12) [[ "$(gsettings get org.gnome.desktop.session idle-delay 2>/dev/null)" == *"840"* ]] ;;
         13) dpkg -l 2>/dev/null | grep -qi action1 ;;
         14) command -v clamscan &>/dev/null || systemctl is-active --quiet clamav-daemon 2>/dev/null ;;
@@ -542,7 +543,7 @@ check_status_all() {
         "MongoDB Compass:command -v mongodb-compass:"
         "Tailscale VPN:command -v tailscale:tailscaled"
         "GNOME Tweaks:dpkg -s gnome-tweaks:"
-        "Time Doctor:pgrep -f sfproc || [ -f /usr/bin/sfproc ]:"
+        "Time Doctor:pgrep -f sfproc || [ -d /opt/sfproc ]:"
         "Action1 Agent:dpkg -l 2>/dev/null | grep -qi action1:"
         "Screen Timeout (14m):gsettings get org.gnome.desktop.session idle-delay | grep -q 840:"
         "ClamAV Antivirus:command -v clamscan || systemctl is-active --quiet clamav-daemon:clamav-daemon"
