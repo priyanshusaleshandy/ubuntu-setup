@@ -202,7 +202,30 @@ EOF
     fi
     sudo chmod 0644 /etc/default/tailscaled
 
+    # A leftover systemd unit override (e.g. from an old manual/tarball
+    # install) in /etc/systemd/system/ takes priority over the package's own
+    # unit and survives apt purge/reinstall. If it points at a tailscaled
+    # binary that no longer exists, the service fails with status=203/EXEC
+    # every time, no matter how many times the package is reinstalled.
+    if [[ -f /etc/systemd/system/tailscaled.service || -d /etc/systemd/system/tailscaled.service.d ]]; then
+        log_warn "Found a systemd override for tailscaled.service — removing so the package's own unit is used."
+        sudo rm -f /etc/systemd/system/tailscaled.service
+        sudo rm -rf /etc/systemd/system/tailscaled.service.d
+    fi
     sudo systemctl daemon-reload
+
+    # Belt-and-suspenders: even the package's own unit can end up pointing at
+    # a stale path after a partial/interrupted install. If ExecStart doesn't
+    # resolve to a real, executable file, force a package reinstall to
+    # regenerate the unit against the binary's actual location.
+    local exec_path
+    exec_path=$(systemctl show tailscaled -p ExecStart --value 2>/dev/null | grep -oP '(?<=path=)[^ ;]+' | head -1)
+    if [[ -n "$exec_path" && ! -x "$exec_path" ]]; then
+        log_warn "tailscaled.service points to '$exec_path' which doesn't exist — reinstalling package to fix it."
+        sudo apt-get install --reinstall -y tailscale
+        sudo systemctl daemon-reload
+    fi
+
     sudo systemctl reset-failed tailscaled 2>/dev/null || true
     sudo systemctl enable tailscaled
     sudo systemctl restart tailscaled
@@ -346,6 +369,13 @@ uninstall_tailscale() {
 
     # Remove lingering binaries if any
     sudo rm -f /usr/bin/tailscale /usr/sbin/tailscale /usr/local/bin/tailscale /usr/bin/tailscaled /usr/sbin/tailscaled /usr/local/bin/tailscaled
+
+    # Remove any leftover systemd unit override — otherwise it survives this
+    # purge and can point the next install's daemon at a binary path that no
+    # longer exists (status=203/EXEC).
+    sudo rm -f /etc/systemd/system/tailscaled.service
+    sudo rm -rf /etc/systemd/system/tailscaled.service.d
+    sudo systemctl daemon-reload
 
     sudo apt-get autoremove -y 2>/dev/null || true
     log_ok "Tailscale uninstalled completely."
