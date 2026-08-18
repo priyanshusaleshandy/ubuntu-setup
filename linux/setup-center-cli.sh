@@ -766,6 +766,14 @@ menu_tailscale() {
                 echo -e "  ${DIM}desktops that support the AppIndicator/StatusNotifierItem protocol.${NC}"
                 echo -e "  ${DIM}GNOME needs an extension for this — KDE/XFCE usually work out of the box.${NC}\n"
 
+                log_info "Granting your user control over tailscaled (needed for the GUI to actually apply changes — otherwise switching silently fails, since the tray runs unprivileged and tailscaled ignores requests from non-operator users)..."
+                if sudo tailscale set --operator="$(whoami)"; then
+                    log_ok "Operator set for '$(whoami)' — tray icon can now switch exit nodes without sudo."
+                else
+                    log_warn "Could not set operator — make sure Tailscale is installed and logged in first."
+                fi
+                echo ""
+
                 local desktop="${XDG_CURRENT_DESKTOP:-Unknown}"
                 log_info "Detected desktop: $desktop"
 
