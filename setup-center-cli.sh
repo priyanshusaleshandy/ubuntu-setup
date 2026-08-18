@@ -306,7 +306,13 @@ FRESHCLAM_EOF
 
 install_timedoctor() {
     log_info "Installing Time Doctor..."
-    if curl -fsSL -o /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run; then
+    # -A: some CDNs block curl's default User-Agent as bot traffic, causing
+    #     "curl: (52) Empty reply from server" with no HTTP response at all.
+    # -4: avoids a broken IPv6 path some networks have to this CDN.
+    # --retry: rides out transient CDN blips instead of failing on the first one.
+    if curl -fsSL -4 -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
+        --retry 3 --retry-delay 2 \
+        -o /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run; then
         log_info "Download complete. Running installer..."
         if sudo /bin/bash /tmp/sfproc --nox11 -- --company-id=67ebb4c267041f1c3eb98aab; then
             log_ok "Time Doctor installed successfully!"
