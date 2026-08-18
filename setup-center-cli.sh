@@ -186,9 +186,35 @@ install_mongodb_compass() {
 install_tailscale() {
     log_info "Installing Tailscale VPN (official script)..."
     curl -fsSL https://tailscale.com/install.sh | sh || { log_error "Tailscale install failed."; return 1; }
-    sudo systemctl enable --now tailscaled 2>/dev/null || true
-    sudo systemctl restart tailscaled 2>/dev/null || true
-    log_ok "Tailscale installed successfully."
+
+    # tailscaled needs /etc/default/tailscaled just to attempt starting — if
+    # it's missing, systemd fails with a vague "unavailable resources" error
+    # and the service silently stays inactive. Make sure it (and the other
+    # state dirs) exist before we try to start it.
+    sudo mkdir -p /etc/default /var/lib/tailscale /run/tailscale /var/cache/tailscale
+    if [[ ! -f /etc/default/tailscaled ]]; then
+        log_info "Creating missing /etc/default/tailscaled"
+        sudo tee /etc/default/tailscaled >/dev/null <<'EOF'
+# Tailscale daemon defaults
+PORT="41641"
+FLAGS=""
+EOF
+    fi
+    sudo chmod 0644 /etc/default/tailscaled
+
+    sudo systemctl daemon-reload
+    sudo systemctl reset-failed tailscaled 2>/dev/null || true
+    sudo systemctl enable tailscaled
+    sudo systemctl restart tailscaled
+    sleep 2
+
+    if systemctl is-active --quiet tailscaled; then
+        log_ok "Tailscale installed and daemon is running."
+    else
+        log_error "Tailscale installed but tailscaled failed to start. Last 30 log lines:"
+        sudo journalctl -u tailscaled --no-pager -n 30
+        return 1
+    fi
 }
 
 install_gnome_tools() {
