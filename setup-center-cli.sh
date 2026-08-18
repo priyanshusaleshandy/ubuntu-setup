@@ -644,6 +644,8 @@ menu_tailscale() {
                     NTFY_TOPIC="${NTFY_TOPIC%/}"
                     log_info "Requesting login link (will auto-send to '$NTFY_TOPIC')..."
                     log_warn "This forces a fresh login even if already connected — if you're SSH'd in over Tailscale right now, that session may drop."
+                    log_info "Logging out of the existing session first, so a fresh code is always generated..."
+                    sudo tailscale logout 2>/dev/null || true
                     TS_LOG="$(mktemp)"
                     sudo tailscale up --login-server="$server" --accept-routes --accept-dns --force-reauth > "$TS_LOG" 2>&1 &
                     TS_PID=$!
