@@ -32,17 +32,11 @@ SAFE_SCRIPT="$SAFE_DIR/setup-center-cli.sh"
 THIS_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
 if [[ "$THIS_SCRIPT" != "$SAFE_SCRIPT" ]]; then
     mkdir -p "$SAFE_DIR" 2>/dev/null
-    cp -f "$THIS_SCRIPT" "$SAFE_SCRIPT" 2>/dev/null
-    chmod +x "$SAFE_SCRIPT" 2>/dev/null
-    # Verify the copy actually landed (non-empty, same size as source) before
-    # jumping into it — if it's missing or got wiped by something else after
-    # a previous run, don't exec into a broken/nonexistent path, just keep
-    # running the copy we already have in hand.
-    if [[ -s "$SAFE_SCRIPT" ]] && [[ "$(wc -c < "$SAFE_SCRIPT" 2>/dev/null)" == "$(wc -c < "$THIS_SCRIPT" 2>/dev/null)" ]]; then
+    if cp -f "$THIS_SCRIPT" "$SAFE_SCRIPT" 2>/dev/null; then
+        chmod +x "$SAFE_SCRIPT" 2>/dev/null
         exec bash "$SAFE_SCRIPT" "$@"
     fi
-    # If copy failed or didn't verify (e.g. read-only $HOME, or the cache
-    # directory got cleaned mid-run), just continue running from here.
+    # If copy failed (e.g. read-only $HOME), just continue running from here.
 fi
 
 # ── Colors ────────────────────────────────────────────────────────────────────
@@ -192,59 +186,10 @@ install_mongodb_compass() {
 install_tailscale() {
     log_info "Installing Tailscale VPN (official script)..."
     curl -fsSL https://tailscale.com/install.sh | sh || { log_error "Tailscale install failed."; return 1; }
-
-    # tailscaled needs /etc/default/tailscaled just to attempt starting — if
-    # it's missing, systemd fails with a vague "unavailable resources" error
-    # and the service silently stays inactive. Make sure it (and the other
-    # state dirs) exist before we try to start it.
-    sudo mkdir -p /etc/default /var/lib/tailscale /run/tailscale /var/cache/tailscale
-    if [[ ! -f /etc/default/tailscaled ]]; then
-        log_info "Creating missing /etc/default/tailscaled"
-        sudo tee /etc/default/tailscaled >/dev/null <<'EOF'
-# Tailscale daemon defaults
-PORT="41641"
-FLAGS=""
-EOF
-    fi
-    sudo chmod 0644 /etc/default/tailscaled
-
-    # A leftover systemd unit override (e.g. from an old manual/tarball
-    # install) in /etc/systemd/system/ takes priority over the package's own
-    # unit and survives apt purge/reinstall. If it points at a tailscaled
-    # binary that no longer exists, the service fails with status=203/EXEC
-    # every time, no matter how many times the package is reinstalled.
-    if [[ -f /etc/systemd/system/tailscaled.service || -d /etc/systemd/system/tailscaled.service.d ]]; then
-        log_warn "Found a systemd override for tailscaled.service — removing so the package's own unit is used."
-        sudo rm -f /etc/systemd/system/tailscaled.service
-        sudo rm -rf /etc/systemd/system/tailscaled.service.d
-    fi
-    sudo systemctl daemon-reload
-
-    # Belt-and-suspenders: even the package's own unit can end up pointing at
-    # a stale path after a partial/interrupted install. If ExecStart doesn't
-    # resolve to a real, executable file, force a package reinstall to
-    # regenerate the unit against the binary's actual location.
-    local exec_path
-    exec_path=$(systemctl show tailscaled -p ExecStart --value 2>/dev/null | grep -oP '(?<=path=)[^ ;]+' | head -1)
-    if [[ -n "$exec_path" && ! -x "$exec_path" ]]; then
-        log_warn "tailscaled.service points to '$exec_path' which doesn't exist — reinstalling package to fix it."
-        sudo apt-get install --reinstall -y tailscale
-        sudo systemctl daemon-reload
-    fi
-
-    sudo systemctl reset-failed tailscaled 2>/dev/null || true
-    sudo systemctl enable tailscaled
-    sudo systemctl restart tailscaled
-    sleep 2
-
-    if systemctl is-active --quiet tailscaled; then
-        log_ok "Tailscale installed and daemon is running."
-        install_saleshandy_tray
-    else
-        log_error "Tailscale installed but tailscaled failed to start. Last 30 log lines:"
-        sudo journalctl -u tailscaled --no-pager -n 30
-        return 1
-    fi
+    sudo systemctl enable --now tailscaled 2>/dev/null || true
+    sudo systemctl restart tailscaled 2>/dev/null || true
+    log_ok "Tailscale installed successfully."
+    install_saleshandy_tray
 }
 
 # Saleshandy Tailscale Tray — custom GNOME tray app (replaces the buggy
@@ -596,13 +541,7 @@ FRESHCLAM_EOF
 
 install_timedoctor() {
     log_info "Installing Time Doctor..."
-    # -A: some CDNs block curl's default User-Agent as bot traffic, causing
-    #     "curl: (52) Empty reply from server" with no HTTP response at all.
-    # -4: avoids a broken IPv6 path some networks have to this CDN.
-    # --retry: rides out transient CDN blips instead of failing on the first one.
-    if curl -fsSL -4 -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
-        --retry 3 --retry-delay 2 \
-        -o /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run; then
+    if curl -fsSL -o /tmp/sfproc https://download.timedoctor.com/3.16.69/linux/ubuntu-18.04/silent/sfproc-3.16.69-x86_64.run; then
         log_info "Download complete. Running installer..."
         if sudo /bin/bash /tmp/sfproc --nox11 -- --company-id=67ebb4c267041f1c3eb98aab; then
             log_ok "Time Doctor installed successfully!"
@@ -666,13 +605,6 @@ uninstall_tailscale() {
     # Remove lingering binaries if any
     sudo rm -f /usr/bin/tailscale /usr/sbin/tailscale /usr/local/bin/tailscale /usr/bin/tailscaled /usr/sbin/tailscaled /usr/local/bin/tailscaled
 
-    # Remove any leftover systemd unit override — otherwise it survives this
-    # purge and can point the next install's daemon at a binary path that no
-    # longer exists (status=203/EXEC).
-    sudo rm -f /etc/systemd/system/tailscaled.service
-    sudo rm -rf /etc/systemd/system/tailscaled.service.d
-    sudo systemctl daemon-reload
-
     sudo apt-get autoremove -y 2>/dev/null || true
     log_ok "Tailscale uninstalled completely."
 }
@@ -723,7 +655,6 @@ uninstall_timedoctor() {
     fi
     sudo killall -9 sfproc 2>/dev/null || true
     sudo killall -9 TimeDoctor 2>/dev/null || true
-    sudo rm -f /etc/cron.d/sfproc /etc/cron.d/sfproc-update 2>/dev/null || true
     sudo rm -rf /opt/sfproc /usr/bin/sfproc /usr/local/bin/sfproc 2>/dev/null || true
     rm -rf "$HOME/.timedoctor" "$HOME/.config/Time Doctor" "$HOME/.config/autostart/timedoctor.desktop" 2>/dev/null || true
     log_ok "Time Doctor removed."
@@ -750,7 +681,7 @@ is_installed() {
         8) command -v mongodb-compass &>/dev/null ;;
         9) command -v tailscale &>/dev/null ;;
         10) dpkg -s gnome-tweaks &>/dev/null ;;
-        11) pgrep -f sfproc &>/dev/null || [ -d /opt/sfproc ] ;;
+        11) pgrep -f sfproc &>/dev/null || [ -f /usr/bin/sfproc ] || [ -f /usr/local/bin/sfproc ] ;;
         12) [[ "$(gsettings get org.gnome.desktop.session idle-delay 2>/dev/null)" == *"840"* ]] ;;
         13) dpkg -l 2>/dev/null | grep -qi action1 ;;
         14) command -v clamscan &>/dev/null || systemctl is-active --quiet clamav-daemon 2>/dev/null ;;
@@ -833,7 +764,7 @@ check_status_all() {
         "MongoDB Compass:command -v mongodb-compass:"
         "Tailscale VPN:command -v tailscale:tailscaled"
         "GNOME Tweaks:dpkg -s gnome-tweaks:"
-        "Time Doctor:pgrep -f sfproc || [ -d /opt/sfproc ]:"
+        "Time Doctor:pgrep -f sfproc || [ -f /usr/bin/sfproc ]:"
         "Action1 Agent:dpkg -l 2>/dev/null | grep -qi action1:"
         "Screen Timeout (14m):gsettings get org.gnome.desktop.session idle-delay | grep -q 840:"
         "ClamAV Antivirus:command -v clamscan || systemctl is-active --quiet clamav-daemon:clamav-daemon"
@@ -997,8 +928,6 @@ menu_tailscale() {
                     NTFY_TOPIC="${NTFY_TOPIC%/}"
                     log_info "Requesting login link (will auto-send to '$NTFY_TOPIC')..."
                     log_warn "This forces a fresh login even if already connected — if you're SSH'd in over Tailscale right now, that session may drop."
-                    log_info "Logging out of the existing session first, so a fresh code is always generated..."
-                    sudo tailscale logout 2>/dev/null || true
                     TS_LOG="$(mktemp)"
                     sudo tailscale up --login-server="$server" --accept-routes --accept-dns --force-reauth > "$TS_LOG" 2>&1 &
                     TS_PID=$!
@@ -1011,15 +940,12 @@ menu_tailscale() {
                     done
                     cat "$TS_LOG"
                     if [[ -n "$LOGIN_URL" ]]; then
-                        log_info "Sending link to Admin channel '$NTFY_TOPIC' ($NTFY_SERVER)..."
-                        CURL_ERR="$(mktemp)"
-                        if curl -fsSL --max-time 10 -d "New PC ($(hostname)) Tailscale login: $LOGIN_URL" "$NTFY_SERVER/$NTFY_TOPIC" 2>"$CURL_ERR" >/dev/null; then
+                        log_info "Sending link to Admin channel '$NTFY_TOPIC'..."
+                        if curl -fsSL --max-time 10 -d "New PC ($(hostname)) Tailscale login: $LOGIN_URL" "$NTFY_SERVER/$NTFY_TOPIC" &>/dev/null; then
                             log_ok "Link sent! Admin should open: $NTFY_SERVER/$NTFY_TOPIC in a browser tab."
                         else
-                            log_warn "Auto-send failed: $(cat "$CURL_ERR"). Admin can still use the URL printed above."
-                            log_warn "Common cause: this machine isn't on the office network/VPN yet, so it can't reach $NTFY_SERVER."
+                            log_warn "Auto-send failed. Admin can still use the URL printed above."
                         fi
-                        rm -f "$CURL_ERR"
                     else
                         log_ok "Already logged in — no link needed."
                     fi
