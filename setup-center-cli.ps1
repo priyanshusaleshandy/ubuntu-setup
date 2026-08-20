@@ -27,6 +27,22 @@ $ProgressPreference = 'SilentlyContinue'
 $NtfyServer = "http://192.168.126.101:8080"   # Private self-hosted ntfy (Mac Mini via Docker)
 $NtfyAdminChannel = "priyanshu-setup"
 
+# ── Local NAS app cache ──────────────────────────────────────────────────────
+# Some installers are large and their upstream hosts are occasionally flaky.
+# If the office NAS is reachable, pull from its local cache instead - falls
+# straight through to the original web URL if it isn't (laptop off-site, NAS
+# down, etc).
+$LocalAppsBase = "http://192.168.126.21:8001/windows/apps"
+
+function Get-LocalOrWebFile {
+    param([string]$Name, [string]$WebUrl, [string]$OutFile)
+    try {
+        Invoke-WebRequest -Uri "$LocalAppsBase/$Name" -OutFile $OutFile -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+        return
+    } catch { }
+    Invoke-WebRequest -Uri $WebUrl -OutFile $OutFile -UseBasicParsing -ErrorAction Stop
+}
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 function Write-Sep  { param([string]$c="=",[int]$w=70) Write-Host ($c*$w) -ForegroundColor Cyan }
 function Write-OK   { param([string]$m) Write-Host "  [OK]  $m" -ForegroundColor Green }
@@ -124,7 +140,7 @@ function Install-AnyDeskDirectly {
     Write-INFO "Installing AnyDesk..."
     try {
         if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-        Invoke-WebRequest -Uri "https://download.anydesk.com/AnyDesk.exe" -OutFile $exe -UseBasicParsing -ErrorAction Stop
+        Get-LocalOrWebFile -Name "AnyDesk.exe" -WebUrl "https://download.anydesk.com/AnyDesk.exe" -OutFile $exe
         Start-Process -FilePath $exe -ArgumentList "--install" -Wait -NoNewWindow -ErrorAction SilentlyContinue
         if (Test-Path $exe) { New-DesktopShortcut $exe "AnyDesk" | Out-Null; Write-OK "AnyDesk installed." }
     } catch { Write-ERR "AnyDesk: $($_.Exception.Message)" }
@@ -135,7 +151,7 @@ function Install-UltraViewerDirectly {
     Write-INFO "Installing UltraViewer..."
     try {
         if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-        Invoke-WebRequest -Uri "https://ultraviewer.net/UltraViewer_setup.exe" -OutFile $setup -UseBasicParsing -ErrorAction Stop
+        Get-LocalOrWebFile -Name "UltraViewer_setup.exe" -WebUrl "https://ultraviewer.net/UltraViewer_setup.exe" -OutFile $setup
         Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/NORESTART" -Wait -NoNewWindow -ErrorAction SilentlyContinue
         $inst = "C:\Program Files\UltraViewer\UltraViewer.exe"
         if (Test-Path $inst) { New-DesktopShortcut $inst "UltraViewer" | Out-Null; Write-OK "UltraViewer installed." }
@@ -222,7 +238,7 @@ function Install-MSOffice {
     Write-Host "  [2/5] Downloading Office zip..." -ForegroundColor Yellow
     try {
         $ProgressPreference='SilentlyContinue'
-        Invoke-WebRequest -Uri $ZipUrl -OutFile $ZipPath -UseBasicParsing -ErrorAction Stop
+        Get-LocalOrWebFile -Name "Office Installer 1.33.zip" -WebUrl $ZipUrl -OutFile $ZipPath
         Write-OK "Download complete."
     } catch { Write-ERR "Download failed: $($_.Exception.Message)"; Pause-Menu; return }
 
