@@ -239,11 +239,295 @@ EOF
 
     if systemctl is-active --quiet tailscaled; then
         log_ok "Tailscale installed and daemon is running."
+        install_saleshandy_tray
     else
         log_error "Tailscale installed but tailscaled failed to start. Last 30 log lines:"
         sudo journalctl -u tailscaled --no-pager -n 30
         return 1
     fi
+}
+
+# Saleshandy Tailscale Tray — custom GNOME tray app (replaces the buggy
+# tailscale-status@maxgallup.github.com extension). Always uses `tailscale set`
+# (never `up --reset`), so switching exit-node never silently resets unrelated
+# prefs like exit-node-allow-lan-access or the operator setting.
+install_saleshandy_tray() {
+    # Don't rely on $XDG_CURRENT_DESKTOP alone — it's only set by the display
+    # manager for GUI-launched sessions, so it's empty over SSH or su/sudo
+    # subshells even on a real GNOME desktop. Fall back to checking whether
+    # gnome-shell is actually installed, which is invocation-independent.
+    local desktop="${XDG_CURRENT_DESKTOP:-${DESKTOP_SESSION:-}}"
+    if ! echo "$desktop" | grep -qi "gnome" && ! command -v gnome-shell &>/dev/null; then
+        log_warn "GNOME not detected (desktop='$desktop') — Saleshandy Tailscale Tray targets GNOME's AppIndicator support. Skipping."
+        return 0
+    fi
+
+    log_info "Installing Saleshandy Tailscale Tray (GUI exit-node switcher)..."
+    sudo apt-get update -y
+    sudo apt-get install -y gir1.2-ayatanaappindicator3-0.1 || { log_error "Failed to install gir1.2-ayatanaappindicator3-0.1."; return 1; }
+
+    log_info "Granting $USER operator rights over tailscale (no sudo needed for day-to-day switching)..."
+    sudo tailscale set --operator="$USER" 2>/dev/null || log_warn "Could not set tailscale operator yet — run 'sudo tailscale set --operator=$USER' after logging in."
+
+    mkdir -p "$HOME/.local/bin"
+    cat > "$HOME/.local/bin/saleshandy-tailscale-tray.py" <<'PYEOF'
+#!/usr/bin/env python3
+"""Saleshandy Tailscale Tray — GNOME tray indicator for Tailscale/Headscale (bifrost.saleshandy.com).
+
+Replaces the buggy tailscale-status@maxgallup.github.com extension. Key differences:
+  - Always uses `tailscale set` (never `up --reset`), so toggling one preference
+    never silently resets unrelated ones (that reset behaviour is what broke
+    exit-node-allow-lan-access and the operator setting before).
+  - If a command fails because the operator isn't set, it prompts once via
+    pkexec to fix that, then retries unprivileged - no more permission dance
+    on every click.
+"""
+import fcntl
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('AyatanaAppIndicator3', '0.1')
+from gi.repository import Gtk, GLib, AyatanaAppIndicator3 as AppIndicator3
+
+TAILSCALE = shutil.which('tailscale') or '/usr/bin/tailscale'
+APP_ID = 'saleshandy-tailscale-tray'
+LOCK_PATH = os.path.expanduser('~/.cache/saleshandy-tailscale-tray.lock')
+
+
+def acquire_single_instance_lock():
+    """Returns an open file handle holding an exclusive lock, or None if
+    another instance already holds it. Caller must keep the handle alive
+    for the process lifetime."""
+    os.makedirs(os.path.dirname(LOCK_PATH), exist_ok=True)
+    lock_file = open(LOCK_PATH, 'w')
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return None
+    return lock_file
+
+
+def ts(*args, timeout=15):
+    try:
+        return subprocess.run([TAILSCALE, *args], capture_output=True, text=True, timeout=timeout)
+    except Exception as e:
+        return subprocess.CompletedProcess(args, 1, '', str(e))
+
+
+def get_status():
+    r = ts('status', '--json')
+    if r.returncode != 0:
+        return None
+    try:
+        return json.loads(r.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
+def node_name(peer):
+    """Tailscale/Headscale display name (e.g. 'ikigai-office-network-node-1'),
+    not the peer's raw OS hostname (e.g. 'WIN-PLGNKME7A7F')."""
+    dns = peer.get('DNSName') or ''
+    return dns.split('.')[0] or peer.get('HostName') or ''
+
+
+def get_prefs():
+    r = ts('debug', 'prefs')
+    if r.returncode != 0:
+        return None
+    try:
+        return json.loads(r.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
+class TailscaleTray:
+    def __init__(self):
+        self.indicator = AppIndicator3.Indicator.new(
+            APP_ID, 'network-vpn-symbolic',
+            AppIndicator3.IndicatorCategory.APPLICATION_STATUS)
+        self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+        self.menu = Gtk.Menu()
+        self.menu.connect('show', lambda _w: self.refresh())
+        self.indicator.set_menu(self.menu)
+        self.last_error = None
+        self.refresh()
+
+    def _append_label(self, text, sensitive=False):
+        item = Gtk.MenuItem(label=text)
+        item.set_sensitive(sensitive)
+        self.menu.append(item)
+
+    def _append_separator(self):
+        self.menu.append(Gtk.SeparatorMenuItem())
+
+    def _append_footer(self):
+        self._append_separator()
+        refresh_item = Gtk.MenuItem(label='Refresh')
+        refresh_item.connect('activate', lambda _: self.refresh())
+        self.menu.append(refresh_item)
+        quit_item = Gtk.MenuItem(label='Quit')
+        quit_item.connect('activate', lambda _: Gtk.main_quit())
+        self.menu.append(quit_item)
+
+    def refresh(self):
+        status = get_status()
+        prefs = get_prefs()
+
+        for child in self.menu.get_children():
+            self.menu.remove(child)
+
+        if status is None or status.get('BackendState') != 'Running':
+            state = status.get('BackendState', 'unknown') if status else 'unreachable'
+            self._append_label(f'Tailscale: {state}')
+            self._append_separator()
+            if status and status.get('BackendState') == 'Stopped':
+                up_item = Gtk.MenuItem(label='Connect')
+                up_item.connect('activate', self._on_connect)
+                self.menu.append(up_item)
+            self._append_footer()
+            self.menu.show_all()
+            return
+
+        self_ips = status.get('Self', {}).get('TailscaleIPs') or []
+        ip_label = self_ips[0] if self_ips else '-'
+        self._append_label(f'Connected — {ip_label}')
+
+        current_exit_name = None
+        candidates = []
+        for peer in (status.get('Peer') or {}).values():
+            if peer.get('ExitNodeOption'):
+                candidates.append(peer)
+            if peer.get('ExitNode'):
+                current_exit_name = node_name(peer)
+
+        self._append_label(f'Exit node: {current_exit_name or "None"}')
+        self._append_separator()
+
+        exit_submenu = Gtk.Menu()
+        none_item = Gtk.RadioMenuItem(label='None')
+        none_item.set_active(current_exit_name is None)
+        none_item.connect('toggled', self._on_exit_node, None)
+        exit_submenu.append(none_item)
+        group = none_item
+        for peer in sorted(candidates, key=node_name):
+            ip = (peer.get('TailscaleIPs') or [None])[0]
+            name = node_name(peer) or ip
+            radio = Gtk.RadioMenuItem.new_with_label_from_widget(group, name)
+            radio.set_active(name == current_exit_name)
+            radio.connect('toggled', self._on_exit_node, ip)
+            exit_submenu.append(radio)
+        exit_menu_item = Gtk.MenuItem(label='Exit node')
+        exit_menu_item.set_submenu(exit_submenu)
+        self.menu.append(exit_menu_item)
+
+        lan_item = Gtk.CheckMenuItem(label='Allow LAN access while using exit node')
+        lan_item.set_active(bool((prefs or {}).get('ExitNodeAllowLANAccess')))
+        lan_item.connect('toggled', self._on_lan_access)
+        self.menu.append(lan_item)
+
+        self._append_separator()
+        down_item = Gtk.MenuItem(label='Disconnect')
+        down_item.connect('activate', self._on_disconnect)
+        self.menu.append(down_item)
+
+        logout_item = Gtk.MenuItem(label='Log out')
+        logout_item.connect('activate', self._on_logout)
+        self.menu.append(logout_item)
+
+        if self.last_error:
+            self._append_separator()
+            self._append_label(f'⚠ {self.last_error}')
+
+        self._append_footer()
+        self.menu.show_all()
+
+    def _run_set_and_refresh(self, args):
+        r = ts('set', *args)
+        if r.returncode != 0 and 'operator' in (r.stderr or '').lower():
+            pk = subprocess.run(
+                ['pkexec', TAILSCALE, 'set', f'--operator={GLib.get_user_name()}'],
+                capture_output=True, text=True)
+            if pk.returncode == 0:
+                r = ts('set', *args)
+        self.last_error = None if r.returncode == 0 else (r.stderr or 'command failed').strip().splitlines()[-1][:160]
+        GLib.timeout_add(600, lambda: (self.refresh(), False)[1])
+
+    def _on_exit_node(self, widget, ip):
+        if not widget.get_active():
+            return
+        self._run_set_and_refresh([f'--exit-node={ip or ""}'])
+
+    def _on_lan_access(self, widget):
+        value = 'true' if widget.get_active() else 'false'
+        self._run_set_and_refresh([f'--exit-node-allow-lan-access={value}'])
+
+    def _on_connect(self, _widget):
+        r = ts('up')
+        self.last_error = None if r.returncode == 0 else (r.stderr or 'connect failed').strip().splitlines()[-1][:160]
+        GLib.timeout_add(600, lambda: (self.refresh(), False)[1])
+
+    def _on_disconnect(self, _widget):
+        r = ts('down')
+        self.last_error = None if r.returncode == 0 else (r.stderr or 'disconnect failed').strip().splitlines()[-1][:160]
+        GLib.timeout_add(600, lambda: (self.refresh(), False)[1])
+
+    def _on_logout(self, _widget):
+        r = ts('logout')
+        self.last_error = None if r.returncode == 0 else (r.stderr or 'logout failed').strip().splitlines()[-1][:160]
+        GLib.timeout_add(600, lambda: (self.refresh(), False)[1])
+
+
+if __name__ == '__main__':
+    _lock = acquire_single_instance_lock()
+    if _lock is None:
+        sys.exit(0)  # another instance is already running
+    TailscaleTray()
+    Gtk.main()
+PYEOF
+    chmod +x "$HOME/.local/bin/saleshandy-tailscale-tray.py"
+
+    mkdir -p "$HOME/.local/share/applications"
+    cat > "$HOME/.local/share/applications/saleshandy-tailscale-tray.desktop" <<DESKEOF
+[Desktop Entry]
+Type=Application
+Name=Saleshandy Tailscale Tray
+Comment=Control Tailscale exit-node and connection settings
+Exec=/usr/bin/python3 $HOME/.local/bin/saleshandy-tailscale-tray.py
+Icon=network-vpn
+Terminal=false
+Categories=Network;
+StartupNotify=false
+DESKEOF
+    chmod +x "$HOME/.local/share/applications/saleshandy-tailscale-tray.desktop"
+    update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+
+    mkdir -p "$HOME/.config/systemd/user"
+    cat > "$HOME/.config/systemd/user/saleshandy-tailscale-tray.service" <<SVCEOF
+[Unit]
+Description=Saleshandy Tailscale Tray
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/python3 %h/.local/bin/saleshandy-tailscale-tray.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target
+SVCEOF
+
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user enable --now saleshandy-tailscale-tray.service 2>/dev/null || \
+        log_warn "Could not start the tray service now (no active graphical session?) — it will start automatically at next login."
+
+    log_ok "Saleshandy Tailscale Tray installed — tray icon should appear in the top bar."
 }
 
 install_gnome_tools() {
@@ -689,7 +973,7 @@ menu_tailscale() {
         echo -e "  [6] Fix Ubuntu Exit Node Routing (sysctl rp_filter=2)"
         echo -e "  [7] Diagnose & Status"
         echo -e "  [8] Uninstall Tailscale"
-        echo -e "  [9] Enable GUI Tray Icon (switch Exit Node without terminal)"
+        echo -e "  [9] Install Saleshandy Tailscale Tray (GUI exit-node switcher, no terminal)"
         echo -e "  [0] Back\n"
 
         local server="https://bifrost.saleshandy.com"
@@ -835,41 +1119,9 @@ menu_tailscale() {
                 fi
                 press_enter ;;
             9)
-                log_section "ENABLE GUI TRAY ICON — SWITCH EXIT NODE WITHOUT TERMINAL"
-                echo -e "  ${DIM}Tailscale shows a system tray icon (Exit Node picker included) on${NC}"
-                echo -e "  ${DIM}desktops that support the AppIndicator/StatusNotifierItem protocol.${NC}"
-                echo -e "  ${DIM}GNOME needs an extension for this — KDE/XFCE usually work out of the box.${NC}\n"
-
-                log_info "Granting your user control over tailscaled (needed for the GUI to actually apply changes — otherwise switching silently fails, since the tray runs unprivileged and tailscaled ignores requests from non-operator users)..."
-                if sudo tailscale set --operator="$(whoami)"; then
-                    log_ok "Operator set for '$(whoami)' — tray icon can now switch exit nodes without sudo."
-                else
-                    log_warn "Could not set operator — make sure Tailscale is installed and logged in first."
-                fi
-                echo ""
-
-                local desktop="${XDG_CURRENT_DESKTOP:-Unknown}"
-                log_info "Detected desktop: $desktop"
-
-                if echo "$desktop" | grep -qi "gnome"; then
-                    log_info "Installing GNOME AppIndicator support extension..."
-                    sudo apt-get update -y
-                    sudo apt-get install -y gnome-shell-extension-appindicator
-                    if command -v gnome-extensions &>/dev/null; then
-                        gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com 2>/dev/null \
-                            && log_ok "AppIndicator extension enabled." \
-                            || log_warn "Could not auto-enable — open 'Extensions' app and enable 'AppIndicator and KStatusNotifierItem Support' manually."
-                    else
-                        log_warn "'gnome-extensions' command not found — open the 'Extensions' app and enable 'AppIndicator and KStatusNotifierItem Support' manually."
-                    fi
-                    log_warn "Log out & log back in (or on X11: Alt+F2 → type 'r' → Enter) for the tray icon to appear."
-                    log_info "After that: click the Tailscale tray icon → 'Exit Node' submenu to switch nodes — no terminal needed."
-                elif echo "$desktop" | grep -qiE "kde|xfce"; then
-                    log_ok "$desktop already supports tray icons natively — no extra extension needed."
-                    log_info "Restart the Tailscale session (or log out/in) and the tray icon should appear automatically."
-                else
-                    log_warn "Unrecognized desktop ('$desktop') — tray icon support depends on your desktop having AppIndicator/StatusNotifierItem support."
-                fi
+                log_section "SALESHANDY TAILSCALE TRAY — SWITCH EXIT NODE WITHOUT TERMINAL"
+                ensure_tailscale_service || { press_enter; continue; }
+                install_saleshandy_tray
                 press_enter ;;
             0) return ;;
             *) log_warn "Invalid choice." ;;
