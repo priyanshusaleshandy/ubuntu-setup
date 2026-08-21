@@ -248,9 +248,12 @@ Replaces the buggy tailscale-status@maxgallup.github.com extension. Key differen
 import fcntl
 import json
 import os
+import re
 import shutil
+import socket
 import subprocess
 import sys
+import threading
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -260,6 +263,11 @@ from gi.repository import Gtk, GLib, AyatanaAppIndicator3 as AppIndicator3
 TAILSCALE = shutil.which('tailscale') or '/usr/bin/tailscale'
 APP_ID = 'saleshandy-tailscale-tray'
 LOCK_PATH = os.path.expanduser('~/.cache/saleshandy-tailscale-tray.lock')
+LOGIN_SERVER = 'https://bifrost.saleshandy.com'
+# Auto-sends the login link here instead of leaving it to find in a terminal.
+# Only reachable on the office LAN — off-site this send will just fail quietly
+# and the link is still visible in `tailscale status` / journalctl as before.
+NTFY_URL = 'http://192.168.126.101:8080/priyanshu-setup'
 
 
 def acquire_single_instance_lock():
@@ -319,6 +327,8 @@ class TailscaleTray:
         self.menu.connect('show', lambda _w: self.refresh())
         self.indicator.set_menu(self.menu)
         self.last_error = None
+        self.info_message = None
+        self._login_thread = None
         self.refresh()
 
     def _append_label(self, text, sensitive=False):
@@ -353,6 +363,15 @@ class TailscaleTray:
                 up_item = Gtk.MenuItem(label='Connect')
                 up_item.connect('activate', self._on_connect)
                 self.menu.append(up_item)
+            login_item = Gtk.MenuItem(label='Login (send code to ntfy)')
+            login_item.connect('activate', self._on_login)
+            self.menu.append(login_item)
+            if self.info_message:
+                self._append_separator()
+                self._append_label(f'ℹ {self.info_message}')
+            if self.last_error:
+                self._append_separator()
+                self._append_label(f'⚠ {self.last_error}')
             self._append_footer()
             self.menu.show_all()
             return
@@ -399,10 +418,17 @@ class TailscaleTray:
         down_item.connect('activate', self._on_disconnect)
         self.menu.append(down_item)
 
+        login_item = Gtk.MenuItem(label='Login (send code to ntfy)')
+        login_item.connect('activate', self._on_login)
+        self.menu.append(login_item)
+
         logout_item = Gtk.MenuItem(label='Log out')
         logout_item.connect('activate', self._on_logout)
         self.menu.append(logout_item)
 
+        if self.info_message:
+            self._append_separator()
+            self._append_label(f'ℹ {self.info_message}')
         if self.last_error:
             self._append_separator()
             self._append_label(f'⚠ {self.last_error}')
@@ -445,6 +471,74 @@ class TailscaleTray:
         self.last_error = None if r.returncode == 0 else (r.stderr or 'logout failed').strip().splitlines()[-1][:160]
         GLib.timeout_add(600, lambda: (self.refresh(), False)[1])
 
+    def _notify(self, text):
+        try:
+            subprocess.run(['notify-send', 'Saleshandy Tailscale', text], timeout=5)
+        except Exception:
+            pass
+        return False
+
+    def _on_login(self, _widget):
+        if self._login_thread and self._login_thread.is_alive():
+            return  # already in progress
+        self.last_error = None
+        self.info_message = 'Logging in — waiting for auth link…'
+        self.refresh()
+        self._login_thread = threading.Thread(target=self._login_worker, daemon=True)
+        self._login_thread.start()
+
+    def _login_worker(self):
+        # --force-reauth always gets a fresh code, whether currently logged
+        # out (NeedsLogin) or already connected (re-login/switch account) -
+        # matches the setup-center-cli.sh login flow this mirrors.
+        try:
+            proc = subprocess.Popen(
+                [TAILSCALE, 'up', f'--login-server={LOGIN_SERVER}',
+                 '--accept-routes', '--accept-dns', '--force-reauth'],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        except Exception as e:
+            GLib.idle_add(self._login_finished, None, str(e))
+            return
+
+        url = None
+        for line in proc.stdout:
+            m = re.search(r'https://\S+', line)
+            if m:
+                url = m.group(0)
+                GLib.idle_add(self._login_url_found, url)
+                break
+        try:
+            proc.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            pass  # keep running in the background until the browser flow completes
+        GLib.idle_add(self._login_finished, url, None)
+
+    def _login_url_found(self, url):
+        self.info_message = f'Login link sent to ntfy ({NTFY_URL})'
+        self.refresh()
+
+        def send():
+            try:
+                subprocess.run(
+                    ['curl', '-fsSL', '--max-time', '10', '-d',
+                     f'Tailscale login ({socket.gethostname()}): {url}', NTFY_URL],
+                    capture_output=True, timeout=15)
+            except Exception:
+                pass
+            GLib.idle_add(self._notify, f'Login link sent to ntfy for {socket.gethostname()}')
+        threading.Thread(target=send, daemon=True).start()
+        return False
+
+    def _login_finished(self, url, err):
+        if err:
+            self.last_error = f'Login failed: {err}'[:160]
+            self.info_message = None
+        elif not url:
+            self.last_error = 'Login finished but no auth link was seen — check `tailscale status`.'
+            self.info_message = None
+        GLib.timeout_add(600, lambda: (self.refresh(), False)[1])
+        return False
+
 
 if __name__ == '__main__':
     _lock = acquire_single_instance_lock()
@@ -452,6 +546,7 @@ if __name__ == '__main__':
         sys.exit(0)  # another instance is already running
     TailscaleTray()
     Gtk.main()
+
 PYEOF
     chmod +x "$HOME/.local/bin/saleshandy-tailscale-tray.py"
 
