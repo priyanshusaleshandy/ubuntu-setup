@@ -1,0 +1,14 @@
+[Unit]
+Description=BioMax fingerprint auto-sync (propagates new enrollments across devices, separate from attendance sync)
+After=network.target
+
+[Service]
+Type=simple
+User=saleshandy
+WorkingDirectory=/home/saleshandy/biomax-sync
+ExecStart=/usr/bin/python3 -u /home/saleshandy/biomax-sync/biomax_autosync.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
