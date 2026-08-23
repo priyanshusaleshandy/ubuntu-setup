@@ -5,15 +5,37 @@ import os
 import datetime
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask, render_template, request, g, redirect, url_for, flash
+from flask import Flask, render_template, request, g, redirect, url_for, flash, session
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from device_push import push_user, delete_user, list_device_users, copy_fingerprint
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "biomax.db")
+SECRET_KEY_FILE = os.path.join(BASE_DIR, ".secret_key")
+DEFAULT_ADMIN_USER = "admin"
+DEFAULT_ADMIN_PASS = "Admin@ikigai"
+
+
+def _get_secret_key():
+    """A random key per process (the old behavior) logs everyone out on every
+    restart - this app gets restarted a lot during normal maintenance, so
+    persist one to disk instead. BIOMAX_SECRET_KEY env var still wins if set."""
+    env_key = os.environ.get("BIOMAX_SECRET_KEY")
+    if env_key:
+        return env_key
+    if os.path.exists(SECRET_KEY_FILE):
+        with open(SECRET_KEY_FILE, "r") as f:
+            return f.read().strip()
+    key = os.urandom(32).hex()
+    with open(SECRET_KEY_FILE, "w") as f:
+        f.write(key)
+    return key
+
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("BIOMAX_SECRET_KEY", os.urandom(24))
+app.secret_key = _get_secret_key()
+app.permanent_session_lifetime = datetime.timedelta(days=30)
 
 
 def ping_ok(ip):
@@ -49,6 +71,22 @@ def get_db():
         g.db = sqlite3.connect(DB_FILE, timeout=10.0)
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA journal_mode=WAL")
+        g.db.execute(
+            """CREATE TABLE IF NOT EXISTS console_users (
+                   username TEXT PRIMARY KEY,
+                   password_hash TEXT NOT NULL,
+                   updated_at TEXT
+               )"""
+        )
+        # seed the one default admin account, but only the very first time this
+        # table is empty - never touches it again after that, so a changed
+        # password is never silently reset back to the default on a redeploy.
+        if g.db.execute("SELECT COUNT(*) FROM console_users").fetchone()[0] == 0:
+            g.db.execute(
+                "INSERT INTO console_users (username, password_hash, updated_at) VALUES (?, ?, ?)",
+                (DEFAULT_ADMIN_USER, generate_password_hash(DEFAULT_ADMIN_PASS), datetime.datetime.now().isoformat()),
+            )
+            g.db.commit()
     return g.db
 
 
@@ -57,6 +95,72 @@ def close_db(exc):
     db = g.pop("db", None)
     if db is not None:
         db.close()
+
+
+@app.before_request
+def require_login():
+    if request.endpoint in ("login_page", "static"):
+        return
+    if not session.get("logged_in"):
+        return redirect(url_for("login_page", next=request.path))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login_page():
+    if session.get("logged_in"):
+        return redirect(url_for("dashboard"))
+
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        db = get_db()
+        row = db.execute("SELECT * FROM console_users WHERE username = ?", (username,)).fetchone()
+        if row and check_password_hash(row["password_hash"], password):
+            session.clear()
+            session["logged_in"] = True
+            session["username"] = row["username"]
+            session.permanent = True
+            next_path = request.form.get("next") or url_for("dashboard")
+            return redirect(next_path)
+        error = "Invalid username or password."
+
+    return render_template("login.html", error=error, next=request.args.get("next", ""))
+
+
+@app.route("/logout")
+def logout_page():
+    session.clear()
+    return redirect(url_for("login_page"))
+
+
+@app.route("/change-password", methods=["GET", "POST"])
+def change_password_page():
+    db = get_db()
+    result = None
+
+    if request.method == "POST":
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        row = db.execute("SELECT * FROM console_users WHERE username = ?", (session["username"],)).fetchone()
+
+        if not row or not check_password_hash(row["password_hash"], current_password):
+            result = {"success": False, "error": "Current password is incorrect."}
+        elif len(new_password) < 6:
+            result = {"success": False, "error": "New password must be at least 6 characters."}
+        elif new_password != confirm_password:
+            result = {"success": False, "error": "New password and confirmation don't match."}
+        else:
+            db.execute(
+                "UPDATE console_users SET password_hash = ?, updated_at = ? WHERE username = ?",
+                (generate_password_hash(new_password), datetime.datetime.now().isoformat(), session["username"]),
+            )
+            db.commit()
+            result = {"success": True}
+
+    return render_template("change_password.html", result=result, active="change_password")
 
 
 @app.route("/")
