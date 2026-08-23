@@ -1,0 +1,14 @@
+[Unit]
+Description=BioMax health monitor (device reachability + attendance sync staleness, alerts via ntfy)
+After=network.target
+
+[Service]
+Type=simple
+User=saleshandy
+WorkingDirectory=/home/saleshandy/biomax-sync
+ExecStart=/usr/bin/python3 -u /home/saleshandy/biomax-sync/biomax_healthcheck.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
