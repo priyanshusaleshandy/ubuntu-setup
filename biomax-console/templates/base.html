@@ -91,6 +91,9 @@
     margin-top: auto; padding: 12px 10px 2px; font-size: 11px; color: var(--text-faint);
     border-top: 1px solid var(--border-soft); margin-top: 16px; padding-top: 14px;
   }
+  nav .sidebar-foot .watermark {
+    margin-top: 10px; font-size: 10px; letter-spacing: .3px; opacity: .55;
+  }
 
   /* ---------- Main ---------- */
   main { flex: 1; min-width: 0; padding: 30px 36px 60px; max-width: 1240px; }
@@ -295,7 +298,11 @@
     <a href="/change-password" class="{{ 'active' if active=='change_password' }}"><span class="ic">🔑</span>Change Password</a>
     <a href="/logout" class="nav-danger"><span class="ic">🚪</span>Logout</a>
 
-    <div class="sidebar-foot">{% if session.username %}Signed in as <strong>{{ session.username }}</strong><br>{% endif %}Direct device sync · no SmartOffice dependency</div>
+    <div class="sidebar-foot">
+      {% if session.username %}Signed in as <strong>{{ session.username }}</strong><br>{% endif %}
+      Direct device sync · no SmartOffice dependency
+      <div class="watermark">Made by Priyanshu</div>
+    </div>
   </nav>
   <main>
     {% with messages = get_flashed_messages(with_categories=true) %}
