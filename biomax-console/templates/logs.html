@@ -5,7 +5,9 @@
 </div>
 <form class="filters" method="get">
   <input type="text" name="user" placeholder="🔍 User ID or name..." value="{{ user_filter }}">
-  <input type="date" name="date" value="{{ date_filter }}">
+  <input type="date" name="date_from" value="{{ date_from }}" title="From date">
+  <span class="muted" style="align-self:center;">to</span>
+  <input type="date" name="date_to" value="{{ date_to }}" title="To date">
   <select name="device">
     <option value="">All devices</option>
     {% for d in devices %}

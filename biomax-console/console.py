@@ -330,12 +330,13 @@ def devices_page():
 def logs_page():
     db = get_db()
     user_filter = request.args.get("user", "").strip()
-    date_filter = request.args.get("date", "").strip()  # YYYY-MM-DD
+    date_from = request.args.get("date_from", "").strip()  # YYYY-MM-DD
+    date_to = request.args.get("date_to", "").strip()  # YYYY-MM-DD
     device_filter = request.args.get("device", "").strip()
     # don't dump the whole recent-logs table by default - only search once a
     # date or a user/ID has actually been picked (device alone doesn't count,
     # that's still "show me everything on this device")
-    searched = bool(user_filter or date_filter)
+    searched = bool(user_filter or date_from or date_to)
 
     logs = []
     if searched:
@@ -347,12 +348,23 @@ def logs_page():
         if device_filter:
             query += " AND device_id = ?"
             params.append(device_filter)
-        if date_filter:
+        # log_date is stored as text "MM/DD/YY HH:MM:SS" - a plain string
+        # compare on that breaks across year boundaries (e.g. "01/15/27" <
+        # "12/01/26" as strings, even though Jan 2027 is later). Reorder to
+        # YY/MM/DD first so the comparison is actually chronological.
+        sortable_log_date = "substr(log_date,7,2) || substr(log_date,1,2) || substr(log_date,4,2)"
+        if date_from:
             try:
-                d = datetime.datetime.strptime(date_filter, "%Y-%m-%d")
-                mdy = d.strftime("%m/%d/%y")
-                query += " AND log_date LIKE ?"
-                params.append(f"{mdy}%")
+                d = datetime.datetime.strptime(date_from, "%Y-%m-%d")
+                query += f" AND {sortable_log_date} >= ?"
+                params.append(d.strftime("%y%m%d"))
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                d = datetime.datetime.strptime(date_to, "%Y-%m-%d")
+                query += f" AND {sortable_log_date} <= ?"
+                params.append(d.strftime("%y%m%d"))
             except ValueError:
                 pass
         query += " ORDER BY device_log_id DESC LIMIT 500"
@@ -361,7 +373,7 @@ def logs_page():
     devices = db.execute("SELECT * FROM devices ORDER BY name").fetchall()
     return render_template(
         "logs.html", logs=logs, devices=devices, searched=searched,
-        user_filter=user_filter, date_filter=date_filter, device_filter=device_filter,
+        user_filter=user_filter, date_from=date_from, date_to=date_to, device_filter=device_filter,
         active="logs",
     )
 
