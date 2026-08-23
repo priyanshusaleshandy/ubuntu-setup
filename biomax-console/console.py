@@ -2,11 +2,15 @@
 """BioMax attendance console - devices/logs/users viewing + user push."""
 import sqlite3
 import os
+import io
+import base64
 import datetime
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, render_template, request, g, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
+import pyotp
+import qrcode
 
 from device_push import push_user, delete_user, list_device_users, copy_fingerprint
 
@@ -78,6 +82,13 @@ def get_db():
                    updated_at TEXT
                )"""
         )
+        # migrate in the 2FA columns for a table that already existed before this -
+        # ALTER TABLE has no "ADD COLUMN IF NOT EXISTS", so check first
+        existing_cols = {row["name"] for row in g.db.execute("PRAGMA table_info(console_users)")}
+        if "totp_secret" not in existing_cols:
+            g.db.execute("ALTER TABLE console_users ADD COLUMN totp_secret TEXT")
+        if "totp_enabled" not in existing_cols:
+            g.db.execute("ALTER TABLE console_users ADD COLUMN totp_enabled INTEGER DEFAULT 0")
         # seed the one default admin account, but only the very first time this
         # table is empty - never touches it again after that, so a changed
         # password is never silently reset back to the default on a redeploy.
@@ -99,7 +110,7 @@ def close_db(exc):
 
 @app.before_request
 def require_login():
-    if request.endpoint in ("login_page", "static"):
+    if request.endpoint in ("login_page", "login_2fa_page", "static"):
         return
     if not session.get("logged_in"):
         return redirect(url_for("login_page", next=request.path))
@@ -114,18 +125,48 @@ def login_page():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
+        next_path = request.form.get("next") or url_for("dashboard")
         db = get_db()
         row = db.execute("SELECT * FROM console_users WHERE username = ?", (username,)).fetchone()
         if row and check_password_hash(row["password_hash"], password):
             session.clear()
+            if row["totp_enabled"]:
+                # password alone isn't enough - park them one step short of
+                # logged_in until they also pass the 6-digit code
+                session["pending_2fa_username"] = row["username"]
+                session["pending_2fa_next"] = next_path
+                return redirect(url_for("login_2fa_page"))
             session["logged_in"] = True
             session["username"] = row["username"]
             session.permanent = True
-            next_path = request.form.get("next") or url_for("dashboard")
             return redirect(next_path)
         error = "Invalid username or password."
 
     return render_template("login.html", error=error, next=request.args.get("next", ""))
+
+
+@app.route("/login-2fa", methods=["GET", "POST"])
+def login_2fa_page():
+    pending_user = session.get("pending_2fa_username")
+    if not pending_user:
+        return redirect(url_for("login_page"))
+
+    error = None
+    if request.method == "POST":
+        code = request.form.get("code", "").strip()
+        db = get_db()
+        row = db.execute("SELECT * FROM console_users WHERE username = ?", (pending_user,)).fetchone()
+        totp = pyotp.TOTP(row["totp_secret"]) if row and row["totp_secret"] else None
+        if totp and totp.verify(code, valid_window=1):
+            next_path = session.get("pending_2fa_next") or url_for("dashboard")
+            session.clear()
+            session["logged_in"] = True
+            session["username"] = pending_user
+            session.permanent = True
+            return redirect(next_path)
+        error = "Invalid or expired code."
+
+    return render_template("login_2fa.html", error=error)
 
 
 @app.route("/logout")
@@ -161,6 +202,66 @@ def change_password_page():
             result = {"success": True}
 
     return render_template("change_password.html", result=result, active="change_password")
+
+
+@app.route("/setup-2fa", methods=["GET", "POST"])
+def setup_2fa_page():
+    db = get_db()
+    row = db.execute("SELECT * FROM console_users WHERE username = ?", (session["username"],)).fetchone()
+    error = None
+    success = False
+
+    if row["totp_enabled"]:
+        # already on - this page just offers to turn it off (needs the
+        # password, not a code, since losing the code is exactly why someone
+        # would be here)
+        if request.method == "POST":
+            password = request.form.get("password", "")
+            if not check_password_hash(row["password_hash"], password):
+                error = "Password is incorrect."
+            else:
+                db.execute(
+                    "UPDATE console_users SET totp_enabled=0, totp_secret=NULL, updated_at=? WHERE username=?",
+                    (datetime.datetime.now().isoformat(), session["username"]),
+                )
+                db.commit()
+                return redirect(url_for("setup_2fa_page"))
+        return render_template("setup_2fa.html", enabled=True, error=error, active="setup_2fa")
+
+    # not enabled yet - generate (or reuse, mid-setup) a pending secret and
+    # ask for one valid code before actually turning it on, so a bad
+    # scan/typo can't lock the account out
+    if request.method == "POST":
+        code = request.form.get("code", "").strip()
+        pending_secret = session.get("pending_totp_secret")
+        totp = pyotp.TOTP(pending_secret) if pending_secret else None
+        if totp and totp.verify(code, valid_window=1):
+            db.execute(
+                "UPDATE console_users SET totp_secret=?, totp_enabled=1, updated_at=? WHERE username=?",
+                (pending_secret, datetime.datetime.now().isoformat(), session["username"]),
+            )
+            db.commit()
+            session.pop("pending_totp_secret", None)
+            success = True
+        else:
+            error = "That code didn't match — try the current code from your app."
+
+    if not success and "pending_totp_secret" not in session:
+        session["pending_totp_secret"] = pyotp.random_base32()
+
+    qr_data_uri = None
+    secret = session.get("pending_totp_secret")
+    if secret and not success:
+        otp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=session["username"], issuer_name="BioMax Console")
+        img = qrcode.make(otp_uri)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        qr_data_uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+    return render_template(
+        "setup_2fa.html", enabled=False, error=error, success=success,
+        secret=secret, qr_data_uri=qr_data_uri, active="setup_2fa",
+    )
 
 
 @app.route("/")

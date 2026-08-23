@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <h1>📟 Two-Factor Authentication</h1>
+</div>
+
+{% if enabled %}
+  <p class="subtitle">2FA is currently <strong style="color:var(--green)">enabled</strong> on your account. Every login needs a code from your authenticator app, in addition to your password.</p>
+  {% if error %}
+  <div class="alert error">❌ {{ error }}</div>
+  {% endif %}
+  <div class="form-card">
+    <p class="muted" style="margin-top:0; font-size:13px;">To turn 2FA off, confirm your password.</p>
+    <form method="post">
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-danger">Disable 2FA</button>
+    </form>
+  </div>
+
+{% elif success %}
+  <div class="alert success">✅ 2FA is now enabled. You'll be asked for a code on every future login.</div>
+
+{% else %}
+  <p class="subtitle">Scan this QR code with an authenticator app (Google Authenticator, Authy, 1Password, etc.), then enter the 6-digit code it shows to turn 2FA on.</p>
+  {% if error %}
+  <div class="alert error">❌ {{ error }}</div>
+  {% endif %}
+  <div class="form-card" style="max-width:420px;">
+    {% if qr_data_uri %}
+    <div style="background:white; padding:14px; border-radius:var(--radius-sm); display:inline-block; margin-bottom:16px;">
+      <img src="{{ qr_data_uri }}" alt="2FA QR code" width="180" height="180" style="display:block;">
+    </div>
+    {% endif %}
+    <div class="field">
+      <label>Can't scan? Enter this key manually</label>
+      <input type="text" value="{{ secret }}" readonly style="font-family:ui-monospace,monospace; letter-spacing:1px;">
+    </div>
+    <form method="post">
+      <div class="field">
+        <label>6-digit code from your app</label>
+        <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" style="font-size:20px; text-align:center; letter-spacing:4px;">
+      </div>
+      <button type="submit" class="btn-primary">Enable 2FA</button>
+    </form>
+  </div>
+{% endif %}
+{% endblock %}
