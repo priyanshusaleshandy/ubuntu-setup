@@ -18,7 +18,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "biomax.db")
 SECRET_KEY_FILE = os.path.join(BASE_DIR, ".secret_key")
 DEFAULT_ADMIN_USER = "admin"
-DEFAULT_ADMIN_PASS = "Admin@ikigai"
 
 
 def _get_secret_key():
@@ -34,12 +33,26 @@ def _get_secret_key():
     key = os.urandom(32).hex()
     with open(SECRET_KEY_FILE, "w") as f:
         f.write(key)
+    os.chmod(SECRET_KEY_FILE, 0o600)  # owner-only - this key can forge session cookies
     return key
 
 
 app = Flask(__name__)
 app.secret_key = _get_secret_key()
 app.permanent_session_lifetime = datetime.timedelta(days=30)
+# Lax blocks the session cookie from riding along on a cross-site POST (the
+# classic CSRF pattern) while still working normally for same-site use.
+# Not Secure - this deployment is plain HTTP on the LAN, no TLS in front of
+# it, so a Secure cookie would just never get sent and break login entirely.
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Frame-Options"] = "DENY"  # blocks clickjacking (embedding this admin console in a hidden iframe)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 def ping_ok(ip):
@@ -92,10 +105,22 @@ def get_db():
         # seed the one default admin account, but only the very first time this
         # table is empty - never touches it again after that, so a changed
         # password is never silently reset back to the default on a redeploy.
+        # No hardcoded password in source (this file is committed to a public
+        # repo) - either BIOMAX_ADMIN_SEED_PASSWORD is set, or a random one-time
+        # password is generated and printed to the service log (journalctl) so
+        # whoever deploys it can grab it once and change it via Change Password.
         if g.db.execute("SELECT COUNT(*) FROM console_users").fetchone()[0] == 0:
+            seed_password = os.environ.get("BIOMAX_ADMIN_SEED_PASSWORD")
+            if not seed_password:
+                seed_password = os.urandom(9).hex()
+                print(
+                    f"[console] No BIOMAX_ADMIN_SEED_PASSWORD set - generated one-time "
+                    f"admin password: {seed_password}  (log in as '{DEFAULT_ADMIN_USER}' "
+                    f"and change it via Change Password right away)"
+                )
             g.db.execute(
                 "INSERT INTO console_users (username, password_hash, updated_at) VALUES (?, ?, ?)",
-                (DEFAULT_ADMIN_USER, generate_password_hash(DEFAULT_ADMIN_PASS), datetime.datetime.now().isoformat()),
+                (DEFAULT_ADMIN_USER, generate_password_hash(seed_password), datetime.datetime.now().isoformat()),
             )
             g.db.commit()
     return g.db
@@ -106,6 +131,18 @@ def close_db(exc):
     db = g.pop("db", None)
     if db is not None:
         db.close()
+
+
+def _safe_next(path):
+    """Only allow a relative, in-app path for ?next= / hidden next fields.
+    Passing it straight to redirect() unchecked is a classic open-redirect:
+    a crafted link like /login?next=https://evil.example/phish would bounce
+    a just-authenticated user straight to it. "//evil.example" is also
+    rejected - browsers treat a leading // as protocol-relative (still
+    external), not as this app's root."""
+    if not path or not path.startswith("/") or path.startswith("//"):
+        return url_for("dashboard")
+    return path
 
 
 @app.before_request
@@ -125,7 +162,7 @@ def login_page():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        next_path = request.form.get("next") or url_for("dashboard")
+        next_path = _safe_next(request.form.get("next"))
         db = get_db()
         row = db.execute("SELECT * FROM console_users WHERE username = ?", (username,)).fetchone()
         if row and check_password_hash(row["password_hash"], password):
