@@ -3,11 +3,12 @@
 import sqlite3
 import os
 import io
+import csv
 import base64
 import datetime
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask, render_template, request, g, redirect, url_for, flash, session
+from flask import Flask, render_template, request, g, redirect, url_for, flash, session, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 import pyotp
 import qrcode
@@ -301,6 +302,50 @@ def setup_2fa_page():
     )
 
 
+@app.route("/manage-admins", methods=["GET", "POST"])
+def manage_admins_page():
+    db = get_db()
+    error = None
+    success = None
+
+    if request.method == "POST":
+        action = request.form.get("action", "")
+
+        if action == "add":
+            new_username = request.form.get("new_username", "").strip()
+            new_password = request.form.get("new_password", "")
+            if not new_username or not new_username.replace("_", "").replace("-", "").isalnum():
+                error = "Username can only contain letters, numbers, - and _."
+            elif len(new_password) < 6:
+                error = "Password must be at least 6 characters."
+            elif db.execute("SELECT 1 FROM console_users WHERE username = ?", (new_username,)).fetchone():
+                error = "That username already exists."
+            else:
+                db.execute(
+                    "INSERT INTO console_users (username, password_hash, updated_at) VALUES (?, ?, ?)",
+                    (new_username, generate_password_hash(new_password), datetime.datetime.now().isoformat()),
+                )
+                db.commit()
+                success = f'Admin "{new_username}" created.'
+
+        elif action == "delete":
+            target_username = request.form.get("username", "")
+            total_admins = db.execute("SELECT COUNT(*) c FROM console_users").fetchone()["c"]
+            if target_username == session["username"]:
+                error = "You can't remove your own account while logged in as it — ask another admin to do it."
+            elif total_admins <= 1:
+                error = "Can't remove the last remaining admin account — that would lock everyone out."
+            else:
+                db.execute("DELETE FROM console_users WHERE username = ?", (target_username,))
+                db.commit()
+                success = f'Admin "{target_username}" removed.'
+
+    admins = db.execute("SELECT username, totp_enabled, updated_at FROM console_users ORDER BY username").fetchall()
+    return render_template(
+        "manage_admins.html", admins=admins, error=error, success=success, active="manage_admins",
+    )
+
+
 @app.route("/")
 def dashboard():
     db = get_db()
@@ -326,6 +371,40 @@ def devices_page():
     return render_template("devices.html", devices=devices, active="devices")
 
 
+def _build_logs_query(user_filter, date_from, date_to, device_filter, limit):
+    """Shared by the Logs page and the CSV export - same filters, same
+    chronological-safe date range handling, just a different row limit."""
+    query = "SELECT * FROM attendance WHERE 1=1"
+    params = []
+    if user_filter:
+        query += " AND (user_id LIKE ? OR employee_name LIKE ?)"
+        params += [f"%{user_filter}%", f"%{user_filter}%"]
+    if device_filter:
+        query += " AND device_id = ?"
+        params.append(device_filter)
+    # log_date is stored as text "MM/DD/YY HH:MM:SS" - a plain string
+    # compare on that breaks across year boundaries (e.g. "01/15/27" <
+    # "12/01/26" as strings, even though Jan 2027 is later). Reorder to
+    # YY/MM/DD first so the comparison is actually chronological.
+    sortable_log_date = "substr(log_date,7,2) || substr(log_date,1,2) || substr(log_date,4,2)"
+    if date_from:
+        try:
+            d = datetime.datetime.strptime(date_from, "%Y-%m-%d")
+            query += f" AND {sortable_log_date} >= ?"
+            params.append(d.strftime("%y%m%d"))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            d = datetime.datetime.strptime(date_to, "%Y-%m-%d")
+            query += f" AND {sortable_log_date} <= ?"
+            params.append(d.strftime("%y%m%d"))
+        except ValueError:
+            pass
+    query += f" ORDER BY device_log_id DESC LIMIT {int(limit)}"
+    return query, params
+
+
 @app.route("/logs")
 def logs_page():
     db = get_db()
@@ -340,34 +419,7 @@ def logs_page():
 
     logs = []
     if searched:
-        query = "SELECT * FROM attendance WHERE 1=1"
-        params = []
-        if user_filter:
-            query += " AND (user_id LIKE ? OR employee_name LIKE ?)"
-            params += [f"%{user_filter}%", f"%{user_filter}%"]
-        if device_filter:
-            query += " AND device_id = ?"
-            params.append(device_filter)
-        # log_date is stored as text "MM/DD/YY HH:MM:SS" - a plain string
-        # compare on that breaks across year boundaries (e.g. "01/15/27" <
-        # "12/01/26" as strings, even though Jan 2027 is later). Reorder to
-        # YY/MM/DD first so the comparison is actually chronological.
-        sortable_log_date = "substr(log_date,7,2) || substr(log_date,1,2) || substr(log_date,4,2)"
-        if date_from:
-            try:
-                d = datetime.datetime.strptime(date_from, "%Y-%m-%d")
-                query += f" AND {sortable_log_date} >= ?"
-                params.append(d.strftime("%y%m%d"))
-            except ValueError:
-                pass
-        if date_to:
-            try:
-                d = datetime.datetime.strptime(date_to, "%Y-%m-%d")
-                query += f" AND {sortable_log_date} <= ?"
-                params.append(d.strftime("%y%m%d"))
-            except ValueError:
-                pass
-        query += " ORDER BY device_log_id DESC LIMIT 500"
+        query, params = _build_logs_query(user_filter, date_from, date_to, device_filter, limit=500)
         logs = db.execute(query, params).fetchall()
 
     devices = db.execute("SELECT * FROM devices ORDER BY name").fetchall()
@@ -375,6 +427,34 @@ def logs_page():
         "logs.html", logs=logs, devices=devices, searched=searched,
         user_filter=user_filter, date_from=date_from, date_to=date_to, device_filter=device_filter,
         active="logs",
+    )
+
+
+@app.route("/logs/export.csv")
+def logs_export():
+    db = get_db()
+    user_filter = request.args.get("user", "").strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    device_filter = request.args.get("device", "").strip()
+
+    query, params = _build_logs_query(user_filter, date_from, date_to, device_filter, limit=100000)
+    rows = db.execute(query, params).fetchall()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Log ID", "User ID", "Name", "Date/Time", "Direction", "Device ID", "Status"])
+    for r in rows:
+        writer.writerow([
+            r["device_log_id"], r["user_id"], r["employee_name"] or "",
+            r["log_date"], r["direction"], r["device_id"], r["employee_status"] or "",
+        ])
+
+    filename = f"biomax_logs_{datetime.date.today().isoformat()}.csv"
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

@@ -17,6 +17,10 @@
   <button type="submit">Filter</button>
 </form>
 {% if logs %}
+<div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+  <a class="btn-primary" style="text-decoration:none;"
+     href="/logs/export.csv?user={{ user_filter|urlencode }}&date_from={{ date_from|urlencode }}&date_to={{ date_to|urlencode }}&device={{ device_filter|urlencode }}">📥 Download CSV</a>
+</div>
 <div class="table-wrap">
 <table>
   <tr><th>Log ID</th><th>User ID</th><th class="flex">Name</th><th>Date/Time</th><th>Direction</th><th>Device</th><th>Status</th></tr>

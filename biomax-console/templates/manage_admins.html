@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <h1>👥 Manage Admins</h1>
+</div>
+<p class="subtitle">Console login accounts — separate from the biometric device Users list. Everyone here has full access.</p>
+
+{% if success %}
+<div class="alert success">✅ {{ success }}</div>
+{% endif %}
+{% if error %}
+<div class="alert error">❌ {{ error }}</div>
+{% endif %}
+
+<div class="table-wrap">
+<table>
+  <tr><th class="flex">Username</th><th>2FA</th><th>Last Updated</th><th class="actions-col"></th></tr>
+  {% for a in admins %}
+  <tr>
+    <td><strong>{{ a.username }}</strong>{% if a.username == session.username %} <span class="muted">(you)</span>{% endif %}</td>
+    <td><span class="badge {{ 'online' if a.totp_enabled else 'offline' }}">{{ 'On' if a.totp_enabled else 'Off' }}</span></td>
+    <td class="muted">{{ a.updated_at or '—' }}</td>
+    <td class="actions-col">
+      {% if admins|length > 1 and a.username != session.username %}
+      <form method="post" style="display:inline;" onsubmit="return confirm('Remove admin \'{{ a.username }}\'?');">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="username" value="{{ a.username }}">
+        <button type="submit" class="row-action" title="Remove this admin">🗑️</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+
+<div class="section-title">Add New Admin</div>
+<div class="form-card">
+<form method="post">
+  <input type="hidden" name="action" value="add">
+  <div class="field">
+    <label>Username</label>
+    <input type="text" name="new_username" required placeholder="e.g. colleague">
+  </div>
+  <div class="field">
+    <label>Password</label>
+    <input type="password" name="new_password" required minlength="6" autocomplete="new-password">
+  </div>
+  <button type="submit" class="btn-primary">Add Admin</button>
+</form>
+</div>
+{% endblock %}
