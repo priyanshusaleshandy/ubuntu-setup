@@ -32,7 +32,9 @@
 </table>
 </div>
 <p class="muted" style="margin-top:14px; font-size:12px;">Showing up to 500 most recent matching rows.</p>
-{% else %}
+{% elif searched %}
 <div class="empty"><span class="empty-icon">📋</span>No logs match this filter.</div>
+{% else %}
+<div class="empty"><span class="empty-icon">🔍</span>Pick a date or search a user/ID above to see logs.</div>
 {% endif %}
 {% endblock %}

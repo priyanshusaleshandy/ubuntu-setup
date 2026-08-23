@@ -332,29 +332,35 @@ def logs_page():
     user_filter = request.args.get("user", "").strip()
     date_filter = request.args.get("date", "").strip()  # YYYY-MM-DD
     device_filter = request.args.get("device", "").strip()
+    # don't dump the whole recent-logs table by default - only search once a
+    # date or a user/ID has actually been picked (device alone doesn't count,
+    # that's still "show me everything on this device")
+    searched = bool(user_filter or date_filter)
 
-    query = "SELECT * FROM attendance WHERE 1=1"
-    params = []
-    if user_filter:
-        query += " AND (user_id LIKE ? OR employee_name LIKE ?)"
-        params += [f"%{user_filter}%", f"%{user_filter}%"]
-    if device_filter:
-        query += " AND device_id = ?"
-        params.append(device_filter)
-    if date_filter:
-        try:
-            d = datetime.datetime.strptime(date_filter, "%Y-%m-%d")
-            mdy = d.strftime("%m/%d/%y")
-            query += " AND log_date LIKE ?"
-            params.append(f"{mdy}%")
-        except ValueError:
-            pass
-    query += " ORDER BY device_log_id DESC LIMIT 500"
+    logs = []
+    if searched:
+        query = "SELECT * FROM attendance WHERE 1=1"
+        params = []
+        if user_filter:
+            query += " AND (user_id LIKE ? OR employee_name LIKE ?)"
+            params += [f"%{user_filter}%", f"%{user_filter}%"]
+        if device_filter:
+            query += " AND device_id = ?"
+            params.append(device_filter)
+        if date_filter:
+            try:
+                d = datetime.datetime.strptime(date_filter, "%Y-%m-%d")
+                mdy = d.strftime("%m/%d/%y")
+                query += " AND log_date LIKE ?"
+                params.append(f"{mdy}%")
+            except ValueError:
+                pass
+        query += " ORDER BY device_log_id DESC LIMIT 500"
+        logs = db.execute(query, params).fetchall()
 
-    logs = db.execute(query, params).fetchall()
     devices = db.execute("SELECT * FROM devices ORDER BY name").fetchall()
     return render_template(
-        "logs.html", logs=logs, devices=devices,
+        "logs.html", logs=logs, devices=devices, searched=searched,
         user_filter=user_filter, date_filter=date_filter, device_filter=device_filter,
         active="logs",
     )

@@ -74,7 +74,8 @@ def store_attendance_punch(device_id: str, user_id: str, io_time: str, io_mode, 
     log_date = f"{io_time[0:4]}-{io_time[4:6]}-{io_time[6:8]} {io_time[8:10]}:{io_time[10:12]}:{io_time[12:14]}"
     direction = {0: "in", 1: "out", 2: "io"}.get(io_mode, str(io_mode))
     now = datetime.datetime.now().isoformat()
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    conn.execute("PRAGMA journal_mode=WAL")
     try:
         emp = conn.execute(
             "SELECT employee_name, status FROM employees WHERE employee_code=?", (user_id,)
@@ -208,6 +209,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
+    # default request_queue_size is 5 (stdlib default) - these devices retry
+    # frequently and 3 of them can burst-reconnect around the same moment
+    # (e.g. after any brief network blip), which is enough to overflow a
+    # backlog that small; the OS then refuses/resets the new connection
+    # attempt before we ever see it. Bumped generously - found via a live
+    # ConnectionResetError pattern in the logs (47 failed connection
+    # attempts since 2026-08-12, no successful push since), 2026-08-23.
+    request_queue_size = 64
 
 
 if __name__ == "__main__":
