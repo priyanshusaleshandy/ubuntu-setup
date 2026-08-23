@@ -299,8 +299,7 @@
     <a href="/logout" class="nav-danger"><span class="ic">🚪</span>Logout</a>
 
     <div class="sidebar-foot">
-      {% if session.username %}Signed in as <strong>{{ session.username }}</strong><br>{% endif %}
-      Direct device sync · no SmartOffice dependency
+      {% if session.username %}Signed in as <strong>{{ session.username }}</strong>{% endif %}
       <div class="watermark">Made by Priyanshu</div>
     </div>
   </nav>
