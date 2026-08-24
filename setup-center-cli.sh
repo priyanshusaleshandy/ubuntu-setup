@@ -347,6 +347,8 @@ class TailscaleTray:
         quit_item = Gtk.MenuItem(label='Quit')
         quit_item.connect('activate', lambda _: Gtk.main_quit())
         self.menu.append(quit_item)
+        self._append_separator()
+        self._append_label('Made by Priyanshu')
 
     def refresh(self):
         status = get_status()
