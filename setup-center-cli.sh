@@ -273,7 +273,7 @@ NTFY_URL = 'http://192.168.126.101:8080/priyanshu-setup'
 # Bump this on every change that should roll out automatically. Checked
 # against the same number embedded in whichever copy of this file is fetched
 # below - NAS first (fast, LAN-only), GitHub as the fallback.
-SCRIPT_VERSION = 1
+SCRIPT_VERSION = 2
 UPDATE_CHECK_INTERVAL_SEC = 1800  # 30 minutes
 UPDATE_SOURCES = (
     'http://192.168.126.21:8000/setup-center-cli.sh',
@@ -288,44 +288,24 @@ def _extract_embedded_tray_script(sh_text):
     return m.group(1) if m else None
 
 
-def check_for_update():
-    """Self-update: replaces this script file with a newer one and re-execs
-    the process - that's *all* it ever does. It must NEVER call `tailscale`
-    (login/logout/up/down/set), so an update can never touch the VPN session
-    or force a re-login. If you're editing this, keep it that way."""
-    sh_text = None
+def _fetch_latest_tray_script():
+    """Returns (version, script_text) for the newest copy of this script found
+    across UPDATE_SOURCES (NAS first, GitHub fallback), or (None, None)."""
     for url in UPDATE_SOURCES:
         try:
             r = subprocess.run(['curl', '-fsSL', '--max-time', '8', url],
                                 capture_output=True, text=True, timeout=12)
-            if r.returncode == 0 and r.stdout:
-                sh_text = r.stdout
-                break
         except Exception:
             continue
-    if not sh_text:
-        return
-
-    new_script = _extract_embedded_tray_script(sh_text)
-    if not new_script:
-        return
-    m = re.search(r'^SCRIPT_VERSION\s*=\s*(\d+)', new_script, re.MULTILINE)
-    if not m or int(m.group(1)) <= SCRIPT_VERSION:
-        return
-
-    dest = os.path.realpath(__file__)
-    try:
-        with open(dest, 'w', encoding='utf-8', newline='\n') as f:
-            f.write(new_script)
-    except Exception:
-        return
-
-    try:
-        subprocess.run(['notify-send', 'Saleshandy Tailscale',
-                         f'Updated to v{m.group(1)} — restarting'], timeout=5)
-    except Exception:
-        pass
-    os.execv(sys.executable, [sys.executable, dest])
+        if r.returncode != 0 or not r.stdout:
+            continue
+        new_script = _extract_embedded_tray_script(r.stdout)
+        if not new_script:
+            continue
+        m = re.search(r'^SCRIPT_VERSION\s*=\s*(\d+)', new_script, re.MULTILINE)
+        if m:
+            return int(m.group(1)), new_script
+    return None, None
 
 
 def acquire_single_instance_lock():
@@ -387,7 +367,11 @@ class TailscaleTray:
         self.last_error = None
         self.info_message = None
         self._login_thread = None
+        self._update_thread = None
+        self._dismissed_version = None  # version the user said "No" to - don't re-prompt for it
         self.refresh()
+        GLib.timeout_add_seconds(120, lambda: (self._check_for_update(), False)[1])  # early one-shot
+        GLib.timeout_add_seconds(UPDATE_CHECK_INTERVAL_SEC, lambda: (self._check_for_update(), True)[1])
 
     def _append_label(self, text, sensitive=False):
         item = Gtk.MenuItem(label=text)
@@ -538,6 +522,55 @@ class TailscaleTray:
             pass
         return False
 
+    def _check_for_update(self):
+        if self._update_thread and self._update_thread.is_alive():
+            return False
+        self._update_thread = threading.Thread(target=self._update_check_worker, daemon=True)
+        self._update_thread.start()
+        return False
+
+    def _update_check_worker(self):
+        version, new_script = _fetch_latest_tray_script()
+        if version is None or version <= SCRIPT_VERSION or version == self._dismissed_version:
+            return
+        GLib.idle_add(self._prompt_update, version, new_script)
+
+    def _prompt_update(self, version, new_script):
+        dialog = Gtk.MessageDialog(
+            message_type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.NONE,
+            text='Saleshandy Tailscale Tray update available')
+        dialog.format_secondary_text(f'Version {version} is available (you have {SCRIPT_VERSION}). Update now?')
+        dialog.add_button('Remind me later', Gtk.ResponseType.CANCEL)
+        dialog.add_button('No', Gtk.ResponseType.NO)
+        dialog.add_button('Yes', Gtk.ResponseType.YES)
+        dialog.set_default_response(Gtk.ResponseType.YES)
+        response = dialog.run()
+        dialog.destroy()
+
+        if response == Gtk.ResponseType.YES:
+            self._apply_update(version, new_script)
+        elif response == Gtk.ResponseType.NO:
+            self._dismissed_version = version  # don't ask again until a newer one shows up
+        # "Remind me later" (or closing the dialog): do nothing - the next
+        # periodic check will just ask again.
+        return False
+
+    def _apply_update(self, version, new_script):
+        """The *only* thing an update ever does: write this file and re-exec
+        the process. Never calls `tailscale` (login/logout/up/down/set)
+        anywhere in this path, so it can never touch the VPN session or
+        force a re-login. Keep it that way if you're editing this."""
+        dest = os.path.realpath(__file__)
+        try:
+            with open(dest, 'w', encoding='utf-8', newline='\n') as f:
+                f.write(new_script)
+        except Exception as e:
+            self.last_error = f'Update failed: {e}'[:160]
+            self.refresh()
+            return
+        self._notify(f'Updated to v{version} — restarting')
+        os.execv(sys.executable, [sys.executable, dest])
+
     def _on_login(self, _widget):
         if self._login_thread and self._login_thread.is_alive():
             return  # already in progress
@@ -609,8 +642,6 @@ if __name__ == '__main__':
     if _lock is None:
         sys.exit(0)  # another instance is already running
     TailscaleTray()
-    GLib.timeout_add_seconds(120, lambda: (check_for_update(), False)[1])  # early one-shot check
-    GLib.timeout_add_seconds(UPDATE_CHECK_INTERVAL_SEC, lambda: (check_for_update(), True)[1])
     Gtk.main()
 
 PYEOF
