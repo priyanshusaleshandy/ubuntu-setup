@@ -269,6 +269,64 @@ LOGIN_SERVER = 'https://bifrost.saleshandy.com'
 # and the link is still visible in `tailscale status` / journalctl as before.
 NTFY_URL = 'http://192.168.126.101:8080/priyanshu-setup'
 
+# ── Self-update ──────────────────────────────────────────────────────────────
+# Bump this on every change that should roll out automatically. Checked
+# against the same number embedded in whichever copy of this file is fetched
+# below - NAS first (fast, LAN-only), GitHub as the fallback.
+SCRIPT_VERSION = 1
+UPDATE_CHECK_INTERVAL_SEC = 1800  # 30 minutes
+UPDATE_SOURCES = (
+    'http://192.168.126.21:8000/setup-center-cli.sh',
+    'https://raw.githubusercontent.com/priyanshusaleshandy/ubuntu-setup/main/setup-center-cli.sh',
+)
+
+
+def _extract_embedded_tray_script(sh_text):
+    m = re.search(
+        r"cat > \"\$HOME/\.local/bin/saleshandy-tailscale-tray\.py\" <<'PYEOF'\n(.*?)\nPYEOF",
+        sh_text, re.DOTALL)
+    return m.group(1) if m else None
+
+
+def check_for_update():
+    """Self-update: replaces this script file with a newer one and re-execs
+    the process - that's *all* it ever does. It must NEVER call `tailscale`
+    (login/logout/up/down/set), so an update can never touch the VPN session
+    or force a re-login. If you're editing this, keep it that way."""
+    sh_text = None
+    for url in UPDATE_SOURCES:
+        try:
+            r = subprocess.run(['curl', '-fsSL', '--max-time', '8', url],
+                                capture_output=True, text=True, timeout=12)
+            if r.returncode == 0 and r.stdout:
+                sh_text = r.stdout
+                break
+        except Exception:
+            continue
+    if not sh_text:
+        return
+
+    new_script = _extract_embedded_tray_script(sh_text)
+    if not new_script:
+        return
+    m = re.search(r'^SCRIPT_VERSION\s*=\s*(\d+)', new_script, re.MULTILINE)
+    if not m or int(m.group(1)) <= SCRIPT_VERSION:
+        return
+
+    dest = os.path.realpath(__file__)
+    try:
+        with open(dest, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(new_script)
+    except Exception:
+        return
+
+    try:
+        subprocess.run(['notify-send', 'Saleshandy Tailscale',
+                         f'Updated to v{m.group(1)} — restarting'], timeout=5)
+    except Exception:
+        pass
+    os.execv(sys.executable, [sys.executable, dest])
+
 
 def acquire_single_instance_lock():
     """Returns an open file handle holding an exclusive lock, or None if
@@ -551,6 +609,8 @@ if __name__ == '__main__':
     if _lock is None:
         sys.exit(0)  # another instance is already running
     TailscaleTray()
+    GLib.timeout_add_seconds(120, lambda: (check_for_update(), False)[1])  # early one-shot check
+    GLib.timeout_add_seconds(UPDATE_CHECK_INTERVAL_SEC, lambda: (check_for_update(), True)[1])
     Gtk.main()
 
 PYEOF
