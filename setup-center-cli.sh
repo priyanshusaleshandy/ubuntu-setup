@@ -502,7 +502,11 @@ class TailscaleTray:
 
         url = None
         for line in proc.stdout:
-            m = re.search(r'https://\S+', line)
+            # Only match an actual registration link (always has /register/ in
+            # the path for this headscale server) - tailscale prints other
+            # https:// mentions (e.g. the control server URL itself) earlier
+            # in the output, and matching any https:// grabbed those instead.
+            m = re.search(r'https://\S+/register/\S+', line)
             if m:
                 url = m.group(0)
                 GLib.idle_add(self._login_url_found, url)
