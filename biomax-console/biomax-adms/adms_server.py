@@ -66,6 +66,50 @@ def extract_hdata_json(body_bytes: bytes):
         return None
 
 
+def _resolve_device_id(sn: str):
+    """Map an iclock device's reported serial number (SN=... in the URL) to
+    our internal device_id, via the devices.serial_number column. Returns
+    None if this SN hasn't been registered yet (e.g. a brand new device
+    whose real SN we haven't seen/recorded until its first push)."""
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    try:
+        row = conn.execute("SELECT device_id FROM devices WHERE serial_number = ?", (sn,)).fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+
+def store_iclock_attendance(device_id: str, pin: str, timestamp: str, status, verify_method):
+    """Standard iclock ATTLOG format: timestamp is 'YYYY-MM-DD HH:MM:SS' -
+    reformat to 'MM/DD/YY HH:MM:SS' to match every other device/path in this
+    system (the Logs date-range filter and CSV export both assume that
+    format), so this doesn't create a second inconsistent date shape."""
+    try:
+        dt = datetime.datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        log_date = dt.strftime("%m/%d/%y %H:%M:%S")
+    except ValueError:
+        log_date = timestamp  # unexpected format - store as-is rather than drop it
+    direction = {"0": "in", "1": "out"}.get(str(status), str(status) if status else "")
+    now = datetime.datetime.now().isoformat()
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    conn.execute("PRAGMA journal_mode=WAL")
+    try:
+        emp = conn.execute(
+            "SELECT employee_name, status FROM employees WHERE employee_code=?", (pin,)
+        ).fetchone()
+        conn.execute(
+            """INSERT OR IGNORE INTO attendance
+               (device_id, user_id, employee_name, employee_status,
+                log_date, direction, verification_mode, synced_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (device_id, pin, emp[0] if emp else None, emp[1] if emp else None,
+             log_date, direction, str(verify_method) if verify_method else None, now),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def store_attendance_punch(device_id: str, user_id: str, io_time: str, io_mode, verify_mode):
     """io_time is YYYYMMDDHHMMSS. Same dedupe key/shape as the direct device-pull
     path (biomax_sync.py) so both sources land in the same place without clashing."""
@@ -186,22 +230,38 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def _store_attlog(self, sn: str, body: str):
+        device_id = _resolve_device_id(sn)
         for line in body.splitlines():
             line = line.strip()
             if not line:
                 continue
             fields = line.split("\t")
+            pin = fields[0] if len(fields) > 0 else None
+            timestamp = fields[1] if len(fields) > 1 else None
+            status = fields[2] if len(fields) > 2 else None
+            verify_method = fields[3] if len(fields) > 3 else None
+
             record = {
                 "received_at": datetime.datetime.now().isoformat(),
                 "device_sn": sn,
-                "pin": fields[0] if len(fields) > 0 else None,
-                "timestamp": fields[1] if len(fields) > 1 else None,
-                "status": fields[2] if len(fields) > 2 else None,
-                "verify_method": fields[3] if len(fields) > 3 else None,
+                "pin": pin,
+                "timestamp": timestamp,
+                "status": status,
+                "verify_method": verify_method,
                 "raw": line,
             }
             with open(ATTLOG_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+            if not device_id:
+                log_raw(f"  ATTLOG from unknown SN={sn} - add it to the devices.serial_number column to store this in the real attendance table")
+                continue
+            if not pin or not timestamp:
+                continue
+            try:
+                store_iclock_attendance(device_id, pin, timestamp, status, verify_method)
+            except Exception as e:
+                log_raw(f"  ERROR storing ATTLOG punch: {e}")
 
     def log_message(self, fmt, *args):
         pass  # suppress default stderr access log; we log to RAW_LOG instead
