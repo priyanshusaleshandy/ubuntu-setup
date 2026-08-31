@@ -1374,251 +1374,288 @@ menu_status() {
     press_enter
 }
 
-# ── Restart Display Driver / Graphics Context ──────────────────────────────────
-restart_display_driver() {
-    log_section "RESTART DISPLAY DRIVER / MANAGER"
-    local session_type="${XDG_SESSION_TYPE:-Unknown}"
-    
-    if [[ "$session_type" == "x11" ]]; then
-        echo -e "  X11 session detected."
-        read -rp "  Do you want to gracefully restart the GNOME Shell? (This won't close apps) (y/N): " conf < /dev/tty
-        if [[ "$conf" =~ ^[Yy]$ ]]; then
-            log_info "Sending restart signal to GNOME Shell..."
-            if busctl --user call org.gnome.Shell /org/gnome/Shell org.gnome.Shell Eval s 'global.reinit_locale(); main.restart();' &>/dev/null; then
-                log_ok "GNOME Shell restart signal sent via busctl."
-            else
-                killall -3 gnome-shell 2>/dev/null
-                log_ok "GNOME Shell restart signal sent via killall."
-            fi
-        fi
+# ── [9] Lid-Close / Suspend Fix ───────────────────────────────────────────────
+# The exact fix that is known to work on HP Victus (Intel iGPU + NVIDIA dGPU):
+#   /etc/default/grub         -> GRUB_CMDLINE_LINUX_DEFAULT gains
+#                                intel_idle.max_cstate=4 nvidia-drm.modeset=1
+#   /etc/systemd/logind.conf  -> HandleLidSwitch=ignore
+# Everything below exists to apply exactly that, and to prove it landed.
+
+LID_GRUB_FILE="/etc/default/grub"
+LID_LOGIND_FILE="/etc/systemd/logind.conf"
+LID_PARAMS="intel_idle.max_cstate=4 nvidia-drm.modeset=1"
+
+# Read GRUB_CMDLINE_LINUX_DEFAULT the same way grub-mkconfig does — by sourcing the
+# file — so single quotes, no quotes and trailing whitespace all parse correctly.
+_lid_grub_value() {
+    ( set +u; . "$LID_GRUB_FILE" >/dev/null 2>&1; printf '%s' "${GRUB_CMDLINE_LINUX_DEFAULT-}" )
+}
+_lid_grub_is_set() {
+    ( set +u; . "$LID_GRUB_FILE" >/dev/null 2>&1; printf '%s' "${GRUB_CMDLINE_LINUX_DEFAULT+SET}" )
+}
+
+# Replace the key in place, or append it if missing. awk (not sed) so the value is
+# always literal — no & / | / backslash surprises.
+_lid_write_grub() {
+    local new_val="$1" tmp rc
+    tmp=$(mktemp) || return 1
+    awk -v v="$new_val" '
+        /^[[:space:]]*GRUB_CMDLINE_LINUX_DEFAULT=/ {
+            if (!done) { print "GRUB_CMDLINE_LINUX_DEFAULT=\"" v "\""; done=1 }
+            next
+        }
+        { print }
+        END { if (!done) print "GRUB_CMDLINE_LINUX_DEFAULT=\"" v "\"" }
+    ' "$LID_GRUB_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+    sudo cp "$tmp" "$LID_GRUB_FILE"
+    rc=$?
+    rm -f "$tmp"
+    return $rc
+}
+
+_lid_write_logind() {
+    local key="$1" val="$2" tmp rc
+    [ -f "$LID_LOGIND_FILE" ] || echo "[Login]" | sudo tee "$LID_LOGIND_FILE" > /dev/null
+    tmp=$(mktemp) || return 1
+    # The "=" in the pattern is what stops HandleLidSwitch from also matching
+    # HandleLidSwitchExternalPower / HandleLidSwitchDocked.
+    awk -v k="$key" -v v="$val" '
+        $0 ~ ("^[[:space:]]*#?[[:space:]]*" k "[[:space:]]*=") {
+            if (!done) { print k "=" v; done=1 }
+            next
+        }
+        { print }
+        END { if (!done) print k "=" v }
+    ' "$LID_LOGIND_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+    sudo cp "$tmp" "$LID_LOGIND_FILE"
+    rc=$?
+    rm -f "$tmp"
+    return $rc
+}
+
+# Drop-ins are applied after the main file, so one of these silently beats any edit
+# to logind.conf. This is the usual reason for "I set it but nothing changed".
+_lid_dropin_overrides() {
+    local d f hits=""
+    for d in /etc/systemd/logind.conf.d /run/systemd/logind.conf.d \
+             /usr/lib/systemd/logind.conf.d /usr/local/lib/systemd/logind.conf.d; do
+        [ -d "$d" ] || continue
+        for f in "$d"/*.conf; do
+            [ -f "$f" ] || continue
+            grep -qE '^[[:space:]]*HandleLidSwitch[[:space:]]*=' "$f" && hits="$hits $f"
+        done
+    done
+    printf '%s' "$hits"
+}
+
+# The value logind is actually enforcing — not what the file claims.
+_lid_effective() {
+    local v
+    v=$(loginctl show-config 2>/dev/null | grep -E '^HandleLidSwitch=' | head -n1 | cut -d= -f2-)
+    if [ -n "$v" ]; then printf '%s' "$v"; else printf 'unknown'; fi
+}
+
+_lid_show_status() {
+    local grub_val cmdline eff dropins missing p f
+    grub_val=$(_lid_grub_value)
+    cmdline=$(cat /proc/cmdline 2>/dev/null)
+
+    echo -e "  ${BOLD}Current state${NC}"
+    echo -e "  ${DIM}--------------------------------------------------------------${NC}"
+
+    missing=""
+    for p in $LID_PARAMS; do
+        [[ " $grub_val " == *" $p "* ]] || missing="$missing $p"
+    done
+    if [ -z "$missing" ]; then
+        echo -e "  GRUB config file  : ${GREEN}both parameters present${NC}"
     else
-        echo -e "  Wayland session (or other non-X11 session) detected: ${YELLOW}${session_type}${NC}"
-        log_warn "Restarting graphics on Wayland requires restarting the Display Manager (which will log you out!)."
+        echo -e "  GRUB config file  : ${YELLOW}missing:${missing}${NC}"
     fi
 
-    # Check for NVIDIA GPU and offer nvidia system services restart
-    if lspci 2>/dev/null | grep -qi nvidia; then
-        echo ""
-        read -rp "  NVIDIA GPU detected. Restart NVIDIA & logind system services? (y/N): " nv_conf < /dev/tty
-        if [[ "$nv_conf" =~ ^[Yy]$ ]]; then
-            log_info "Restarting NVIDIA services..."
-            sudo systemctl restart nvidia-persistenced 2>/dev/null || true
-            sudo systemctl restart systemd-logind 2>/dev/null || true
-            log_ok "NVIDIA system services restarted."
-        fi
+    missing=""
+    for p in $LID_PARAMS; do
+        [[ " $cmdline " == *" $p "* ]] || missing="$missing $p"
+    done
+    if [ -z "$missing" ]; then
+        echo -e "  Running kernel    : ${GREEN}both parameters active${NC}"
+    else
+        echo -e "  Running kernel    : ${YELLOW}not active${missing}${NC} ${DIM}(reboot needed)${NC}"
+    fi
+
+    eff=$(_lid_effective)
+    if [ "$eff" = "ignore" ]; then
+        echo -e "  HandleLidSwitch   : ${GREEN}${eff}${NC} ${DIM}(effective)${NC}"
+    else
+        echo -e "  HandleLidSwitch   : ${YELLOW}${eff}${NC} ${DIM}(effective)${NC}"
+    fi
+
+    dropins=$(_lid_dropin_overrides)
+    if [ -n "$dropins" ]; then
+        echo -e "  Drop-in override  : ${RED}yes${NC}"
+        for f in $dropins; do echo -e "                      ${RED}${f}${NC}"; done
+    fi
+    echo ""
+}
+
+_lid_apply() {
+    log_section "APPLYING LID-CLOSE / SUSPEND FIX"
+
+    # ---- 1. GRUB kernel parameters -------------------------------------------
+    if [ ! -f "$LID_GRUB_FILE" ]; then
+        log_error "$LID_GRUB_FILE not found — this does not look like a GRUB system. Aborting."
+        return 1
+    fi
+
+    local current_val probe
+    current_val=$(_lid_grub_value)
+    probe=$(_lid_grub_is_set)
+    if grep -qE '^[[:space:]]*GRUB_CMDLINE_LINUX_DEFAULT=' "$LID_GRUB_FILE" && [ "$probe" != "SET" ]; then
+        log_error "Could not parse GRUB_CMDLINE_LINUX_DEFAULT in $LID_GRUB_FILE."
+        log_info  "Refusing to write — a bad write here can stop the machine booting cleanly."
+        log_info  "Fix the line by hand first:  sudo nano $LID_GRUB_FILE"
+        return 1
+    fi
+
+    # Drop the params an older version of this menu used to add. They do not fix
+    # this bug, and mem_sleep_default=deep breaks resume on S0ix-only laptops.
+    local kept="" removed="" tok
+    for tok in $current_val; do
+        case "$tok" in
+            intel_idle.max_cstate=*|nvidia-drm.modeset=*)  continue ;;
+            i915.enable_psr=*|mem_sleep_default=*)         removed="$removed $tok" ;;
+            *)                                             kept="$kept $tok" ;;
+        esac
+    done
+    local new_val
+    new_val=$(echo "$kept $LID_PARAMS" | xargs)
+
+    sudo cp "$LID_GRUB_FILE" "${LID_GRUB_FILE}.bak-$(date +%s)"
+    if ! _lid_write_grub "$new_val"; then
+        log_error "Failed to write $LID_GRUB_FILE. Nothing was changed."
+        return 1
+    fi
+
+    # Prove the value we intended is the value the file now yields.
+    local readback
+    readback=$(_lid_grub_value)
+    if [ "$readback" != "$new_val" ]; then
+        log_error "Write-back check failed. Expected:"
+        echo -e "    ${DIM}${new_val}${NC}"
+        log_error "File now reads:"
+        echo -e "    ${DIM}${readback}${NC}"
+        log_warn  "Restore the .bak-* file next to $LID_GRUB_FILE before rebooting."
+        return 1
+    fi
+    log_ok "GRUB parameters set: ${new_val}"
+    [ -n "$removed" ] && log_info "Removed parameters that do not help on this hardware:${removed}"
+
+    log_info "Running update-grub..."
+    if sudo update-grub; then
+        log_ok "update-grub finished."
+    else
+        log_error "update-grub failed — see its output above. Do not reboot until it succeeds."
+        return 1
+    fi
+
+    # ---- 2. logind lid behaviour ---------------------------------------------
+    sudo cp "$LID_LOGIND_FILE" "${LID_LOGIND_FILE}.bak-$(date +%s)" 2>/dev/null
+    _lid_write_logind "HandleLidSwitch" "ignore" && \
+        log_ok "HandleLidSwitch=ignore written to $LID_LOGIND_FILE"
+
+    # Ubuntu splits lid behaviour by power source. If this key exists on this
+    # systemd version it has to be set too, or the fix does nothing while plugged
+    # in — which is how a Victus is normally used.
+    if grep -qE '^[[:space:]]*#?[[:space:]]*HandleLidSwitchExternalPower[[:space:]]*=' "$LID_LOGIND_FILE"; then
+        _lid_write_logind "HandleLidSwitchExternalPower" "ignore" && \
+            log_ok "HandleLidSwitchExternalPower=ignore written (applies while on AC power)."
+    fi
+
+    log_info "Reloading systemd-logind..."
+    sudo systemctl restart systemd-logind 2>/dev/null || sudo systemctl reload systemd-logind 2>/dev/null
+
+    # ---- 3. Verify what actually took effect ----------------------------------
+    echo ""
+    log_section "VERIFICATION"
+    local eff dropins f
+    eff=$(_lid_effective)
+    if [ "$eff" = "ignore" ]; then
+        log_ok "logind is enforcing HandleLidSwitch=ignore. Closing the lid now does nothing."
+    elif [ "$eff" = "unknown" ]; then
+        log_warn "Could not read the effective value — 'loginctl show-config' is not available here."
+        log_info "Check by hand instead:  systemctl show systemd-logind -p HandleLidSwitch"
+    else
+        log_error "logind still reports HandleLidSwitch=${eff} — the file was written but something overrides it."
+    fi
+
+    dropins=$(_lid_dropin_overrides)
+    if [ -n "$dropins" ]; then
+        log_error "These drop-in files override logind.conf and must be edited or removed:"
+        for f in $dropins; do echo -e "    ${YELLOW}${f}${NC}"; done
     fi
 
     echo ""
-    read -rp "  Restart GDM/Display Manager now? (Logs you out immediately) (y/N): " dm_conf < /dev/tty
-    if [[ "$dm_conf" =~ ^[Yy]$ ]]; then
-        log_info "Restarting display manager..."
-        sudo systemctl restart gdm3 2>/dev/null || \
-        sudo systemctl restart gdm 2>/dev/null || \
-        sudo systemctl restart lightdm 2>/dev/null || \
-        log_error "Failed to restart display manager. Please reboot manually."
+    log_warn "The kernel parameters only take effect after a reboot."
+    read -rp "  Reboot now? (y/N): " rb < /dev/tty
+    if [[ "$rb" =~ ^[Yy]$ ]]; then
+        log_info "Rebooting..."
+        sudo reboot
+    else
+        log_info "Reboot later, then reopen this menu — the status block will confirm both parameters are active."
     fi
+    return 0
 }
 
-# ── [9] Suspend/Wake Blinking Screen Fix ──────────────────────────────────────
-menu_wayland() {
+_lid_undo() {
+    log_section "UNDO LID-CLOSE / SUSPEND FIX"
+    local gbak lbak restored=0 conf
+    gbak=$(ls -1t "${LID_GRUB_FILE}".bak-* 2>/dev/null | head -n1)
+    lbak=$(ls -1t "${LID_LOGIND_FILE}".bak-* 2>/dev/null | head -n1)
+
+    if [ -z "$gbak" ] && [ -z "$lbak" ]; then
+        log_warn "No backups found — nothing to undo."
+        return 0
+    fi
+    echo -e "  Will restore:"
+    [ -n "$gbak" ] && echo -e "    ${DIM}${gbak}  ->  ${LID_GRUB_FILE}${NC}"
+    [ -n "$lbak" ] && echo -e "    ${DIM}${lbak}  ->  ${LID_LOGIND_FILE}${NC}"
+    echo ""
+    read -rp "  Continue? (y/N): " conf < /dev/tty
+    if [[ ! "$conf" =~ ^[Yy]$ ]]; then log_info "Cancelled."; return 0; fi
+
+    if [ -n "$gbak" ]; then
+        sudo cp "$gbak" "$LID_GRUB_FILE" && { log_ok "GRUB config restored."; sudo update-grub; restored=1; }
+    fi
+    if [ -n "$lbak" ]; then
+        sudo cp "$lbak" "$LID_LOGIND_FILE" && { log_ok "logind.conf restored."; \
+            sudo systemctl restart systemd-logind 2>/dev/null; restored=1; }
+    fi
+    [ "$restored" -eq 1 ] && log_warn "Reboot to fully revert the kernel parameters."
+    return 0
+}
+
+menu_lid_fix() {
     while true; do
         clear
-        echo -e "${CYAN}${BOLD}=== [9] FIX: SUSPEND/WAKE LOCK SCREEN BLINKING ===${NC}\n"
-        echo -e "  ${DIM}Symptom: after suspend, screen blinks instead of showing lock screen.${NC}"
-        echo -e "  ${DIM}Cause: GDM3 lock screen not syncing properly with the graphics driver.${NC}\n"
+        echo -e "${CYAN}${BOLD}=== [9] FIX LID-CLOSE / SUSPEND (HP VICTUS & NVIDIA LAPTOPS) ===${NC}\n"
+        echo -e "  ${DIM}Symptom: closing the lid suspends badly — screen blinks, stays black,${NC}"
+        echo -e "  ${DIM}or never resumes properly on a hybrid Intel + NVIDIA laptop.${NC}\n"
+        echo -e "  ${DIM}Applies one known-good fix, then verifies it:${NC}"
+        echo -e "  ${DIM}  ${LID_GRUB_FILE}${NC}"
+        echo -e "  ${DIM}    GRUB_CMDLINE_LINUX_DEFAULT += intel_idle.max_cstate=4 nvidia-drm.modeset=1${NC}"
+        echo -e "  ${DIM}  ${LID_LOGIND_FILE}${NC}"
+        echo -e "  ${DIM}    HandleLidSwitch=ignore${NC}\n"
 
-        # Check current running session type
-        local session_type="${XDG_SESSION_TYPE:-Unknown}"
-        echo -e "  Current session type : ${GREEN}${session_type}${NC}"
+        _lid_show_status
 
-        # Find display manager configuration file path
-        local conf_file="/etc/gdm3/custom.conf"
-        if [ ! -f "$conf_file" ] && [ -f "/etc/gdm/custom.conf" ]; then
-            conf_file="/etc/gdm/custom.conf"
-        fi
-
-        local config_status="Enabled (Default)"
-        if [ -f "$conf_file" ]; then
-            if grep -E -q "^[[:space:]]*WaylandEnable[[:space:]]*=[[:space:]]*false" "$conf_file"; then
-                config_status="Disabled (Forced Xorg/X11)"
-            fi
-        else
-            config_status="No configuration file found"
-        fi
-        echo -e "  GDM Configuration    : ${YELLOW}${config_status}${NC}"
-        echo -e "  Config File Path     : ${conf_file}\n"
-
-        echo -e "  ${BOLD}Try these in order — Step 1 fixes most cases:${NC}"
-        echo -e "  [1] Step 1: Force Xorg/X11 (Disable Wayland) — most effective fix"
-        echo -e "  [2] Step 1b: Enable Wayland (Restore Default / undo Step 1)"
-        echo -e "  [3] Step 2: Restart Display Manager (Apply Changes — Logs you out!)"
-        echo -e "  [4] Step 2b: Enable NVIDIA Suspend/Resume Services (NVIDIA GPUs only)"
-        echo -e "  [5] Step 3: Check & Install System Updates (kernel/driver fixes)"
-        echo -e "  [6] Step 4: Disable Suspend-on-Lid-Close (systemd fix — lock only, never suspend)"
-        echo -e "  ${DIM}--- HP Victus / hybrid NVIDIA laptops (known unresolved kernel bug) ---${NC}"
-        echo -e "  [7] Step 5: Switch to Intel-only Graphics (disable NVIDIA dGPU — avoids the bug entirely)"
-        echo -e "  [8] Step 6: Kernel Parameter Fix (i915.enable_psr=0 + NVIDIA memory-preserve + force S3 sleep)"
-        echo -e "  [9] Restart Display Driver / Graphics Context (safe if X11, restarts manager if Wayland)"
+        echo -e "  [1] Apply the fix"
+        echo -e "  [2] Undo (restore the last backup)"
         echo -e "  [0] Back\n"
 
         read -rp "  Choice: " ch < /dev/tty
         case "$ch" in
-            1)
-                if [ -f "$conf_file" ]; then
-                    if grep -q "WaylandEnable" "$conf_file"; then
-                        sudo sed -i 's/.*WaylandEnable.*/WaylandEnable=false/' "$conf_file"
-                    else
-                        sudo sed -i '/\[daemon\]/a WaylandEnable=false' "$conf_file"
-                    fi
-                    log_ok "Wayland disabled (forced Xorg/X11). Now do Step 2 (restart display manager) or reboot to apply."
-                else
-                    log_error "GDM configuration file not found!"
-                fi
-                press_enter ;;
-            2)
-                if [ -f "$conf_file" ]; then
-                    if grep -q "WaylandEnable" "$conf_file"; then
-                        sudo sed -i 's/.*WaylandEnable.*/#WaylandEnable=false/' "$conf_file"
-                    fi
-                    log_ok "Wayland enabled (restored default). Restart GDM to apply."
-                else
-                    log_error "GDM configuration file not found!"
-                fi
-                press_enter ;;
-            3)
-                echo ""
-                read -rp "  This will instantly close your desktop and log you out. Continue? (y/N): " conf < /dev/tty
-                if [[ "$conf" =~ ^[Yy]$ ]]; then
-                    log_info "Restarting display manager..."
-                    sudo systemctl restart gdm3 2>/dev/null || \
-                    sudo systemctl restart gdm 2>/dev/null || \
-                    sudo systemctl restart lightdm 2>/dev/null || \
-                    log_error "Failed to restart display manager. Please reboot manually."
-                else
-                    log_info "Cancelled."
-                fi
-                press_enter ;;
-            4)
-                if lspci 2>/dev/null | grep -qi nvidia; then
-                    log_info "NVIDIA GPU detected. Enabling suspend/resume services..."
-                    sudo systemctl enable nvidia-suspend.service 2>/dev/null && log_ok "nvidia-suspend.service enabled." || log_warn "nvidia-suspend.service not found (driver may not provide it)."
-                    sudo systemctl enable nvidia-resume.service 2>/dev/null && log_ok "nvidia-resume.service enabled." || log_warn "nvidia-resume.service not found (driver may not provide it)."
-                else
-                    log_warn "No NVIDIA GPU detected — this step is not needed on this machine."
-                fi
-                press_enter ;;
-            5)
-                log_info "Checking for system updates..."
-                sudo apt-get update -y
-                local upgradable
-                upgradable=$(apt list --upgradable 2>/dev/null | grep -vc "^Listing...")
-                if [[ "$upgradable" -gt 0 ]]; then
-                    log_warn "$upgradable package(s) can be upgraded."
-                    read -rp "  Install all updates now? (y/N): " conf < /dev/tty
-                    if [[ "$conf" =~ ^[Yy]$ ]]; then
-                        sudo apt-get upgrade -y
-                        log_ok "Updates installed. Reboot recommended to apply kernel/driver updates."
-                    fi
-                else
-                    log_ok "System is already up to date."
-                fi
-                press_enter ;;
-            6)
-                echo ""
-                echo -e "  ${DIM}This edits /etc/systemd/logind.conf (the authoritative, most reliable${NC}"
-                echo -e "  ${DIM}method — more dependable than the GNOME Tweaks toggle, which many${NC}"
-                echo -e "  ${DIM}users report doesn't actually work). Sets HandleLidSwitch=lock, so${NC}"
-                echo -e "  ${DIM}closing the lid locks the screen WITHOUT ever suspending — no more blink.${NC}\n"
-                log_warn "This disables real suspend on lid-close entirely."
-                read -rp "  Apply this fix? (y/N): " conf < /dev/tty
-                if [[ "$conf" =~ ^[Yy]$ ]]; then
-                    local logind_conf="/etc/systemd/logind.conf"
-                    sudo cp "$logind_conf" "${logind_conf}.bak-$(date +%s)" 2>/dev/null
-                    if grep -q "^#*HandleLidSwitch=" "$logind_conf" 2>/dev/null; then
-                        sudo sed -i 's/^#*HandleLidSwitch=.*/HandleLidSwitch=lock/' "$logind_conf"
-                    else
-                        echo "HandleLidSwitch=lock" | sudo tee -a "$logind_conf" > /dev/null
-                    fi
-                    sudo systemctl restart systemd-logind
-                    log_ok "Lid-close now locks the screen only — never suspends. No more blinking on wake."
-                    log_info "(Backup saved as ${logind_conf}.bak-*. To undo: set HandleLidSwitch=suspend and restart systemd-logind.)"
-                    
-                    echo ""
-                    read -rp "  Do you want to restart the display manager / graphics driver now to apply changes? (y/N): " r_conf < /dev/tty
-                    if [[ "$r_conf" =~ ^[Yy]$ ]]; then
-                        restart_display_driver
-                    fi
-                else
-                    log_info "Cancelled."
-                fi
-                press_enter ;;
-            7)
-                echo ""
-                echo -e "  ${DIM}HP Victus / hybrid-graphics laptops often fail to resume because the${NC}"
-                echo -e "  ${DIM}NVIDIA dGPU itself doesn't come back from sleep properly. Running on the${NC}"
-                echo -e "  ${DIM}Intel iGPU only sidesteps the bug entirely (you lose dGPU performance${NC}"
-                echo -e "  ${DIM}for gaming/rendering, but suspend/resume becomes reliable).${NC}\n"
-                log_warn "This disables the NVIDIA GPU for normal use. A reboot is required after."
-                read -rp "  Switch to Intel-only graphics? (y/N): " conf < /dev/tty
-                if [[ "$conf" =~ ^[Yy]$ ]]; then
-                    if ! command -v prime-select &>/dev/null; then
-                        log_info "Installing nvidia-prime..."
-                        sudo apt-get install -y nvidia-prime
-                    fi
-                    if command -v prime-select &>/dev/null; then
-                        sudo prime-select intel
-                        log_ok "Switched to Intel-only graphics. Reboot to apply. Run 'sudo prime-select nvidia' anytime to switch back."
-                    else
-                        log_error "prime-select not available — this system may not have NVIDIA Optimus/PRIME support."
-                    fi
-                else
-                    log_info "Cancelled."
-                fi
-                press_enter ;;
-            8)
-                echo ""
-                echo -e "  ${DIM}This applies 3 known fixes for HP Victus/hybrid-NVIDIA suspend bugs:${NC}"
-                echo -e "  ${DIM}  1. i915.enable_psr=0 — disables Intel Panel Self-Refresh (common blink cause)${NC}"
-                echo -e "  ${DIM}  2. mem_sleep_default=deep — forces real S3 sleep instead of buggy 'modern standby'${NC}"
-                echo -e "  ${DIM}  3. NVIDIA driver memory-preserve options — smoother dGPU resume${NC}\n"
-                log_warn "This edits GRUB boot settings. A reboot is required to take effect."
-                read -rp "  Apply these kernel parameter fixes? (y/N): " conf < /dev/tty
-                if [[ "$conf" =~ ^[Yy]$ ]]; then
-                    local grub_file="/etc/default/grub"
-                    if [ -f "$grub_file" ]; then
-                        sudo cp "$grub_file" "${grub_file}.bak-$(date +%s)"
-                        local current_val
-                        current_val=$(grep '^GRUB_CMDLINE_LINUX_DEFAULT=' "$grub_file" | sed -E 's/^GRUB_CMDLINE_LINUX_DEFAULT="(.*)"$/\1/')
-                        for p in "i915.enable_psr=0" "mem_sleep_default=deep"; do
-                            [[ "$current_val" != *"$p"* ]] && current_val="$current_val $p"
-                        done
-                        current_val=$(echo "$current_val" | xargs)
-                        local new_line="GRUB_CMDLINE_LINUX_DEFAULT=\"$current_val\""
-                        if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$grub_file"; then
-                            sudo sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|$new_line|" "$grub_file"
-                        else
-                            echo "$new_line" | sudo tee -a "$grub_file" > /dev/null
-                        fi
-                        sudo update-grub
-                        log_ok "Kernel parameters added (backup saved as ${grub_file}.bak-*)."
-                    else
-                        log_error "GRUB config not found at $grub_file — is this a GRUB-based system?"
-                    fi
-
-                    if lspci 2>/dev/null | grep -qi nvidia; then
-                        echo 'options nvidia NVreg_PreserveVideoMemoryAllocations=1 NVreg_TemporaryFilePath=/var/tmp' | \
-                            sudo tee /etc/modprobe.d/nvidia-power-management.conf > /dev/null
-                        sudo update-initramfs -u 2>/dev/null || true
-                        log_ok "NVIDIA memory-preserve driver options added."
-                    fi
-                    log_warn "Reboot now for these changes to take effect."
-                else
-                    log_info "Cancelled."
-                fi
-                press_enter ;;
-            9)
-                restart_display_driver
-                press_enter ;;
+            1) _lid_apply; press_enter ;;
+            2) _lid_undo;  press_enter ;;
             0) return ;;
             *) log_warn "Invalid choice." ;;
         esac
@@ -1911,7 +1948,7 @@ while true; do
     echo -e "  ${BOLD}[6]${NC} System Config         — hostname & git setup"
     echo -e "  ${BOLD}[7]${NC} Create Onboarding User"
     echo -e "  ${BOLD}[8]${NC} Time Doctor Setup     — check, install, uninstall"
-    echo -e "  ${BOLD}[9]${NC} Fix Suspend/Wake Blinking Screen — Wayland/GDM3/lid-close fixes"
+    echo -e "  ${BOLD}[9]${NC} Fix Lid-Close / Suspend  — HP Victus & hybrid NVIDIA laptops"
     echo -e "  ${BOLD}[10]${NC} Diagnose WiFi         — fix ? / limited connectivity false warning"
     echo -e "  ${BOLD}[11]${NC} System Toolkit        — swap, docker, xampp, ssh, php, repair, canon"
     echo -e "  ${BOLD}[0]${NC} Exit"
@@ -1927,7 +1964,7 @@ while true; do
         6) menu_sysconfig ;;
         7) menu_create_user ;;
         8) menu_timedoctor ;;
-        9) menu_wayland ;;
+        9) menu_lid_fix ;;
         10) menu_wifi_diagnose ;;
         11) menu_system_toolkit ;;
         0) echo -e "\n  ${CYAN}Goodbye!${NC}\n"; exit 0 ;;
