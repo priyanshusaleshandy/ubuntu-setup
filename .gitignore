@@ -16,3 +16,13 @@ offline-installers/
 .env
 .env.*
 
+# Node projects - dependencies are installed, never committed
+node_modules/
+
+# Live databases and their backups (data, not source)
+*.sqlite
+*.sqlite.bak-*
+data.sqlite*
+
+# Uploaded bills/attachments live on the NAS, not in git
+it-billing-console/uploads/

@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IT Ops — Billing & Renewal Console</title>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h2>CoreLabs IT Ops</h2>
+          <span>Billing & Renewals</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="overview">
+          <span class="icon">📊</span> Overview & Spend
+        </button>
+        <button class="nav-item" data-tab="services">
+          <span class="icon">⏰</span> Renewals & Services
+        </button>
+        <button class="nav-item" data-tab="security">
+          <span class="icon">🛡️</span> Security & Antivirus
+        </button>
+        <button class="nav-item" data-tab="vendors">
+          <span class="icon">🏢</span> Vendor Directory
+        </button>
+        <button class="nav-item" data-tab="mailboxes">
+          <span class="icon">📧</span> Domains & Mailboxes
+        </button>
+        <button class="nav-item" data-tab="payments">
+          <span class="icon">💳</span> Payment History
+        </button>
+        <button class="nav-item" data-tab="worklog">
+          <span class="icon">🛠️</span> Repairs & Site Work
+        </button>
+        <button class="nav-item" data-tab="rentals">
+          <span class="icon">💻</span> RAC Laptops
+        </button>
+        <button class="nav-item" data-tab="company-docs">
+          <span class="icon">📁</span> Company Documents
+        </button>
+        <button class="nav-item" data-tab="import">
+          <span class="icon">📥</span> Import CSV Data
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <span class="icon">⚙️</span> Alert Settings
+        </button>
+      </nav>
+
+      <div class="system-status-widget">
+        <div class="status-indicator online"></div>
+        <div class="status-info">
+          <span class="status-title">Expiry Engine</span>
+          <span class="status-sub">Cron Active (Daily 09:00)</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Action Bar -->
+      <header class="top-header">
+        <h1 id="page-title">Dashboard Overview</h1>
+        <div class="header-actions">
+          <button class="btn btn-secondary" onclick="triggerTestAlert()">🔔 Trigger Alert Check</button>
+          <button class="btn btn-primary" onclick="openModal('service-modal')">➕ Add Contract</button>
+          <button class="btn btn-success" onclick="openModal('vendor-modal')">🏢 Add Vendor</button>
+          <button class="btn btn-outline" onclick="openModal('payment-modal')">💳 Record Payment</button>
+        </div>
+      </header>
+
+      <!-- TAB 1: OVERVIEW & SPEND -->
+      <section id="tab-overview" class="tab-page active">
+        <!-- Expiry Alert Banner -->
+        <div id="expiry-banner" class="alert-banner hidden">
+          <div class="banner-icon">⚠️</div>
+          <div class="banner-content">
+            <h3 id="banner-title">Upcoming Renewals Warning</h3>
+            <p id="banner-desc">You have 0 contracts expiring in the next 30 days.</p>
+          </div>
+          <button class="btn btn-sm btn-dark" onclick="switchTab('services')">View Expiring Items</button>
+        </div>
+
+        <!-- KPI Cards Grid -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-title">Monthly IT Spend (Est.)</div>
+            <div class="kpi-value" id="kpi-monthly-spend">₹0</div>
+            <div class="kpi-sub">Total normalized monthly cost</div>
+          </div>
+          <div class="kpi-card highlight-purple">
+            <div class="kpi-title">Yearly IT Spend (Est.)</div>
+            <div class="kpi-value" id="kpi-yearly-spend">₹0</div>
+            <div class="kpi-sub">Total annual commitment</div>
+          </div>
+          <div class="kpi-card highlight-warning">
+            <div class="kpi-title">Expiring Soon (30 Days)</div>
+            <div class="kpi-value" id="kpi-expiring-soon">0</div>
+            <div class="kpi-sub">Action required</div>
+          </div>
+          <div class="kpi-card highlight-danger">
+            <div class="kpi-title">Expired Contracts</div>
+            <div class="kpi-value" id="kpi-expired">0</div>
+            <div class="kpi-sub">Service disruption risk</div>
+          </div>
+          <div class="kpi-card highlight-success" style="cursor:pointer" onclick="switchTab('mailboxes')">
+            <div class="kpi-title">Domains Tracked</div>
+            <div class="kpi-value" id="kpi-domains">0</div>
+            <div class="kpi-sub" id="kpi-domains-sub">&mdash;</div>
+          </div>
+          <div class="kpi-card" style="cursor:pointer" onclick="switchTab('mailboxes')">
+            <div class="kpi-title">Licensed Seats</div>
+            <div class="kpi-value" id="kpi-seats">0</div>
+            <div class="kpi-sub" id="kpi-seats-sub">&mdash;</div>
+          </div>
+        </div>
+
+        <!-- Charts Container -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Expense Breakdown by Category</h3>
+              <span class="badge">Annual Estimate</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="categoryPieChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Monthly Historical Payments Logged</h3>
+              <span class="badge badge-success">Actual Spend</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="monthlyBarChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: RENEWALS & SERVICES -->
+      <section id="tab-services" class="tab-page">
+        <div class="table-card">
+          <div class="table-header">
+            <div class="filter-group">
+              <input type="text" id="service-search" class="form-input" placeholder="🔍 Search service name, category or vendor...">
+              <select id="service-status-filter" class="form-select">
+                <option value="ALL">All Statuses</option>
+                <option value="Upcoming">Upcoming (Red Tag)</option>
+                <option value="Done">Done (Green Tag)</option>
+                <option value="Auto">Auto Monthly (Blue Tag)</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" onclick="openModal('service-modal')">➕ Add New Contract</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Service / Contract</th>
+                  <th>Vendor</th>
+                  <th>Category</th>
+                  <th>Cost</th>
+                  <th>Billing Cycle</th>
+                  <th>Expiry Date</th>
+                  <th>Auto-Renew</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="services-table-body">
+                <tr><td colspan="9" class="text-center">Loading services...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2b: SECURITY & ANTIVIRUS LICENSES -->
+      <section id="tab-security" class="tab-page">
+        <div class="table-card">
+          <div class="table-header">
+            <input type="text" id="security-search" class="form-input" placeholder="🔍 Search license / product / vendor...">
+            <button class="btn btn-primary" onclick="openAddSecurityLicense()">🛡️ Add License</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>License / Product</th>
+                  <th>Vendor</th>
+                  <th>Cost</th>
+                  <th>Billing Cycle</th>
+                  <th>Expiry Date</th>
+                  <th>Auto-Renew</th>
+                  <th>Status</th>
+                  <th>Notes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="security-table-body">
+                <tr><td colspan="9" class="text-center">Loading security licenses...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: VENDOR DIRECTORY -->
+      <section id="tab-vendors" class="tab-page">
+        <div class="table-card">
+          <div class="table-header">
+            <input type="text" id="vendor-search" class="form-input" placeholder="🔍 Search vendors...">
+            <button class="btn btn-success" onclick="openModal('vendor-modal')">🏢 Add Vendor</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Vendor Name</th>
+                  <th>Category</th>
+                  <th>Contact Person</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Portal Link</th>
+                  <th>Notes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="vendors-table-body">
+                <tr><td colspan="8" class="text-center">Loading vendors...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3b: DOMAINS & MAILBOXES -->
+      <section id="tab-mailboxes" class="tab-page">
+        <div class="table-card">
+          <div class="table-header">
+            <input type="text" id="domain-search" class="form-input" placeholder="🔍 Search domain or admin...">
+            <button class="btn btn-success" onclick="openAddDomain()">🌐 Add Domain</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Primary Domain</th>
+                  <th>Admin</th>
+                  <th>Renewal Date</th>
+                  <th>Cost / Year</th>
+                  <th>Status</th>
+                  <th>Secondary Domains</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="domains-table-body">
+                <tr><td colspan="7" class="text-center">Loading domains...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: PAYMENT HISTORY -->
+      <section id="tab-payments" class="tab-page">
+        <div class="table-card">
+          <div class="table-header">
+            <input type="text" id="payment-search" class="form-input" placeholder="🔍 Search payment logs...">
+            <button class="btn btn-outline" onclick="openModal('payment-modal')">💳 Record Payment</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Service</th>
+                  <th>Vendor</th>
+                  <th>Amount</th>
+                  <th>Method</th>
+                  <th>Invoice No</th>
+                  <th>Notes / Receipt</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="payments-table-body">
+                <tr><td colspan="8" class="text-center">Loading payment history...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: REPAIRS & SITE WORK LOG -->
+      <section id="tab-worklog" class="tab-page">
+        <div class="table-card">
+          <div class="table-header">
+            <div class="filter-group">
+              <input type="text" id="worklog-search" class="form-input" placeholder="🔍 Search title, vendor, route...">
+              <select id="worklog-type-filter" class="form-select">
+                <option value="ALL">All Types</option>
+                <option value="Repair">Repair</option>
+                <option value="Cable">Cable Installation</option>
+                <option value="Other">Other Work</option>
+              </select>
+              <select id="worklog-status-filter" class="form-select">
+                <option value="ALL">All Work Statuses</option>
+                <option value="Pending">Work Pending</option>
+                <option value="Done">Work Done</option>
+              </select>
+              <select id="worklog-bill-status-filter" class="form-select">
+                <option value="ALL">All Payment Statuses</option>
+                <option value="Pending">Payment Pending</option>
+                <option value="Paid">Paid</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" onclick="openWorkLogModal()">🛠️ Add Work Entry</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Date</th>
+                  <th>Title / Route</th>
+                  <th>Vendor</th>
+                  <th>Details</th>
+                  <th>Cost</th>
+                  <th>Work Status</th>
+                  <th>Payment / Bill</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="worklog-table-body">
+                <tr><td colspan="9" class="text-center">Loading work log...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5c: RAC LAPTOPS (hardware taken on rent, billed monthly by the vendor) -->
+      <section id="tab-rentals" class="tab-page">
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-title">Laptops On Rent</div>
+            <div class="kpi-value" id="kpi-rental-count">0</div>
+            <div class="kpi-sub" id="kpi-rental-count-sub">&mdash;</div>
+          </div>
+          <div class="kpi-card highlight-purple">
+            <div class="kpi-title">Monthly Rent</div>
+            <div class="kpi-value" id="kpi-rental-monthly">₹0</div>
+            <div class="kpi-sub" id="kpi-rental-monthly-sub">&mdash;</div>
+          </div>
+          <div class="kpi-card highlight-success">
+            <div class="kpi-title">Last Payment Made</div>
+            <div class="kpi-value" id="kpi-rental-last">&mdash;</div>
+            <div class="kpi-sub" id="kpi-rental-last-sub">No payment recorded yet</div>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <div class="table-header">
+            <input type="text" id="rental-search" class="form-input" placeholder="🔍 Search laptop, model or serial...">
+            <button class="btn btn-primary" onclick="openRentalModal()">💻 Add Rented Laptop</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Laptop</th>
+                  <th>Model / Serial</th>
+                  <th>Monthly Rent</th>
+                  <th>On Rent Since</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="rentals-table-body">
+                <tr><td colspan="7" class="text-center">Loading rented laptops...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-card" style="margin-top:20px;">
+          <div class="table-header">
+            <div>
+              <strong>Bills &amp; Payments</strong>
+              <div class="text-sub" style="font-size:11px;">RAC bills arrive over Gmail from <strong>racwg.com</strong> and are captured automatically as <em>Not paid</em>. Mark one paid once the money actually goes out.</div>
+            </div>
+            <button class="btn btn-primary" onclick="openRentalPaymentModal()">💳 Record Bill / Payment</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Period</th>
+                  <th>Invoice No</th>
+                  <th>Due</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Bill / Proof</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="rental-payments-table-body">
+                <tr><td colspan="9" class="text-center">Loading payments...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5b: COMPANY DOCUMENTS -->
+      <section id="tab-company-docs" class="tab-page">
+        <div class="table-card">
+          <div class="table-header">
+            <input type="text" id="company-doc-search" class="form-input" placeholder="🔍 Search title, category, notes...">
+            <button class="btn btn-primary" onclick="openAddCompanyDoc()">📁 Add Document</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Notes</th>
+                  <th>Files</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="company-docs-table-body">
+                <tr><td colspan="5" class="text-center">Loading company documents...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: IMPORT CSV DATA -->
+      <section id="tab-import" class="tab-page">
+        <div class="card p-4">
+          <h2>📥 Quick CSV Data Importer</h2>
+          <p class="text-sub">Upload your existing spreadsheet (e.g. <code>office-insurance-audit.csv</code>) or paste CSV content below to bulk-import your contracts.</p>
+
+          <div class="form-group my-3">
+            <label>Select CSV File:</label>
+            <input type="file" id="csv-file-input" accept=".csv" class="form-input">
+          </div>
+
+          <div class="form-group my-3">
+            <label>Or Paste CSV Text Directly:</label>
+            <textarea id="csv-paste-area" class="form-input" rows="8" placeholder="Service Name, Category, Cost, Billing Cycle, Expiry Date, Notes&#10;Office Insurance Policy, Office Insurance, 85000, yearly, 2026-08-30, Policy #12345"></textarea>
+          </div>
+
+          <button class="btn btn-primary" onclick="processCSVImport()">🚀 Import CSV Data Now</button>
+          <div id="import-result" class="my-3"></div>
+        </div>
+      </section>
+
+      <!-- TAB 7: ALERT SETTINGS -->
+      <section id="tab-settings" class="tab-page">
+        <div class="card p-4 max-w-700">
+          <h2>⚙️ Automated Alert Credentials & Settings</h2>
+          <p class="text-sub">Configure Email (SMTP) and Telegram bot alerts to receive daily notification pings for expiring items.</p>
+
+          <form id="alert-settings-form">
+            <!-- Email Settings -->
+            <div class="section-divider">
+              <h3>📧 SMTP Email Alerts</h3>
+            </div>
+            <div class="form-group checkbox-group">
+              <input type="checkbox" id="email_enabled">
+              <label for="email_enabled">Enable Automated Email Notifications</label>
+            </div>
+            <div class="form-row">
+              <div class="form-group col-6">
+                <label>SMTP Host</label>
+                <input type="text" id="smtp_host" class="form-input" placeholder="smtp.gmail.com">
+              </div>
+              <div class="form-group col-6">
+                <label>SMTP Port</label>
+                <input type="number" id="smtp_port" class="form-input" value="587">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group col-6">
+                <label>SMTP User / Email</label>
+                <input type="text" id="smtp_user" class="form-input" placeholder="admin@company.com">
+              </div>
+              <div class="form-group col-6">
+                <label>SMTP Password / App Key</label>
+                <input type="password" id="smtp_pass" class="form-input">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Send Alert Notifications To:</label>
+              <input type="email" id="notification_email" class="form-input" placeholder="it-admin@company.com">
+            </div>
+
+            <!-- Telegram Settings -->
+            <div class="section-divider my-4">
+              <h3>✈️ Telegram Bot Alerts</h3>
+            </div>
+            <div class="form-group checkbox-group">
+              <input type="checkbox" id="telegram_enabled">
+              <label for="telegram_enabled">Enable Telegram Alerts</label>
+            </div>
+            <div class="form-group">
+              <label>Telegram Bot Token</label>
+              <input type="text" id="telegram_bot_token" class="form-input" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ">
+            </div>
+            <div class="form-group">
+              <label>Telegram Chat ID</label>
+              <input type="text" id="telegram_chat_id" class="form-input" placeholder="-100123456789">
+            </div>
+
+            <button type="submit" class="btn btn-success my-3">💾 Save Notification Settings</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL 1: ADD / EDIT CONTRACT -->
+  <div id="service-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="service-modal-title">➕ Add New Service / Contract</h3>
+        <button class="modal-close" onclick="closeModal('service-modal')">&times;</button>
+      </div>
+      <form id="service-form">
+        <input type="hidden" id="service-id">
+        <div class="form-group">
+          <label>Service / Contract Name *</label>
+          <input type="text" id="service-name" class="form-input" required placeholder="e.g. AWS Cloud Infra, Office Insurance Policy">
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Vendor</label>
+            <select id="service-vendor-id" class="form-select">
+              <option value="">Select Vendor...</option>
+            </select>
+          </div>
+          <div class="form-group col-6">
+            <label>Category *</label>
+            <select id="service-category" class="form-select" required>
+              <option value="Cloud Servers">Cloud Servers</option>
+              <option value="SaaS Software">SaaS Software</option>
+              <option value="Office Insurance">Office Insurance</option>
+              <option value="Network & ISP">Network & ISP</option>
+              <option value="Hardware & AMC">Hardware & AMC</option>
+              <option value="Antivirus & Security">Antivirus & Security</option>
+              <option value="Domain & SSL">Domain & SSL</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Cost (Amount) *</label>
+            <input type="number" id="service-cost" class="form-input" required placeholder="85000">
+          </div>
+          <div class="form-group col-6">
+            <label>Billing Cycle *</label>
+            <select id="service-cycle" class="form-select" required>
+              <option value="yearly">Yearly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="one-time">One-time</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Start Date</label>
+            <input type="date" id="service-start-date" class="form-input">
+          </div>
+          <div class="form-group col-6">
+            <label>Expiry / Renewal Date *</label>
+            <input type="date" id="service-expiry-date" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="service-auto-renew">
+          <label for="service-auto-renew">Auto-Renewal Enabled</label>
+        </div>
+        <div class="form-group">
+          <label>Notes / Policy Number / PO Details</label>
+          <textarea id="service-notes" class="form-input" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Bill / Invoice / Payment Proof (PDF or Image, select multiple to add several at once)</label>
+          <input type="file" id="service-bill-file" class="form-input" accept=".pdf,image/*" multiple>
+          <div id="service-bill-current" class="text-sub" style="margin-top:6px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('service-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Contract</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: ADD / EDIT VENDOR -->
+  <div id="vendor-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="vendor-modal-title">🏢 Add Vendor Profile</h3>
+        <button class="modal-close" onclick="closeModal('vendor-modal')">&times;</button>
+      </div>
+      <form id="vendor-form">
+        <input type="hidden" id="vendor-id">
+        <div class="form-group">
+          <label>Vendor Name *</label>
+          <input type="text" id="vendor-name" class="form-input" required placeholder="e.g. Cloudflare, Hetzner, National Insurance">
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Category</label>
+            <input type="text" id="vendor-category" class="form-input" placeholder="e.g. Cloud Provider">
+          </div>
+          <div class="form-group col-6">
+            <label>Contact Person</label>
+            <input type="text" id="vendor-contact" class="form-input" placeholder="e.g. Rajesh Sharma">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Support Email</label>
+            <input type="email" id="vendor-email" class="form-input" placeholder="support@vendor.com">
+          </div>
+          <div class="form-group col-6">
+            <label>Support Phone</label>
+            <input type="text" id="vendor-phone" class="form-input" placeholder="+91-9876543210">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Portal URL / Login Link</label>
+          <input type="url" id="vendor-portal" class="form-input" placeholder="https://portal.vendor.com">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="vendor-notes" class="form-input" rows="2"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('vendor-modal')">Cancel</button>
+          <button type="submit" class="btn btn-success">Save Vendor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 3: RECORD PAYMENT -->
+  <div id="payment-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>💳 Log Payment Record</h3>
+        <button class="modal-close" onclick="closeModal('payment-modal')">&times;</button>
+      </div>
+      <form id="payment-form">
+        <div class="form-group">
+          <label>Select Service / Contract</label>
+          <select id="payment-service-id" class="form-select">
+            <option value="">Select Service...</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Amount Paid *</label>
+            <input type="number" id="payment-amount" class="form-input" required placeholder="85000">
+          </div>
+          <div class="form-group col-6">
+            <label>Payment Date *</label>
+            <input type="date" id="payment-date" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Payment Method</label>
+            <select id="payment-method" class="form-select">
+              <option value="Credit Card">Credit Card</option>
+              <option value="Bank Transfer (NEFT)">Bank Transfer (NEFT/RTGS)</option>
+              <option value="Cheque">Cheque</option>
+              <option value="UPI">UPI</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group col-6">
+            <label>Invoice Number</label>
+            <input type="text" id="payment-invoice" class="form-input" placeholder="e.g. INV-2026-991">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes / Receipt Reference</label>
+          <textarea id="payment-note" class="form-input" rows="2" placeholder="e.g. Approved by Finance Team"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('payment-modal')">Cancel</button>
+          <button type="submit" class="btn btn-outline">Record Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 4: ADD / EDIT REPAIR / CABLE / OTHER WORK ENTRY -->
+  <div id="worklog-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="worklog-modal-title">🛠️ Add Work Entry</h3>
+        <button class="modal-close" onclick="closeModal('worklog-modal')">&times;</button>
+      </div>
+      <form id="worklog-form">
+        <input type="hidden" id="worklog-id">
+        <div class="form-group">
+          <label>Work Type *</label>
+          <select id="worklog-type" class="form-select" required onchange="toggleWorkLogFields()">
+            <option value="Repair">🔧 Repair (Laptop / Device)</option>
+            <option value="Cable">🔌 Cable Installation</option>
+            <option value="Other">📋 Other Work</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label id="worklog-title-label">Laptop / Device Name *</label>
+          <input type="text" id="worklog-title" class="form-input" required placeholder="e.g. Dell Latitude - Accounts Team">
+        </div>
+
+        <!-- Repair-only fields -->
+        <div id="worklog-repair-fields">
+          <div class="form-group">
+            <label>Issue</label>
+            <input type="text" id="worklog-issue" class="form-input" placeholder="e.g. Battery not charging, screen flicker">
+          </div>
+          <div class="form-group">
+            <label>Current Condition</label>
+            <input type="text" id="worklog-condition" class="form-input" placeholder="e.g. With vendor for diagnosis, ready for pickup">
+          </div>
+        </div>
+
+        <!-- Cable-only fields -->
+        <div id="worklog-cable-fields">
+          <div class="form-group">
+            <label>Cable Type</label>
+            <select id="worklog-cable-type" class="form-select">
+              <option value="Cat6">Cat6 (LAN)</option>
+              <option value="Cat5e">Cat5e (LAN)</option>
+              <option value="Fiber">Fiber Optic</option>
+              <option value="Coaxial">Coaxial</option>
+              <option value="Power">Power Cable</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label>From Location</label>
+              <input type="text" id="worklog-from" class="form-input" placeholder="e.g. Server Room">
+            </div>
+            <div class="form-group col-6">
+              <label>To Location</label>
+              <input type="text" id="worklog-to" class="form-input" placeholder="e.g. 2nd Floor Cabin 12">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Length (Meters)</label>
+            <input type="number" id="worklog-length" class="form-input" placeholder="e.g. 45">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Vendor Name</label>
+            <input type="text" id="worklog-vendor" class="form-input" placeholder="e.g. Bhawar" value="Bhawar">
+          </div>
+          <div class="form-group col-6">
+            <label>Cost</label>
+            <input type="number" id="worklog-cost" class="form-input" placeholder="e.g. 1500">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Date</label>
+            <input type="date" id="worklog-date" class="form-input">
+          </div>
+          <div class="form-group col-6">
+            <label>Work Status *</label>
+            <select id="worklog-status" class="form-select" required>
+              <option value="Pending">🚨 Pending</option>
+              <option value="Done">✅ Done</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Payment Status *</label>
+          <select id="worklog-bill-status" class="form-select" required>
+            <option value="Pending">💰 Payment Pending</option>
+            <option value="Paid">✅ Paid</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Bill / Invoice / Payment Proof (PDF or Image, select multiple to add several at once)</label>
+          <input type="file" id="worklog-bill-file" class="form-input" accept=".pdf,image/*" multiple>
+          <div id="worklog-bill-current" class="text-sub" style="margin-top:6px;"></div>
+        </div>
+
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="worklog-notes" class="form-input" rows="2"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('worklog-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Work Entry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD / EDIT DOMAIN -->
+  <div id="domain-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="domain-modal-title">🌐 Add Domain</h3>
+        <button class="modal-close" onclick="closeModal('domain-modal')">&times;</button>
+      </div>
+      <form id="domain-form">
+        <input type="hidden" id="domain-id">
+        <div class="form-group">
+          <label>Domain Name *</label>
+          <input type="text" id="domain-name" class="form-input" required placeholder="e.g. krishnabusinesshub.com">
+        </div>
+        <div class="form-group">
+          <label>Type *</label>
+          <select id="domain-type" class="form-select" required onchange="toggleDomainTypeFields()">
+            <option value="Primary">Primary Domain (has its own renewal/contract)</option>
+            <option value="Secondary">Secondary Domain (rides under a primary domain's Workspace)</option>
+          </select>
+        </div>
+        <div class="form-group" id="domain-parent-group">
+          <label>Parent (Primary) Domain *</label>
+          <select id="domain-parent" class="form-select">
+            <option value="">Select primary domain...</option>
+          </select>
+        </div>
+        <div class="form-group" id="domain-service-group">
+          <label>Linked Renewal / Contract (optional)</label>
+          <select id="domain-service" class="form-select">
+            <option value="">None</option>
+          </select>
+        </div>
+        <div class="form-group" id="domain-seats-group">
+          <label>Total Licensed Seats (optional)</label>
+          <input type="number" id="domain-seats" class="form-input" placeholder="e.g. 111">
+        </div>
+        <div class="form-group">
+          <label>Admin (who administers this domain's account)</label>
+          <input type="text" id="domain-admin" class="form-input" placeholder="e.g. leo@humbersolutions.com">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="domain-notes" class="form-input" rows="2"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('domain-modal')">Cancel</button>
+          <button type="submit" class="btn btn-success">Save Domain</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: PRIMARY DOMAIN DETAIL (renewal info + its secondary domains) -->
+  <div id="domain-detail-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width:820px;">
+      <div class="modal-header">
+        <h3 id="domain-detail-title">🌐 Domain</h3>
+        <button class="modal-close" onclick="closeModal('domain-detail-modal')">&times;</button>
+      </div>
+      <div id="domain-detail-renewal-card" class="card p-4 my-3" style="background:#0f172a;"></div>
+
+      <div id="domain-detail-mailboxes-wrap">
+      <div class="table-header" style="margin-bottom:12px;">
+        <span style="font-weight:600;">Mailboxes directly on this domain</span>
+        <input type="text" id="domain-detail-mailbox-search" class="form-input" style="max-width:280px;margin-left:auto;margin-right:12px;" placeholder="🔍 Search email or name...">
+        <button class="btn btn-sm btn-success" id="domain-detail-add-mailbox-btn">📧 Add Mailbox</button>
+      </div>
+      <div class="table-responsive" style="margin-bottom:24px;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Email Address</th>
+              <th>Status</th>
+              <th>Purpose</th>
+              <th>Current User</th>
+              <th>Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="domain-detail-mailboxes-body"></tbody>
+        </table>
+      </div>
+      </div>
+
+      <div class="table-header" style="margin-bottom:12px;">
+        <span style="font-weight:600;">Secondary domains under this account</span>
+        <button class="btn btn-sm btn-success" id="domain-detail-add-secondary-btn">🌐 Add Secondary Domain</button>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Domain</th>
+              <th>Mailboxes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="domain-detail-secondary-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SECONDARY DOMAIN MAILBOXES (opens when a secondary domain row is clicked) -->
+  <div id="subdomain-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width:780px;">
+      <div class="modal-header">
+        <h3 id="subdomain-title">🌐 Domain</h3>
+        <button class="modal-close" onclick="closeModal('subdomain-modal')">&times;</button>
+      </div>
+      <div id="subdomain-mailboxes-wrap">
+      <div class="table-header" style="margin-bottom:12px;">
+        <span style="font-weight:600;">Mailboxes under this domain</span>
+        <button class="btn btn-sm btn-success" id="subdomain-add-mailbox-btn">📧 Add Mailbox</button>
+      </div>
+      <div class="table-responsive" style="margin-bottom:24px;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Email Address</th>
+              <th>Status</th>
+              <th>Purpose</th>
+              <th>Current User</th>
+              <th>Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="subdomain-mailboxes-body"></tbody>
+        </table>
+      </div>
+      </div>
+
+      <div id="subdomain-children-wrap" style="display:none;">
+        <div class="table-header" style="margin-bottom:12px;">
+          <span style="font-weight:600;">Domains grouped under this</span>
+          <button class="btn btn-sm btn-success" id="subdomain-add-child-btn">🌐 Add Domain Here</button>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Domain</th>
+                <th>Mailboxes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="subdomain-children-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD / EDIT MAILBOX -->
+  <div id="mailbox-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="mailbox-modal-title">📧 Add Mailbox</h3>
+        <button class="modal-close" onclick="closeModal('mailbox-modal')">&times;</button>
+      </div>
+      <form id="mailbox-form">
+        <input type="hidden" id="mailbox-id">
+        <div class="form-group">
+          <label>Email Address *</label>
+          <input type="email" id="mailbox-email" class="form-input" required placeholder="e.g. raj@mysaleshandy.com">
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Status</label>
+            <select id="mailbox-status" class="form-select">
+              <option value="Active">✅ Active</option>
+              <option value="Inactive">❌ Inactive</option>
+            </select>
+          </div>
+          <div class="form-group col-6">
+            <label>Current User</label>
+            <input type="text" id="mailbox-current-user" class="form-input" placeholder="e.g. Mohit Nirmal, Sales">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Purpose</label>
+          <input type="text" id="mailbox-purpose" class="form-input" placeholder="e.g. Link Building Outreach">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="mailbox-notes" class="form-input" rows="2"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('mailbox-modal')">Cancel</button>
+          <button type="submit" class="btn btn-success">Save Mailbox</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 5: ADD / EDIT COMPANY DOCUMENT -->
+  <div id="company-doc-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="company-doc-modal-title">📁 Add Company Document</h3>
+        <button class="modal-close" onclick="closeModal('company-doc-modal')">&times;</button>
+      </div>
+      <form id="company-doc-form">
+        <input type="hidden" id="company-doc-id">
+        <div class="form-group">
+          <label>Title *</label>
+          <input type="text" id="company-doc-title" class="form-input" required placeholder="e.g. GST Registration Certificate, Fire Safety NOC">
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="company-doc-category" class="form-select">
+            <option value="Certificate">Certificate</option>
+            <option value="Registration / License">Registration / License</option>
+            <option value="Compliance / Legal">Compliance / Legal</option>
+            <option value="Insurance">Insurance</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="company-doc-notes" class="form-input" rows="2" placeholder="e.g. Issued by, validity, reference no."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Files (PDF or Image, select multiple to add several at once)</label>
+          <input type="file" id="company-doc-file" class="form-input" accept=".pdf,image/*" multiple>
+          <div id="company-doc-current" class="text-sub" style="margin-top:6px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('company-doc-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Document</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="rental-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="rental-modal-title">💻 Add Rented Laptop</h3>
+        <button class="modal-close" onclick="closeModal('rental-modal')">&times;</button>
+      </div>
+      <form id="rental-form">
+        <input type="hidden" id="rental-id">
+        <div class="form-row">
+            <div class="form-group col-6">
+              <label>Laptop Name / Tag *</label>
+              <input type="text" id="rental-asset-name" class="form-input" required placeholder="e.g. RAC-01">
+            </div>
+            <div class="form-group col-6">
+              <label>Vendor</label>
+              <input type="text" id="rental-vendor" class="form-input" value="RAC">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-6">
+              <label>Model</label>
+              <input type="text" id="rental-model" class="form-input" placeholder="e.g. Dell Latitude 5420, i5 / 16GB">
+            </div>
+            <div class="form-group col-6">
+              <label>Serial No</label>
+              <input type="text" id="rental-serial" class="form-input">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-6">
+              <label>Monthly Rent (₹)</label>
+              <input type="number" step="0.01" id="rental-monthly" class="form-input">
+            </div>
+            <div class="form-group col-6">
+              <label>On Rent Since</label>
+              <input type="date" id="rental-start" class="form-input">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-6">
+              <label>Returned On</label>
+              <input type="date" id="rental-end" class="form-input">
+            </div>
+            <div class="form-group col-6">
+              <label>Status</label>
+              <select id="rental-status" class="form-select">
+                <option value="On Rent">On Rent</option>
+                <option value="Returned">Returned</option>
+              </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-6">
+              <label>Gmail Thread Link</label>
+              <input type="url" id="rental-gmail" class="form-input" placeholder="https://mail.google.com/mail/u/0/#inbox/...">
+            </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="rental-notes" class="form-input" rows="2" placeholder="Condition, accessories handed over, agreement terms..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('rental-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Laptop</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="rental-payment-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="rental-payment-modal-title">💳 Record Payment</h3>
+        <button class="modal-close" onclick="closeModal('rental-payment-modal')">&times;</button>
+      </div>
+      <form id="rental-payment-form">
+        <input type="hidden" id="rental-payment-id">
+        <div class="form-row">
+            <div class="form-group col-6">
+              <label>Amount (₹) *</label>
+              <input type="number" step="0.01" id="rental-payment-amount" class="form-input" required>
+            </div>
+            <div class="form-group col-6">
+              <label>Bill / Payment Date *</label>
+              <input type="date" id="rental-payment-date" class="form-input" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-6">
+              <label>Billing Period</label>
+              <input type="text" id="rental-payment-period" class="form-input" placeholder="e.g. Aug 2026">
+            </div>
+            <div class="form-group col-6">
+              <label>Invoice No</label>
+              <input type="text" id="rental-payment-invoice" class="form-input">
+            </div>
+            <div class="form-group col-6">
+              <label>Due Date</label>
+              <input type="date" id="rental-payment-due" class="form-input">
+            </div>
+            <div class="form-group col-6">
+              <label>Paid On</label>
+              <input type="date" id="rental-payment-paidon" class="form-input">
+            </div>
+            <div class="form-group col-6">
+              <label>Amount Actually Paid (₹)</label>
+              <input type="number" step="0.01" id="rental-payment-paidamt" class="form-input" placeholder="only if it differs — e.g. after TDS">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-6">
+              <label>Status</label>
+              <select id="rental-payment-status" class="form-select">
+                <option value="Pending">Bill received - not paid yet</option>
+                <option value="Paid">Paid</option>
+              </select>
+            </div>
+            <div class="form-group col-6">
+              <label>Payment Method</label>
+              <input type="text" id="rental-payment-method" class="form-input" placeholder="NEFT / UPI / Cheque">
+            </div>
+            <div class="form-group col-6">
+              <label>Against Laptop</label>
+              <select id="rental-payment-asset" class="form-select">
+                <option value="">All laptops (single invoice)</option>
+              </select>
+            </div>
+        </div>
+        <div class="form-group">
+          <label>Gmail Thread Link (where the bill came in)</label>
+          <input type="url" id="rental-payment-gmail" class="form-input" placeholder="https://mail.google.com/mail/u/0/#inbox/...">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="rental-payment-notes" class="form-input" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Bill &amp; Payment Proof (PDF or image — pick several at once to add both)</label>
+          <input type="file" id="rental-payment-bill-file" class="form-input" accept=".pdf,image/*" multiple>
+          <div id="rental-payment-current" class="text-sub" style="margin-top:6px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('rental-payment-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

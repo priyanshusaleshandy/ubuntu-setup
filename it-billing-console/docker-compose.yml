@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  it-billing-console:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: it-billing-console
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data.sqlite:/app/data.sqlite
+      - ./uploads:/app/uploads
+      # NAS (SMB share, mounted on the host at ~/nas-documents) - bill copies
+      # land in Documents/<Vendor>/ under here automatically.
+      - /Users/admin/nas-documents:/mnt/nas-docs
+      # Google Drive mount - not set up yet, add once rclone mount is ready:
+      # - /path/to/gdrive-mount:/mnt/gdrive-docs
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      # Without this the container runs UTC: the "daily 09:00" renewal cron fired
+      # at 14:30 IST, and any date derived after midnight was a day behind.
+      - TZ=Asia/Kolkata
+      - NAS_DOCS_DIR=/mnt/nas-docs
+      # - GDRIVE_DOCS_DIR=/mnt/gdrive-docs
