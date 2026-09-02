@@ -139,29 +139,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "6e9b4fa3-7ddd-4699-9a58-ee34890ee7b1",
-    "activeVersionId": "6e9b4fa3-7ddd-4699-9a58-ee34890ee7b1",
+    "versionId": "0bbc5086-a96a-4fa9-bbd4-0e65988eceef",
+    "activeVersionId": null,
     "versionCounter": 3,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-26T18:54:31.791Z",
-        "createdAt": "2026-08-26T18:54:31.791Z",
+        "updatedAt": "2026-09-01T18:28:01.336Z",
+        "createdAt": "2026-09-01T18:28:01.336Z",
         "role": "workflow:owner",
         "workflowId": "Ncx7r0VcoxUfO6hF",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -515,29 +515,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": {},
-    "versionId": "560cb2b6-1318-461d-a26c-377302fb83dc",
-    "activeVersionId": "560cb2b6-1318-461d-a26c-377302fb83dc",
+    "versionId": "a78cf532-64e5-4c0f-bbc8-81e4f104b1ed",
+    "activeVersionId": null,
     "versionCounter": 10,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-27T07:31:43.647Z",
-        "createdAt": "2026-08-27T07:31:43.647Z",
+        "updatedAt": "2026-09-01T18:28:01.338Z",
+        "createdAt": "2026-09-01T18:28:01.338Z",
         "role": "workflow:owner",
         "workflowId": "t4Pui7NwhNkRoabs",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -637,29 +637,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "5920c6d3-10c8-4bb3-aad3-6a8a7cffd261",
-    "activeVersionId": "5920c6d3-10c8-4bb3-aad3-6a8a7cffd261",
+    "versionId": "c857e13b-b867-41fb-ba99-507f583149ce",
+    "activeVersionId": null,
     "versionCounter": 2,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-27T07:52:30.843Z",
-        "createdAt": "2026-08-27T07:52:30.843Z",
+        "updatedAt": "2026-09-01T18:28:01.339Z",
+        "createdAt": "2026-09-01T18:28:01.339Z",
         "role": "workflow:owner",
         "workflowId": "qZ3Gn6zzCACqfweL",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -1720,29 +1720,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "426d7b26-2abc-466a-acf2-c92cb991b5c3",
-    "activeVersionId": "426d7b26-2abc-466a-acf2-c92cb991b5c3",
+    "versionId": "314edc62-c4d0-4d23-9b93-1847249cf599",
+    "activeVersionId": null,
     "versionCounter": 7,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-28T19:44:10.153Z",
-        "createdAt": "2026-08-28T19:44:10.153Z",
+        "updatedAt": "2026-09-01T18:28:01.341Z",
+        "createdAt": "2026-09-01T18:28:01.341Z",
         "role": "workflow:owner",
         "workflowId": "shSheetSync001",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -2180,29 +2180,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "49195926-d825-435d-b7fe-24b32f01cfbc",
-    "activeVersionId": "49195926-d825-435d-b7fe-24b32f01cfbc",
+    "versionId": "42ddbb91-8ca4-4b06-a4c0-4e890e6c385a",
+    "activeVersionId": null,
     "versionCounter": 4,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-28T20:43:08.190Z",
-        "createdAt": "2026-08-28T20:43:08.190Z",
+        "updatedAt": "2026-09-01T18:28:01.343Z",
+        "createdAt": "2026-09-01T18:28:01.343Z",
         "role": "workflow:owner",
         "workflowId": "newJoinersAuto",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -2655,29 +2655,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "ece4bd48-ac22-468c-8214-97cc04f95125",
-    "activeVersionId": "ece4bd48-ac22-468c-8214-97cc04f95125",
+    "versionId": "2c67cf15-d495-42ed-b1db-cb1ed1ad4a69",
+    "activeVersionId": null,
     "versionCounter": 5,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-28T20:45:14.799Z",
-        "createdAt": "2026-08-28T20:45:14.799Z",
+        "updatedAt": "2026-09-01T18:28:01.344Z",
+        "createdAt": "2026-09-01T18:28:01.344Z",
         "role": "workflow:owner",
         "workflowId": "krishnaSheetSync",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -3059,29 +3059,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "2db47570-d8b6-4518-be0c-ee93221a3e49",
-    "activeVersionId": "2db47570-d8b6-4518-be0c-ee93221a3e49",
+    "versionId": "1964f6f6-31cf-4370-8d57-163103d1834c",
+    "activeVersionId": null,
     "versionCounter": 4,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-28T21:18:13.790Z",
-        "createdAt": "2026-08-28T21:18:13.790Z",
+        "updatedAt": "2026-09-01T18:28:01.346Z",
+        "createdAt": "2026-09-01T18:28:01.346Z",
         "role": "workflow:owner",
         "workflowId": "tiSheetSync001",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -3460,29 +3460,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "3ac126b9-5002-41f2-bfb0-0bc1a422526d",
-    "activeVersionId": "3ac126b9-5002-41f2-bfb0-0bc1a422526d",
+    "versionId": "c9593a04-695e-40d9-ab4b-4513b4825443",
+    "activeVersionId": null,
     "versionCounter": 3,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-29T08:01:17.527Z",
-        "createdAt": "2026-08-29T08:01:17.527Z",
+        "updatedAt": "2026-09-01T18:28:01.347Z",
+        "createdAt": "2026-09-01T18:28:01.347Z",
         "role": "workflow:owner",
         "workflowId": "exitSync00001",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -4047,29 +4047,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "3137fbbc-9e4e-4f42-a74f-0330485c31a9",
-    "activeVersionId": "3137fbbc-9e4e-4f42-a74f-0330485c31a9",
+    "versionId": "9db430fc-b497-4219-8442-6bac9b061e75",
+    "activeVersionId": null,
     "versionCounter": 3,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-29T17:47:05.714Z",
-        "createdAt": "2026-08-29T17:47:05.714Z",
+        "updatedAt": "2026-09-01T18:28:01.348Z",
+        "createdAt": "2026-09-01T18:28:01.348Z",
         "role": "workflow:owner",
         "workflowId": "solSheetSync01",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -4516,29 +4516,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "d64675de-024e-4196-a5ae-55a81b02e18a",
-    "activeVersionId": "d64675de-024e-4196-a5ae-55a81b02e18a",
+    "versionId": "0379fb62-8b87-4dce-a3c6-ec04070150b2",
+    "activeVersionId": null,
     "versionCounter": 10,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-31T05:15:42.961Z",
-        "createdAt": "2026-08-31T05:15:42.961Z",
+        "updatedAt": "2026-09-01T18:28:01.350Z",
+        "createdAt": "2026-09-01T18:28:01.350Z",
         "role": "workflow:owner",
         "workflowId": "racBillCapture",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -4988,29 +4988,29 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "53e5e7ba-8574-4f72-9178-6d6b5186b1f1",
-    "activeVersionId": "53e5e7ba-8574-4f72-9178-6d6b5186b1f1",
+    "versionId": "f84cc8ec-222c-4b4b-bb86-e8e0c595799b",
+    "activeVersionId": null,
     "versionCounter": 7,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-08-31T14:38:16.850Z",
-        "createdAt": "2026-08-31T14:38:16.850Z",
+        "updatedAt": "2026-09-01T18:28:01.355Z",
+        "createdAt": "2026-09-01T18:28:01.355Z",
         "role": "workflow:owner",
         "workflowId": "racProofCapture",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],
@@ -5020,7 +5020,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T08:06:39.000Z",
+    "updatedAt": "2026-09-02T07:48:46.000Z",
     "createdAt": "2026-09-01T08:05:36.571Z",
     "id": "syncFailAlert01",
     "name": "Sync Failure Alert",
@@ -5096,29 +5096,824 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "970200dd-af5a-41d2-ad8a-98c263c87b3e",
-    "activeVersionId": "970200dd-af5a-41d2-ad8a-98c263c87b3e",
+    "versionId": "29d77baf-7e21-41a0-b150-0c4e7baed3ea",
+    "activeVersionId": "29d77baf-7e21-41a0-b150-0c4e7baed3ea",
     "versionCounter": 1,
     "triggerCount": 0,
     "sourceWorkflowId": null,
     "tags": [],
     "shared": [
       {
-        "updatedAt": "2026-09-01T08:05:36.572Z",
-        "createdAt": "2026-09-01T08:05:36.572Z",
+        "updatedAt": "2026-09-01T18:28:01.357Z",
+        "createdAt": "2026-09-01T18:28:01.357Z",
         "role": "workflow:owner",
         "workflowId": "syncFailAlert01",
-        "projectId": "yFcgMne9WKGwIb4N",
+        "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
-          "updatedAt": "2026-08-26T17:56:09.462Z",
-          "createdAt": "2026-08-26T17:30:49.815Z",
-          "id": "yFcgMne9WKGwIb4N",
-          "name": "Priyanshu Kumar <priyanshu.k@saleshandy.com>",
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
           "type": "personal",
           "icon": null,
           "description": null,
           "customTelemetryTags": [],
-          "creatorId": "a073991a-9704-43f7-a1e3-6126e7ff7164"
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  },
+  {
+    "updatedAt": "2026-09-02T07:48:44.000Z",
+    "createdAt": "2026-09-01T18:49:37.323Z",
+    "id": "sysBackupNas1",
+    "name": "System Backup to NAS (daily 18:00)",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 18 * * *"
+              }
+            ]
+          }
+        },
+        "id": "b1000000-0000-4000-8000-000000000001",
+        "name": "Daily 18:00 IST",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -440,
+          300
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "b1000000-0000-4000-8000-000000000002",
+        "name": "Run Manually",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          -440,
+          460
+        ]
+      },
+      {
+        "parameters": {
+          "command": "# NOTE: every SSH node in this workflow is a PLAIN command, not an n8n\n# expression. Docker's --format uses Go templates written with double braces,\n# which n8n would try to evaluate as its own expression syntax and blank out.\n# So paths are computed here in shell and handed on through a date file.\n#\n# Date must be IST. `date` on the host with TZ set is correct by construction -\n# no UTC-vs-IST trap like the one that made Exit Sync a day late.\nset -u\nexport PATH=/Applications/Docker.app/Contents/Resources/bin:/usr/local/bin:$PATH\nDATE=$(TZ=Asia/Kolkata date +%F)\nSTAGE=\"/Users/admin/backup-staging/$DATE\"\nrm -rf /Users/admin/backup-staging; mkdir -p \"$STAGE/docker\" \"$STAGE/native\"\nmkdir -p /Users/admin/backup-staging\necho \"$DATE\" > /Users/admin/backup-staging/.date\nINV=\"$STAGE/INVENTORY.tsv\"\nprintf 'kind\\tname\\tsource\\tarchive\\n' > \"$INV\"\n\n# ============================================================\n# DISCOVERY - nothing below is a hardcoded service list.\n# Anything you add later is picked up because it is derived from\n# what Docker actually has, not from a list someone must remember\n# to update. That was the flaw in the first version of this job.\n# ============================================================\nBINDS=/tmp/_bk_binds; PROJDIRS=/tmp/_bk_projdirs; VOLS=/tmp/_bk_vols\n: > $BINDS; : > $PROJDIRS; : > $VOLS\n\nfor c in $(docker ps -aq); do\n  cname=$(docker inspect -f '{{.Name}}' \"$c\" | sed 's#^/##')\n  proj=$(docker inspect -f '{{index .Config.Labels \"com.docker.compose.project\"}}' \"$c\" 2>/dev/null)\n  wdir=$(docker inspect -f '{{index .Config.Labels \"com.docker.compose.project.working_dir\"}}' \"$c\" 2>/dev/null)\n  img=$(docker inspect -f '{{.Config.Image}}' \"$c\" 2>/dev/null)\n  printf 'container\\t%s\\t%s\\t%s\\n' \"$cname\" \"${proj:-standalone}\" \"$img\" >> \"$INV\"\n  docker inspect -f '{{range .Mounts}}{{if eq .Type \"volume\"}}{{println .Name}}{{end}}{{end}}' \"$c\" 2>/dev/null >> $VOLS\n  docker inspect -f '{{range .Mounts}}{{if eq .Type \"bind\"}}{{println .Source}}{{end}}{{end}}' \"$c\" 2>/dev/null >> $BINDS\n  [ -n \"${wdir:-}\" ] && echo \"$wdir\" >> $PROJDIRS\ndone\n\n# Volumes that exist but are attached to nothing still hold data - catch them too.\ndocker volume ls --format '{{.Name}}' >> $VOLS\n# Compose projects that are not running right now would otherwise be invisible.\nls -d /Users/admin/*/docker-compose*.y*ml 2>/dev/null | xargs -n1 dirname 2>/dev/null >> $PROJDIRS\n\nsort -u $VOLS | grep -vE '^[0-9a-f]{64}$' | grep -v '^$' > /tmp/_bk_vols_u\nsort -u $BINDS | grep -v '^$' | grep -vE '^/(var|run|proc|sys|dev)(/|$)' > /tmp/_bk_binds_u\nsort -u $PROJDIRS | grep -v '^$' > /tmp/_bk_projdirs_u\n\necho \"discovered: $(wc -l < /tmp/_bk_vols_u | tr -d ' ') volumes, $(wc -l < /tmp/_bk_binds_u | tr -d ' ') bind paths, $(wc -l < /tmp/_bk_projdirs_u | tr -d ' ') compose dirs\"\n\n# ---- n8n logical export (kept first: it is what rescued the 12 workflows) ----\nif docker ps --format '{{.Names}}' | grep -qx n8n; then\n  docker exec n8n rm -f /home/node/wf.json /home/node/cr.json >/dev/null 2>&1; docker exec n8n n8n export:workflow --all --output=/home/node/wf.json >/dev/null 2>&1 \\\n    && docker cp n8n:/home/node/wf.json \"$STAGE/docker/n8n-workflows.json\" >/dev/null 2>&1 \\\n    && echo \"OK  n8n-workflows.json\" || echo \"WARN n8n workflow export failed\"\n  docker exec n8n n8n export:credentials --all --output=/home/node/cr.json >/dev/null 2>&1 \\\n    && docker cp n8n:/home/node/cr.json \"$STAGE/docker/n8n-credentials.enc.json\" >/dev/null 2>&1 \\\n    && echo \"OK  n8n-credentials.enc.json\" || echo \"WARN n8n credential export failed\"\nfi\n\n# ---- volumes ----\nwhile read -r v; do\n  [ -z \"$v\" ] && continue\n  if docker run --rm -v \"$v\":/from:ro -v \"$STAGE/docker\":/to alpine \\\n       tar czf \"/to/vol-$v.tar.gz\" -C /from . >/dev/null 2>&1; then\n    printf 'volume\\t%s\\t-\\tdocker/vol-%s.tar.gz\\n' \"$v\" \"$v\" >> \"$INV\"; echo \"OK  vol-$v.tar.gz\"\n  else echo \"WARN volume $v failed\"; fi\ndone < /tmp/_bk_vols_u\n\n# ---- bind mounts: stop whichever containers write to the path, then copy ----\nwhile read -r b; do\n  [ -z \"$b\" ] || [ ! -e \"$b\" ] && continue\n  slug=$(echo \"$b\" | sed 's#^/##; s#/#_#g')\n  owners=$(docker ps -q --filter \"volume=$b\")\n  [ -n \"$owners\" ] && docker stop $owners >/dev/null 2>&1\n  if tar czf \"$STAGE/docker/bind-$slug.tar.gz\" -C \"$(dirname \"$b\")\" \"$(basename \"$b\")\" >/dev/null 2>&1; then\n    printf 'bind\\t%s\\t%s\\tdocker/bind-%s.tar.gz\\n' \"$slug\" \"$b\" \"$slug\" >> \"$INV\"; echo \"OK  bind-$slug.tar.gz\"\n  else echo \"WARN bind $b failed\"; fi\n  [ -n \"$owners\" ] && { docker start $owners >/dev/null 2>&1 || echo \"ERROR could not restart containers for $b\"; }\ndone < /tmp/_bk_binds_u\n\n# ---- compose project dirs (compose files, .env, Dockerfiles, source) ----\n# node_modules/.git/data volumes are excluded: reproducible or already captured.\nwhile read -r d; do\n  [ -z \"$d\" ] || [ ! -d \"$d\" ] && continue\n  slug=$(basename \"$d\")\n  if tar czf \"$STAGE/docker/proj-$slug.tar.gz\" -C \"$(dirname \"$d\")\" \\\n       --exclude='node_modules' --exclude='.git' --exclude='*.tar.gz' \\\n       \"$slug\" >/dev/null 2>&1; then\n    printf 'project\\t%s\\t%s\\tdocker/proj-%s.tar.gz\\n' \"$slug\" \"$d\" \"$slug\" >> \"$INV\"; echo \"OK  proj-$slug.tar.gz\"\n  else echo \"WARN project $d failed\"; fi\ndone < /tmp/_bk_projdirs_u\n\n# ============================================================\n# NATIVE (non-Docker) - Hermes, the invoice parser and the 7 cloudflared\n# tunnels are launchd services. The first version of this job did not back\n# them up at all; their plists hold the bot token and tunnel tokens.\n# ============================================================\ntar czf \"$STAGE/native/launchagents.tar.gz\" -C /Users/admin/Library LaunchAgents >/dev/null 2>&1 \\\n  && { printf 'native\\tlaunchagents\\t/Users/admin/Library/LaunchAgents\\tnative/launchagents.tar.gz\\n' >> \"$INV\"; echo \"OK  launchagents.tar.gz\"; } \\\n  || echo \"WARN launchagents failed\"\n\n# Any dir referenced by a LaunchAgent's ProgramArguments is a live service dir.\nfor p in /Users/admin/Library/LaunchAgents/*.plist; do\n  [ -e \"$p\" ] || continue\n  plutil -convert xml1 -o - \"$p\" 2>/dev/null | grep -oE '/Users/admin/[A-Za-z0-9._-]+' \ndone | sort -u > /tmp/_bk_nativedirs\necho \"/Users/admin/bin\" >> /tmp/_bk_nativedirs\nsort -u /tmp/_bk_nativedirs | while read -r nd; do\n  [ -z \"$nd\" ] || [ ! -d \"$nd\" ] && continue\n  slug=$(basename \"$nd\")\n  case \"$slug\" in local-node|Library|cloudflared-bin) continue;; esac\n  if tar czf \"$STAGE/native/$slug.tar.gz\" -C /Users/admin \\\n       --exclude='node_modules' --exclude='*.log' --exclude='packages' --exclude='cache' --exclude='plugins' --exclude='rclone' \"$slug\" >/dev/null 2>&1; then\n    printf 'native\\t%s\\t%s\\tnative/%s.tar.gz\\n' \"$slug\" \"$nd\" \"$slug\" >> \"$INV\"; echo \"OK  native/$slug.tar.gz\"\n  else echo \"WARN native $nd failed\"; fi\ndone\n\n# Docker Desktop's own resource settings - the values that caused the 01-09 outage.\ncp \"/Users/admin/Library/Group Containers/group.com.docker/settings-store.json\" \\\n   \"$STAGE/native/docker-settings-store.json\" 2>/dev/null && echo \"OK  docker-settings-store.json\"\n\n# ---- coverage check: discovered vs captured, so a gap is never silent ----\nDV=$(wc -l < /tmp/_bk_vols_u | tr -d ' '); CV=$(ls \"$STAGE/docker\"/vol-*.tar.gz 2>/dev/null | wc -l | tr -d ' ')\nDB=$(wc -l < /tmp/_bk_binds_u | tr -d ' '); CB=$(ls \"$STAGE/docker\"/bind-*.tar.gz 2>/dev/null | wc -l | tr -d ' ')\nDP=$(wc -l < /tmp/_bk_projdirs_u | tr -d ' '); CP=$(ls \"$STAGE/docker\"/proj-*.tar.gz 2>/dev/null | wc -l | tr -d ' ')\necho \"COVERAGE volumes=$CV/$DV binds=$CB/$DB projects=$CP/$DP\"\n[ \"$CV\" = \"$DV\" ] && [ \"$CB\" = \"$DB\" ] && [ \"$CP\" = \"$DP\" ] || echo \"WARN coverage gap - something discovered was not captured\"\n\nDN=$(ls \"$STAGE/native\"/*.tar.gz 2>/dev/null | wc -l | tr -d \" \")\necho \"COVERAGE-NATIVE archives=$DN\"\n[ \"$DN\" -ge 3 ] || echo \"WARN native coverage low - expected launchagents + hermes-native + invoice-parser + bin\"\necho \"---DOCKER-DONE---\"",
+          "cwd": "/Users/admin",
+          "authentication": "privateKey"
+        },
+        "id": "b1000000-0000-4000-8000-000000000003",
+        "name": "Discover + Backup Host",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          -220,
+          380
+        ],
+        "retryOnFail": true,
+        "maxTries": 2,
+        "waitBetweenTries": 5000,
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "sshMacBackup01",
+            "name": "SSH - IKI-MAC-27 (backup)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "set -u\nDATE=$(cat /Users/admin/backup-staging/.date)\nSTAGE=\"/Users/admin/backup-staging/$DATE\"\nVM=192.168.126.180\nmkdir -p \"$STAGE/omada\" \"$STAGE/biomax\"\nINV=\"$STAGE/INVENTORY.tsv\"\n\n# The VM is a separate host: if it is down this SKIPS rather than fails, so a\n# good host backup still reaches the NAS.\nif ! ssh -o BatchMode=yes -o ConnectTimeout=8 saleshandy@\"$VM\" true 2>/dev/null; then\n  ping -c 1 -t 2 \"$VM\" >/dev/null 2>&1     && echo \"ERROR .180 is UP but SSH key auth FAILED - omada/biomax NOT backed up\"     || echo \"SKIP .180 unreachable - omada/biomax not in this backup\"\n  echo \"---VM-SKIPPED---\"; exit 0\nfi\nif false; then\n  echo \"SKIP .180 unreachable - omada/biomax not in this backup\"\n  echo \"---VM-SKIPPED---\"; exit 0\nfi\n\n# Deliberately does NOT power the VM off - that is the Friday image job.\n# utmctl cannot restart it over SSH, so a daily job must never stop the VM.\n# Services are discovered, not listed: a new service on .180 is picked up.\nssh -o BatchMode=yes -o ConnectTimeout=10 saleshandy@\"$VM\" 'bash -s' <<'REMOTE'\nset -u\nrm -rf /tmp/bk && mkdir -p /tmp/bk\n\nsudo -n systemctl stop tpeap 2>/dev/null || echo \"WARN could not stop tpeap (needs NOPASSWD sudoers rule)\"\ntar czf /tmp/bk/omada-data.tar.gz -C /opt/tplink/EAPController data properties 2>/dev/null \\\n  && echo \"OK  omada-data.tar.gz\" || echo \"WARN omada tar failed\"\nsudo -n systemctl start tpeap 2>/dev/null || echo \"ERROR could not restart tpeap - CHECK OMADA\"\n\n# Discover every non-stock enabled unit and back up whatever directory it runs\n# from, instead of assuming the biomax-* naming stays put.\nsystemctl list-unit-files --state=enabled --no-legend --type=service 2>/dev/null \\\n  | awk '{print $1}' > /tmp/bk/units.txt\ncp /etc/systemd/system/biomax*.service /etc/systemd/system/tpeap*.service /etc/systemd/system/omada*.service /tmp/bk/ 2>/dev/null || true\nfor u in $(cat /tmp/bk/units.txt); do\n  systemctl cat \"$u\" 2>/dev/null | grep -hoE '/home/saleshandy/[A-Za-z0-9._-]+'\ndone | sort -u > /tmp/bk/servicedirs.txt\nwhile read -r d; do\n  [ -d \"$d\" ] || continue\n  tar czf \"/tmp/bk/svc-$(basename \"$d\").tar.gz\" -C /home/saleshandy \\\n    --exclude='*.log' \"$(basename \"$d\")\" 2>/dev/null \\\n    && echo \"OK  svc-$(basename \"$d\").tar.gz\" || echo \"WARN $d failed\"\ndone < /tmp/bk/servicedirs.txt\n\n# biomax.db runs in WAL mode: the main file was 2 days stale while a 4MB -wal\n# held the recent attendance rows, so a plain file copy is NOT a safe backup.\n# The sqlite3 CLI is not installed on this VM, but python3's sqlite3 module\n# ships with Ubuntu and .backup() is a proper online backup.\nfor db in $(find /home/saleshandy -maxdepth 3 -name '*.db' 2>/dev/null); do\n  nm=$(echo \"$db\" | sed 's#^/##; s#/#_#g')\n  if python3 -c \"import sqlite3,sys\ns=sqlite3.connect(sys.argv[1]); t=sqlite3.connect(sys.argv[2])\ns.backup(t); t.close(); s.close()\" \"$db\" \"/tmp/bk/${nm}.bak\" 2>/dev/null && [ -s \"/tmp/bk/${nm}.bak\" ]; then\n    echo \"OK  ${nm}.bak ($(du -h \"/tmp/bk/${nm}.bak\" | cut -f1))\"\n  else\n    echo \"ERROR sqlite online backup FAILED for $db\"\n  fi\ndone\necho \"DBCOUNT $(ls /tmp/bk/*.bak 2>/dev/null | wc -l | tr -d ' ')\"\necho \"VM discovered $(wc -l < /tmp/bk/servicedirs.txt | tr -d ' ') service dirs\"\nREMOTE\n\nscp -o BatchMode=yes -q saleshandy@\"$VM\":'/tmp/bk/omada-*' \"$STAGE/omada/\"  2>/dev/null || true\nscp -o BatchMode=yes -q saleshandy@\"$VM\":'/tmp/bk/svc-*'    \"$STAGE/biomax/\" 2>/dev/null || true\nscp -o BatchMode=yes -q saleshandy@\"$VM\":'/tmp/bk/*.bak'    \"$STAGE/biomax/\" 2>/dev/null || true\nscp -o BatchMode=yes -q saleshandy@\"$VM\":'/tmp/bk/*.service' \"$STAGE/biomax/\" 2>/dev/null || true\nssh -o BatchMode=yes saleshandy@\"$VM\" 'rm -rf /tmp/bk' 2>/dev/null || true\n\nfor f in \"$STAGE/omada\"/* \"$STAGE/biomax\"/*; do\n  [ -e \"$f\" ] || continue\n  printf 'vm\\t%s\\t192.168.126.180\\t%s\\n' \"$(basename \"$f\")\" \"${f#$STAGE/}\" >> \"$INV\"\ndone\nNF=$(ls \"$STAGE/omada\" \"$STAGE/biomax\" 2>/dev/null | grep -c . )\necho \"COVERAGE-VM files=$NF\"\n[ \"$NF\" -gt 0 ] || echo \"ERROR VM stage produced NO files despite .180 being reachable\"\necho \"---VM-DONE---\"",
+          "cwd": "/Users/admin",
+          "authentication": "privateKey"
+        },
+        "id": "b1000000-0000-4000-8000-000000000004",
+        "name": "Backup Omada + BioMax",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          0,
+          380
+        ],
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "sshMacBackup01",
+            "name": "SSH - IKI-MAC-27 (backup)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "set -u\nDATE=$(cat /Users/admin/backup-staging/.date)\nSTAGE=\"/Users/admin/backup-staging/$DATE\"\n\n# RESTORE.sh is generated FROM the inventory, not hand-written. If tomorrow's\n# backup discovers a new stack, the restore script that ships with it already\n# knows how to put that stack back - no one has to remember to edit anything.\ncat > \"$STAGE/RESTORE.sh\" <<'RSH'\n#!/bin/bash\n# Restore this backup onto a Docker host. Run from inside the backup folder.\n# Driven entirely by INVENTORY.tsv, so it restores whatever this backup holds.\nset -u\nHERE=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\nexport PATH=/Applications/Docker.app/Contents/Resources/bin:/usr/local/bin:$PATH\nINV=\"$HERE/INVENTORY.tsv\"\n[ -f \"$INV\" ] || { echo \"INVENTORY.tsv missing\"; exit 1; }\n\necho \"== volumes ==\"\nawk -F'\\t' '$1==\"volume\"{print $2\"\\t\"$4}' \"$INV\" | while IFS=$'\\t' read -r v a; do\n  docker volume create \"$v\" >/dev/null\n  docker run --rm -v \"$v\":/to -v \"$HERE/docker\":/from alpine \\\n    tar xzf \"/from/$(basename \"$a\")\" -C /to && echo \"  $v\"\ndone\n\necho \"== bind mounts ==\"\nawk -F'\\t' '$1==\"bind\"{print $3\"\\t\"$4}' \"$INV\" | while IFS=$'\\t' read -r path a; do\n  mkdir -p \"$(dirname \"$path\")\"\n  tar xzf \"$HERE/$a\" -C \"$(dirname \"$path\")\" && echo \"  $path\"\ndone\n\necho \"== project dirs ==\"\nawk -F'\\t' '$1==\"project\"{print $3\"\\t\"$4}' \"$INV\" | while IFS=$'\\t' read -r path a; do\n  mkdir -p \"$(dirname \"$path\")\"\n  tar xzf \"$HERE/$a\" -C \"$(dirname \"$path\")\" && echo \"  $path\"\ndone\n\necho \"== native services ==\"\nawk -F'\\t' '$1==\"native\"{print $3\"\\t\"$4}' \"$INV\" | while IFS=$'\\t' read -r path a; do\n  mkdir -p \"$(dirname \"$path\")\"\n  tar xzf \"$HERE/$a\" -C \"$(dirname \"$path\")\" && echo \"  $path\"\ndone\n\necho \"== starting compose projects ==\"\nawk -F'\\t' '$1==\"project\"{print $3}' \"$INV\" | while read -r d; do\n  [ -d \"$d\" ] || continue\n  ( cd \"$d\" && docker compose up -d 2>&1 | tail -2 ) && echo \"  up: $d\"\ndone\n\necho\necho \"Done. Check: docker ps\"\necho \"Standalone containers (ntfy etc) are NOT compose-managed - see INVENTORY.tsv\"\necho \"  kind=container rows, and re-run their original docker run command.\"\necho \"n8n workflows are INACTIVE after restore - activate once credentials are in.\"\nRSH\nchmod +x \"$STAGE/RESTORE.sh\"\necho \"OK  RESTORE.sh (inventory-driven)\"\n\n( cd \"$STAGE\" && find . -type f -print0 | xargs -0 shasum -a 256 ) > \"$STAGE/MANIFEST.sha256\" 2>/dev/null\necho \"taken: $(TZ=Asia/Kolkata date '+%F %T IST')\" >> \"$STAGE/MANIFEST.sha256\"\necho \"---RESTORE-BUILT---\"\ncat \"$STAGE/INVENTORY.tsv\"",
+          "cwd": "/Users/admin",
+          "authentication": "privateKey"
+        },
+        "id": "b1000000-0000-4000-8000-000000000005",
+        "name": "Build RESTORE.sh",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          220,
+          380
+        ],
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "sshMacBackup01",
+            "name": "SSH - IKI-MAC-27 (backup)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "set -u\nDATE=$(cat /Users/admin/backup-staging/.date)\nSTAGE=\"/Users/admin/backup-staging/$DATE\"\nNAS=truenas_admin@192.168.126.21\nNAS_DIR=\"/mnt/ikigai-local/share1/Backups/IKI-MAC-27/$DATE\"\n\nNEW_DIR=\"${NAS_DIR}.new\"\nssh -o BatchMode=yes \"$NAS\" \"rm -rf '$NEW_DIR'; mkdir -p '$NEW_DIR'\" || { echo \"ERROR cannot create NAS dir\"; exit 1; }\nscp -o BatchMode=yes -q -r \"$STAGE\"/* \"$NAS:$NEW_DIR/\" || { echo \"ERROR scp failed\"; exit 1; }\n\n# Every file must exist remotely at the same byte size. This is the ONLY thing\n# standing between a bad upload and deleting the last good backup.\nfail=0; checked=0\ncd \"$STAGE\"\nfor f in $(find . -type f | sed 's#^\\./##'); do\n  l=$(stat -f %z \"$STAGE/$f\" 2>/dev/null)\n  r=$(ssh -o BatchMode=yes \"$NAS\" \"stat -c %s '$NEW_DIR/$f' 2>/dev/null\")\n  checked=$((checked+1))\n  if [ -z \"$r\" ] || [ \"$l\" != \"$r\" ]; then echo \"MISMATCH $f local=$l remote=${r:-missing}\"; fail=$((fail+1)); fi\ndone\necho \"checked=$checked mismatched=$fail\"\nif [ \"$fail\" -eq 0 ] && [ \"$checked\" -gt 0 ]; then\n  # Swap only after every file verified. Until this line the previous good\n  # backup is still the live one, so a failed run never leaves a gap.\n  ssh -o BatchMode=yes \"$NAS\" \"rm -rf '$NAS_DIR' && mv '$NEW_DIR' '$NAS_DIR'\"     || { echo \"ERROR swap failed - new backup left at $NEW_DIR\"; echo \"---VERIFY-FAILED---\"; exit 1; }\n  echo \"---ALL-VERIFIED---\"\n  du -sh \"$STAGE\" | awk '{print \"size=\" $1}'\n  echo \"nasdir=$NAS_DIR\"\n  rm -rf \"$STAGE\"\n  # Prune only now, and only YYYY-MM-DD folders: vm-image/ and any hand-kept\n  # copy are never matched.\n  ssh -o BatchMode=yes \"$NAS\" \"cd '/mnt/ikigai-local/share1/Backups/IKI-MAC-27' || exit 0\n    for d in *; do\n      [ -d \\\"\\$d\\\" ] || continue\n      echo \\\"\\$d\\\" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}\\$' || continue\n      [ \\\"\\$d\\\" = '$DATE' ] && continue\n      rm -rf \\\"\\$d\\\" && echo \\\"pruned \\$d\\\"\n    done; echo 'remaining:'; ls -1\"\nelse\n  echo \"---VERIFY-FAILED---\"\n  echo \"old backups NOT pruned - previous backup still on the NAS\"\n  echo \"failed upload left at $NEW_DIR for inspection\"\nfi",
+          "cwd": "/Users/admin",
+          "authentication": "privateKey"
+        },
+        "id": "b1000000-0000-4000-8000-000000000006",
+        "name": "Upload + Verify + Prune",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          440,
+          380
+        ],
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "sshMacBackup01",
+            "name": "SSH - IKI-MAC-27 (backup)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const NL = String.fromCharCode(10);\nconst all = ['Discover + Backup Host', 'Backup Omada + BioMax', 'Build RESTORE.sh', 'Upload + Verify + Prune']\n  .map(n => { try { return $(n).first().json.stdout || ''; } catch (e) { return ''; } }).join(NL);\n\nconst verified  = all.includes('---ALL-VERIFIED---');\nconst vmSkipped = all.includes('---VM-SKIPPED---');\nconst problems  = all.split(NL).filter(l => /^(WARN|ERROR|MISMATCH)/.test(l));\nconst captured  = all.split(NL).filter(l => /^OK  /.test(l)).length;\nconst coverage  = (all.match(/COVERAGE [^\\n]*/) || [''])[0];\nconst discovered= (all.match(/discovered: [^\\n]*/) || [''])[0];\nconst size      = (all.match(/size=(\\S+)/) || [])[1] || 'unknown';\nconst nasdir    = (all.match(/nasdir=(\\S+)/) || [])[1] || 'n/a';\nconst date      = new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10);\n\nlet msg = (verified ? 'Backup OK' : 'Backup FAILED') + ' - IKI-MAC-27 ' + date;\nmsg += NL + 'NAS: ' + nasdir;\nmsg += NL + 'size: ' + size + '  archives: ' + captured;\nif (discovered) msg += NL + discovered;\nif (coverage)   msg += NL + coverage;\nif (vmSkipped)  msg += NL + NL + 'NOTE: .180 unreachable - Omada/BioMax NOT in this backup.';\nif (problems.length) msg += NL + NL + 'Problems:' + NL + problems.slice(0, 20).join(NL);\nif (!verified)  msg += NL + NL + 'Old backups NOT pruned - previous backup still on the NAS.';\n\nreturn [{ json: { verified, vmSkipped, captured, coverage, size, nasdir, problems, message: msg } }];"
+        },
+        "id": "b1000000-0000-4000-8000-000000000007",
+        "name": "Build Report",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          660,
+          380
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.verified }}",
+                "rightValue": "true",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "b1000000-0000-4000-8000-000000000008",
+        "name": "Verified?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          880,
+          380
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.126.101:8080/it-billing-console",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Title",
+                "value": "System Backup OK"
+              },
+              {
+                "name": "Tags",
+                "value": "floppy_disk"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/plain",
+          "body": "={{ $json.message }}",
+          "options": {}
+        },
+        "id": "b1000000-0000-4000-8000-000000000009",
+        "name": "ntfy Success",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1100,
+          280
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.126.101:8080/it-billing-console",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Title",
+                "value": "System Backup FAILED"
+              },
+              {
+                "name": "Tags",
+                "value": "rotating_light"
+              },
+              {
+                "name": "Priority",
+                "value": "high"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/plain",
+          "body": "={{ $json.message }}",
+          "options": {}
+        },
+        "id": "b1000000-0000-4000-8000-00000000000a",
+        "name": "ntfy Failure",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1100,
+          500
+        ]
+      }
+    ],
+    "connections": {
+      "Daily 18:00 IST": {
+        "main": [
+          [
+            {
+              "node": "Discover + Backup Host",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run Manually": {
+        "main": [
+          [
+            {
+              "node": "Discover + Backup Host",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Discover + Backup Host": {
+        "main": [
+          [
+            {
+              "node": "Backup Omada + BioMax",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Backup Omada + BioMax": {
+        "main": [
+          [
+            {
+              "node": "Build RESTORE.sh",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build RESTORE.sh": {
+        "main": [
+          [
+            {
+              "node": "Upload + Verify + Prune",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upload + Verify + Prune": {
+        "main": [
+          [
+            {
+              "node": "Build Report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Report": {
+        "main": [
+          [
+            {
+              "node": "Verified?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verified?": {
+        "main": [
+          [
+            {
+              "node": "ntfy Success",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "ntfy Failure",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "errorWorkflow": "syncFailAlert01",
+      "timezone": "Asia/Kolkata",
+      "executionTimeout": 5400
+    },
+    "staticData": {
+      "node:Daily 18:00 IST": {
+        "recurrenceRules": [
+          null
+        ],
+        "recurrenceRuleSignatures": [
+          null
+        ]
+      }
+    },
+    "meta": null,
+    "nodeGroups": [],
+    "pinData": null,
+    "versionId": "52e2d3ee-3d63-47e5-82e8-cc4c228ec16d",
+    "activeVersionId": "52e2d3ee-3d63-47e5-82e8-cc4c228ec16d",
+    "versionCounter": 10,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-09-01T18:49:37.325Z",
+        "createdAt": "2026-09-01T18:49:37.325Z",
+        "role": "workflow:owner",
+        "workflowId": "sysBackupNas1",
+        "projectId": "IgEjm9j7lWKlz3Ja",
+        "project": {
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "customTelemetryTags": [],
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  },
+  {
+    "updatedAt": "2026-09-02T07:48:45.000Z",
+    "createdAt": "2026-09-01T18:59:44.234Z",
+    "id": "vmImageBkFri1",
+    "name": "UTM VM Image Backup (Friday 20:00)",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 20 * * 5"
+              }
+            ]
+          }
+        },
+        "id": "c1000000-0000-4000-8000-000000000001",
+        "name": "Friday 20:00 IST",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -460,
+          300
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "c1000000-0000-4000-8000-000000000002",
+        "name": "Run Manually",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          -460,
+          480
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Same IST-not-UTC rule as the daily job.\nconst istNow = new Date(Date.now() + 5.5 * 3600000);\nconst date  = istNow.toISOString().slice(0, 10);\nconst stamp = istNow.toISOString().slice(0, 19).replace('T', ' ') + ' IST';\n\nreturn [{ json: {\n  date, stamp,\n  SYSTEM:   'IKI-MAC-27',\n  NAS_HOST: 'truenas_admin@192.168.126.21',\n  // Image backups live in their own folder so the daily job's YYYY-MM-DD\n  // prune can never reach them.\n  NAS_DIR:  '/mnt/ikigai-local/share1/Backups/IKI-MAC-27/vm-image',\n  VM_IP:    '192.168.126.180',\n  VM_UUID:  '662D77D5-33A5-43F1-8AF0-37AC6E02723D',\n  BUNDLE:   '/Users/admin/Desktop/OmadaVM-Backups/OmadaVM-backup-20260716.utm',\n  TMP:      '/Users/admin/backup-tmp',\n  ZIP:      'vm-image-' + date + '.zip'\n} }];"
+        },
+        "id": "c1000000-0000-4000-8000-000000000003",
+        "name": "Build Paths",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -240,
+          380
+        ]
+      },
+      {
+        "parameters": {
+          "command": "=set -u\nVM=\"{{ $json.VM_IP }}\"\n\n# Clean guest shutdown first so the qcow2 is consistent. Needs a NOPASSWD\n# sudoers rule for shutdown on .180 - without it this stops here and the VM\n# is left RUNNING, which is the safe direction to fail in.\nif ping -c 1 -t 2 \"$VM\" >/dev/null 2>&1; then\n  ssh -o BatchMode=yes -o ConnectTimeout=10 saleshandy@\"$VM\" \\\n    'sudo -n /sbin/shutdown -h now' 2>&1 | head -2 || true\n  for i in $(seq 1 30); do\n    sleep 5\n    ping -c 1 -t 2 \"$VM\" >/dev/null 2>&1 || { echo \"VM down after $((i*5))s\"; break; }\n  done\n  if ping -c 1 -t 2 \"$VM\" >/dev/null 2>&1; then\n    echo \"ERROR VM still up after 150s - ABORTING, not touching the image\"\n    echo \"---ABORT---\"; exit 1\n  fi\nelse\n  echo \"VM already down\"\nfi\n\n# Let QEMU actually exit before reading the disk file.\nfor i in $(seq 1 12); do\n  pgrep -f QEMULauncher >/dev/null 2>&1 || break\n  sleep 5\ndone\npgrep -f QEMULauncher >/dev/null 2>&1 && echo \"WARN QEMU still running\" || echo \"OK  QEMU exited\"\necho \"---VM-STOPPED---\"",
+          "cwd": "/Users/admin",
+          "authentication": "privateKey"
+        },
+        "id": "c1000000-0000-4000-8000-000000000004",
+        "name": "Safe Stop VM",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          -20,
+          380
+        ],
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "sshMacBackup01",
+            "name": "SSH - IKI-MAC-27 (backup)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "=set -u\nBUNDLE=\"{{ $('Build Paths').first().json.BUNDLE }}\"\nTMP=\"{{ $('Build Paths').first().json.TMP }}\"\nZIP=\"{{ $('Build Paths').first().json.ZIP }}\"\nmkdir -p \"$TMP\"\n\n# Zip the cold bundle. ~5 min for a 14G source; the VM is restarted in the\n# NEXT node, before the upload, so downtime is the zip only - not the upload.\ncd \"$(dirname \"$BUNDLE\")\" && zip -r -q \"$TMP/$ZIP\" \"$(basename \"$BUNDLE\")\" || {\n  echo \"ERROR zip failed\"; echo \"---ZIP-FAILED---\"; exit 1; }\n\nSZ=$(stat -f %z \"$TMP/$ZIP\" 2>/dev/null || echo 0)\n# The real image is multi-GB. Anything under 1G means the source read failed\n# (a Full Disk Access problem has caused exactly this before) - refuse to ship it.\nif [ \"$SZ\" -lt 1000000000 ]; then\n  echo \"ERROR sanity check failed: only $SZ bytes\"; rm -f \"$TMP/$ZIP\"\n  echo \"---ZIP-FAILED---\"; exit 1\nfi\necho \"OK  zip $(du -h \"$TMP/$ZIP\" | cut -f1)\"\necho \"localsize=$SZ\"\necho \"---ZIP-DONE---\"",
+          "cwd": "/Users/admin",
+          "authentication": "privateKey"
+        },
+        "id": "c1000000-0000-4000-8000-000000000005",
+        "name": "Zip VM Image",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          200,
+          380
+        ],
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "sshMacBackup01",
+            "name": "SSH - IKI-MAC-27 (backup)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "=set -u\nUUID=\"{{ $('Build Paths').first().json.VM_UUID }}\"\nVM=\"{{ $('Build Paths').first().json.VM_IP }}\"\n\n# Restarted BEFORE the upload on purpose: Omada and BioMax come back as soon\n# as the zip exists, so downtime is the zip duration, not zip+upload.\n# utmctl cannot do this over SSH (OSStatus -1743); AppleScript to UTM can.\nosascript -e \"tell application \\\"UTM\\\" to start virtual machine id \\\"$UUID\\\"\" 2>&1 | head -2\n\nup=0\nfor i in $(seq 1 36); do\n  sleep 5\n  ping -c 1 -t 2 \"$VM\" >/dev/null 2>&1 && { echo \"OK  VM back after $((i*5))s\"; up=1; break; }\ndone\n[ \"$up\" -eq 1 ] || echo \"ERROR VM did NOT come back - Omada/BioMax are DOWN\"\n\nssh -o BatchMode=yes -o ConnectTimeout=10 saleshandy@\"$VM\" \\\n  'systemctl is-active tpeap biomax-sync 2>/dev/null | tr \"\\n\" \" \"' 2>/dev/null || true\necho\necho \"---VM-RESTARTED---\"",
+          "cwd": "/Users/admin",
+          "authentication": "privateKey"
+        },
+        "id": "c1000000-0000-4000-8000-000000000006",
+        "name": "Restart VM",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          420,
+          380
+        ],
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "sshMacBackup01",
+            "name": "SSH - IKI-MAC-27 (backup)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "=set -u\nNAS=\"{{ $('Build Paths').first().json.NAS_HOST }}\"\nNAS_DIR=\"{{ $('Build Paths').first().json.NAS_DIR }}\"\nTMP=\"{{ $('Build Paths').first().json.TMP }}\"\nZIP=\"{{ $('Build Paths').first().json.ZIP }}\"\n\nssh -o BatchMode=yes \"$NAS\" \"mkdir -p '$NAS_DIR'\" || { echo \"ERROR nas mkdir\"; exit 1; }\nscp -o BatchMode=yes -q \"$TMP/$ZIP\" \"$NAS:$NAS_DIR/$ZIP\" || { echo \"ERROR scp failed\"; exit 1; }\n\nL=$(stat -f %z \"$TMP/$ZIP\")\nR=$(ssh -o BatchMode=yes \"$NAS\" \"stat -c %s '$NAS_DIR/$ZIP' 2>/dev/null\")\necho \"local=$L remote=${R:-missing}\"\nif [ -n \"$R\" ] && [ \"$L\" = \"$R\" ]; then\n  echo \"---IMAGE-VERIFIED---\"\n  rm -f \"$TMP/$ZIP\"\n  # Only now delete older images. Keeps only this run's zip; anything not\n  # named vm-image-*.zip (a hand-kept copy) is left alone.\n  ssh -o BatchMode=yes \"$NAS\" \"cd '$NAS_DIR' && for f in vm-image-*.zip; do [ \\\"\\$f\\\" = '$ZIP' ] || rm -f \\\"\\$f\\\"; done; ls -lh\"\nelse\n  echo \"---IMAGE-VERIFY-FAILED---\"\n  echo \"local zip kept at $TMP/$ZIP for manual retry; previous NAS image untouched\"\nfi",
+          "cwd": "/Users/admin",
+          "authentication": "privateKey"
+        },
+        "id": "c1000000-0000-4000-8000-000000000007",
+        "name": "Upload + Verify + Prune",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          640,
+          380
+        ],
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "sshMacBackup01",
+            "name": "SSH - IKI-MAC-27 (backup)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const NL = String.fromCharCode(10);\nconst text = $input.all().map(i => i.json.stdout || '').join(NL);\nconst p = $('Build Paths').first().json;\nconst prev = [\n  $('Safe Stop VM').first().json.stdout || '',\n  $('Zip VM Image').first().json.stdout || '',\n  $('Restart VM').first().json.stdout || ''\n].join(NL);\nconst all = prev + NL + text;\n\nconst verified  = all.includes('---IMAGE-VERIFIED---');\nconst vmBack    = all.includes('---VM-RESTARTED---') && /OK  VM back|VM already down/.test(all);\nconst problems  = all.split(NL).filter(l => /^(ERROR|WARN)/.test(l));\nconst sizeLine  = (all.match(/OK  zip (\\S+)/) || [])[1] || 'unknown';\n\nlet msg = (verified ? 'VM Image Backup OK' : 'VM Image Backup FAILED') + ' - ' + p.date;\nmsg += NL + 'NAS: ' + p.NAS_DIR + '/' + p.ZIP;\nmsg += NL + 'size: ' + sizeLine;\nmsg += NL + 'VM restarted: ' + (vmBack ? 'yes' : 'NO - CHECK OMADA/BIOMAX');\nif (problems.length) msg += NL + NL + problems.join(NL);\nif (!verified) msg += NL + NL + 'Previous image on the NAS was NOT deleted.';\n\nreturn [{ json: { ...p, verified, vmBack, problems, message: msg,\n  alertOk: verified && vmBack } }];"
+        },
+        "id": "c1000000-0000-4000-8000-000000000008",
+        "name": "Build Report",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          860,
+          380
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.alertOk }}",
+                "rightValue": "true",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "c1000000-0000-4000-8000-000000000009",
+        "name": "All Good?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1080,
+          380
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.126.101:8080/it-billing-console",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Title",
+                "value": "VM Image Backup OK"
+              },
+              {
+                "name": "Tags",
+                "value": "cd"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/plain",
+          "body": "={{ $json.message }}",
+          "options": {}
+        },
+        "id": "c1000000-0000-4000-8000-00000000000a",
+        "name": "ntfy Image OK",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1300,
+          280
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.126.101:8080/it-billing-console",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Title",
+                "value": "VM Image Backup PROBLEM"
+              },
+              {
+                "name": "Tags",
+                "value": "rotating_light"
+              },
+              {
+                "name": "Priority",
+                "value": "high"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/plain",
+          "body": "={{ $json.message }}",
+          "options": {}
+        },
+        "id": "c1000000-0000-4000-8000-00000000000b",
+        "name": "ntfy Image Problem",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1300,
+          500
+        ]
+      }
+    ],
+    "connections": {
+      "Friday 20:00 IST": {
+        "main": [
+          [
+            {
+              "node": "Build Paths",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run Manually": {
+        "main": [
+          [
+            {
+              "node": "Build Paths",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Paths": {
+        "main": [
+          [
+            {
+              "node": "Safe Stop VM",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Safe Stop VM": {
+        "main": [
+          [
+            {
+              "node": "Zip VM Image",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Zip VM Image": {
+        "main": [
+          [
+            {
+              "node": "Restart VM",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Restart VM": {
+        "main": [
+          [
+            {
+              "node": "Upload + Verify + Prune",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upload + Verify + Prune": {
+        "main": [
+          [
+            {
+              "node": "Build Report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Report": {
+        "main": [
+          [
+            {
+              "node": "All Good?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "All Good?": {
+        "main": [
+          [
+            {
+              "node": "ntfy Image OK",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "ntfy Image Problem",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "errorWorkflow": "syncFailAlert01",
+      "timezone": "Asia/Kolkata",
+      "executionTimeout": 7200
+    },
+    "staticData": {
+      "node:Friday 20:00 IST": {
+        "recurrenceRules": [
+          null
+        ],
+        "recurrenceRuleSignatures": [
+          null
+        ]
+      }
+    },
+    "meta": null,
+    "nodeGroups": [],
+    "pinData": null,
+    "versionId": "22a57de6-1046-43b6-a16c-eae81c8036f2",
+    "activeVersionId": "22a57de6-1046-43b6-a16c-eae81c8036f2",
+    "versionCounter": 3,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-09-01T18:59:44.235Z",
+        "createdAt": "2026-09-01T18:59:44.235Z",
+        "role": "workflow:owner",
+        "workflowId": "vmImageBkFri1",
+        "projectId": "IgEjm9j7lWKlz3Ja",
+        "project": {
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "customTelemetryTags": [],
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
         }
       }
     ],

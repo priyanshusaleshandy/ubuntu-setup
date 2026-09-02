@@ -801,9 +801,13 @@ it, and diff the parameters.
 **`import:workflow` deactivates the workflow it overwrites.** Always:
 
 ```bash
-docker exec n8n n8n update:workflow --id=<ID> --active=true
+docker exec n8n n8n publish:workflow --id=<ID>
 docker restart n8n     # DB changes do not take effect while n8n is running
 ```
+
+`update:workflow --active=true` is **deprecated** on this n8n version - it prints
+`Please use: publish:workflow --id=...` and exits **0**, so it looks like it worked
+while the workflow stays inactive. Confirm with `list:workflow --active=true`.
 
 **Running a workflow from the CLI** fails two different ways:
 
@@ -990,16 +994,16 @@ Only what workflows depend on. Source: `../server.js`.
 
 ```bash
 # 1. export what is live (never edit workflows.json blind)
-ssh IKI-MAC-27 '/usr/local/bin/docker exec n8n n8n export:workflow --id=<ID> --output=/tmp/w.json >/dev/null 2>&1; \
-  /usr/local/bin/docker exec n8n cat /tmp/w.json; /usr/local/bin/docker exec -u root n8n rm -f /tmp/w.json' > w.json
+ssh IKI-MAC-27 '/usr/local/bin/docker exec n8n n8n export:workflow --id=<ID> --output=/home/node/w.json >/dev/null 2>&1; \
+  /usr/local/bin/docker exec n8n cat /home/node/w.json; /usr/local/bin/docker exec n8n rm -f /home/node/w.json' > w.json
 
 # 2. edit w.json  (patch parameters.jsCode from a separate .js file - see gotchas)
 
 # 3. import, reactivate, restart
 scp -q w.json IKI-MAC-27:/tmp/w.json
-ssh IKI-MAC-27 '/usr/local/bin/docker cp /tmp/w.json n8n:/tmp/w.json && \
-  /usr/local/bin/docker exec n8n n8n import:workflow --input=/tmp/w.json && \
-  /usr/local/bin/docker exec n8n n8n update:workflow --id=<ID> --active=true && \
+ssh IKI-MAC-27 '/usr/local/bin/docker cp /tmp/w.json n8n:/home/node/w.json && \
+  /usr/local/bin/docker exec n8n n8n import:workflow --input=/home/node/w.json && \
+  /usr/local/bin/docker exec n8n n8n publish:workflow --id=<ID> && \
   /usr/local/bin/docker restart n8n'
 
 # 4. verify
