@@ -5515,10 +5515,10 @@
     }
   },
   {
-    "updatedAt": "2026-09-02T07:48:45.000Z",
+    "updatedAt": "2026-09-02T12:10:30.000Z",
     "createdAt": "2026-09-01T18:59:44.234Z",
     "id": "vmImageBkFri1",
-    "name": "UTM VM Image Backup (Friday 20:00)",
+    "name": "UTM VM Image Backup (Sunday 06:00)",
     "description": null,
     "active": true,
     "isArchived": false,
@@ -5529,13 +5529,13 @@
             "interval": [
               {
                 "field": "cronExpression",
-                "expression": "0 20 * * 5"
+                "expression": "0 6 * * 0"
               }
             ]
           }
         },
         "id": "c1000000-0000-4000-8000-000000000001",
-        "name": "Friday 20:00 IST",
+        "name": "Sunday 06:00 IST",
         "type": "n8n-nodes-base.scheduleTrigger",
         "typeVersion": 1.2,
         "position": [
@@ -5763,20 +5763,45 @@
           1300,
           500
         ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.126.101:8080/it-billing-console",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Title",
+                "value": "={{ ($json.stdout||'').includes('OK  VM back') ? 'VM back up - Omada + BioMax' : 'VM DID NOT COME BACK' }}"
+              },
+              {
+                "name": "Tags",
+                "value": "={{ ($json.stdout||'').includes('OK  VM back') ? 'white_check_mark' : 'rotating_light' }}"
+              },
+              {
+                "name": "Priority",
+                "value": "={{ ($json.stdout||'').includes('OK  VM back') ? '3' : '5' }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/plain",
+          "body": "={{ (($json.stdout||'').includes('OK  VM back') ? 'VM is back up. The zip is still uploading to the NAS - the final backup alert follows.' : 'VM did NOT come back. Omada and BioMax are DOWN.') + String.fromCharCode(10) + String.fromCharCode(10) + ($json.stdout||'').replace('---VM-RESTARTED---','').trim() }}",
+          "options": {}
+        },
+        "id": "c1000000-0000-4000-8000-00000000000f",
+        "name": "ntfy VM Back Up",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          420,
+          580
+        ]
       }
     ],
     "connections": {
-      "Friday 20:00 IST": {
-        "main": [
-          [
-            {
-              "node": "Build Paths",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
       "Run Manually": {
         "main": [
           [
@@ -5825,6 +5850,11 @@
         "main": [
           [
             {
+              "node": "ntfy VM Back Up",
+              "type": "main",
+              "index": 0
+            },
+            {
               "node": "Upload + Verify + Prune",
               "type": "main",
               "index": 0
@@ -5871,6 +5901,17 @@
             }
           ]
         ]
+      },
+      "Sunday 06:00 IST": {
+        "main": [
+          [
+            {
+              "node": "Build Paths",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     },
     "settings": {
@@ -5886,14 +5927,22 @@
         "recurrenceRuleSignatures": [
           null
         ]
+      },
+      "node:Sunday 06:00 IST": {
+        "recurrenceRules": [
+          null
+        ],
+        "recurrenceRuleSignatures": [
+          null
+        ]
       }
     },
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "22a57de6-1046-43b6-a16c-eae81c8036f2",
-    "activeVersionId": "22a57de6-1046-43b6-a16c-eae81c8036f2",
-    "versionCounter": 3,
+    "versionId": "4b3da79b-a481-4897-815c-f6461e946ba5",
+    "activeVersionId": "4b3da79b-a481-4897-815c-f6461e946ba5",
+    "versionCounter": 4,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
