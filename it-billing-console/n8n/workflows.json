@@ -5970,5 +5970,296 @@
       "name": null,
       "description": null
     }
+  },
+  {
+    "updatedAt": "2026-09-03T05:38:25.000Z",
+    "createdAt": "2026-09-03T05:37:43.424Z",
+    "id": "n8nBundle4h",
+    "name": "n8n Restore Bundle (every 4h)",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 */4 * * *"
+              }
+            ]
+          }
+        },
+        "id": "d1000000-0000-4000-8000-000000000001",
+        "name": "Every 4 Hours",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -220,
+          -40
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "d1000000-0000-4000-8000-000000000002",
+        "name": "Run Manually",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          -220,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "command": "~/n8n-restore-bundle.sh",
+          "cwd": "/Users/admin",
+          "authentication": "privateKey"
+        },
+        "id": "d1000000-0000-4000-8000-000000000003",
+        "name": "Build + Ship Bundle",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          20,
+          60
+        ],
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "sshMacBackup01",
+            "name": "SSH - IKI-MAC-27 (backup)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const NL = String.fromCharCode(10);\nconst out = ($input.first().json.stdout || '') + NL + ($input.first().json.stderr || '');\n\nconst built    = /^OK  built /m.test(out);\nconst verified = out.includes('OK  verified on NAS');\nconst done     = out.includes('---BUNDLE-DONE---');\nconst problems = out.split(NL).filter(l => /^(ERROR|WARN)/.test(l));\n\nconst name = (out.match(/BUNDLE_NAME=(\\S+)/) || [])[1] || 'unknown';\nconst size = (out.match(/BUNDLE_SIZE=(\\S+)/) || [])[1] || 'unknown';\nconst rot  = (out.match(/^OK  rotation: .*$/m) || [])[0] || 'rotation: unknown';\n\nconst ok = built && verified && done && problems.length === 0;\n\nlet msg = (ok ? 'n8n restore bundle OK' : 'n8n restore bundle FAILED');\nmsg += NL + 'file: ' + name + '  (' + size + ')';\nmsg += NL + rot.replace('OK  ', '');\nmsg += NL + 'restores workflows + credentials + encryption key - nothing to re-authorise';\nif (problems.length) msg += NL + NL + problems.join(NL);\nif (!ok && !verified) msg += NL + NL + 'Previous bundles on the NAS were NOT pruned.';\n\nreturn [{ json: { alertOk: ok, name, size, message: msg } }];"
+        },
+        "id": "d1000000-0000-4000-8000-000000000004",
+        "name": "Build Report",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          260,
+          60
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.alertOk }}",
+                "rightValue": "true",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "d1000000-0000-4000-8000-000000000005",
+        "name": "All Good?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          500,
+          60
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.126.101:8080/it-billing-console",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Title",
+                "value": "n8n restore bundle OK"
+              },
+              {
+                "name": "Tags",
+                "value": "floppy_disk"
+              },
+              {
+                "name": "Priority",
+                "value": "min"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/plain",
+          "body": "={{ $json.message }}",
+          "options": {}
+        },
+        "id": "d1000000-0000-4000-8000-000000000006",
+        "name": "ntfy Bundle OK",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          740,
+          -40
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.126.101:8080/it-billing-console",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Title",
+                "value": "n8n RESTORE BUNDLE FAILED"
+              },
+              {
+                "name": "Tags",
+                "value": "rotating_light"
+              },
+              {
+                "name": "Priority",
+                "value": "high"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/plain",
+          "body": "={{ $json.message }}",
+          "options": {}
+        },
+        "id": "d1000000-0000-4000-8000-000000000007",
+        "name": "ntfy Bundle Problem",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          740,
+          160
+        ]
+      }
+    ],
+    "connections": {
+      "Every 4 Hours": {
+        "main": [
+          [
+            {
+              "node": "Build + Ship Bundle",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run Manually": {
+        "main": [
+          [
+            {
+              "node": "Build + Ship Bundle",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build + Ship Bundle": {
+        "main": [
+          [
+            {
+              "node": "Build Report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Report": {
+        "main": [
+          [
+            {
+              "node": "All Good?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "All Good?": {
+        "main": [
+          [
+            {
+              "node": "ntfy Bundle OK",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "ntfy Bundle Problem",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "errorWorkflow": "syncFailAlert01",
+      "timezone": "Asia/Kolkata"
+    },
+    "staticData": {
+      "node:Every 4 Hours": {
+        "recurrenceRules": [
+          null
+        ],
+        "recurrenceRuleSignatures": [
+          null
+        ]
+      }
+    },
+    "meta": null,
+    "nodeGroups": [],
+    "pinData": {},
+    "versionId": "39687abf-ea12-41d3-92e0-ab7755430680",
+    "activeVersionId": "39687abf-ea12-41d3-92e0-ab7755430680",
+    "versionCounter": 1,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-09-03T05:37:43.425Z",
+        "createdAt": "2026-09-03T05:37:43.425Z",
+        "role": "workflow:owner",
+        "workflowId": "n8nBundle4h",
+        "projectId": "IgEjm9j7lWKlz3Ja",
+        "project": {
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "customTelemetryTags": [],
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
   }
 ]
