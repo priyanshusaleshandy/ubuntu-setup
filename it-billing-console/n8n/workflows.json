@@ -171,7 +171,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T08:06:28.000Z",
+    "updatedAt": "2026-09-04T10:36:42.000Z",
     "createdAt": "2026-08-27T07:31:43.646Z",
     "id": "t4Pui7NwhNkRoabs",
     "name": "Gmail Invoice Auto-Capture",
@@ -268,7 +268,7 @@
       },
       {
         "parameters": {
-          "jsCode": "const vendors = $('Get Existing Vendors').all().map(i => i.json);\nconst domains = $('Get Existing Domains').all().map(i => i.json);\nconst text = $('Extract PDF Text').first().json.text;\nreturn [{ json: {\n  text,\n  existingVendors: vendors.map(v => v.name),\n  existingDomains: domains.map(d => d.domain_name)\n} }];"
+          "jsCode": "const vendors = $('Get Existing Vendors').all().map(i => i.json);\nconst domains = $('Get Existing Domains').all().map(i => i.json);\nconst text = $('Extract PDF Text').first().json.text;\n\nconst out = {\n  text,\n  existingVendors: vendors.map(v => v.name),\n  existingDomains: domains.map(d => d.domain_name)\n};\n\n// A scanned invoice has no text layer, so Extract PDF Text returns '' and the\n// parser used to reject it with 400 \"missing text field\" - Amity's bill was\n// lost exactly that way on 2026-09-04. Send the PDF itself instead and let the\n// parser render it (sips) for the agent to read. Text stays preferred: reading\n// the text layer is cheaper and more accurate than reading a picture of it.\nif (!text || !text.trim()) {\n  const bin = $('Normalize PDF Attachment').first().binary;\n  if (bin && bin.pdf && bin.pdf.data) out.pdfBase64 = bin.pdf.data;\n}\n\nreturn [{ json: out }];"
         },
         "id": "buildParseRequest",
         "name": "Build Parse Request",
@@ -286,7 +286,7 @@
           "sendBody": true,
           "contentType": "json",
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ text: $json.text, existingVendors: $json.existingVendors, existingDomains: $json.existingDomains }) }}",
+          "jsonBody": "={{ JSON.stringify({ text: $json.text, existingVendors: $json.existingVendors, existingDomains: $json.existingDomains, pdfBase64: $json.pdfBase64 }) }}",
           "options": {
             "timeout": 90000
           }
@@ -504,10 +504,10 @@
     "staticData": {
       "node:Gmail Trigger": {
         "Gmail Trigger": {
-          "lastTimeChecked": 1788240610,
+          "lastTimeChecked": 1788505604,
           "possibleDuplicates": [
-            "1a05b72521ca273c",
-            "1a0568ee85b2a337"
+            "1a06b3e50beead48",
+            "1a06a7872ef3b304"
           ]
         }
       }
@@ -515,9 +515,9 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": {},
-    "versionId": "a78cf532-64e5-4c0f-bbc8-81e4f104b1ed",
-    "activeVersionId": null,
-    "versionCounter": 10,
+    "versionId": "bd298298-4c06-409f-abe3-99bda56a885e",
+    "activeVersionId": "bd298298-4c06-409f-abe3-99bda56a885e",
+    "versionCounter": 11,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],

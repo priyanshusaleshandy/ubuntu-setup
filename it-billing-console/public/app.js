@@ -107,10 +107,80 @@ function getAttachments(entityType, entityId) {
   return attachmentsData.filter(a => a.entity_type === entityType && a.entity_id === entityId);
 }
 
-function attachmentChips(entityType, entityId) {
-  return getAttachments(entityType, entityId)
-    .map(a => `<a href="/api/attachments/${a.id}" target="_blank" class="btn btn-sm btn-secondary" title="${escapeHtml(a.original_filename)}">📎</a>`)
-    .join('');
+// One button per row instead of one per file. A row with several bills, proofs
+// and renewal letters used to render a chip each, which crowded the actions
+// column out of the table long before a vendor's paperwork was actually complete.
+function attachmentFolderButton(entityType, entityId) {
+  const n = getAttachments(entityType, entityId).length;
+  const label = n ? `📁 ${n}` : '📁';
+  const title = n ? `${n} document${n > 1 ? 's' : ''} — click to open` : 'No documents yet';
+  return `<button class="btn btn-sm btn-secondary" title="${title}"
+    style="${n ? '' : 'opacity:.55;'}"
+    onclick="openDocsModal('${entityType}', ${entityId})">${label}</button>`;
+}
+
+// The folder view: every document for one row, listed rather than crammed inline.
+function openDocsModal(entityType, entityId) {
+  document.getElementById('docs-modal-entity-type').value = entityType;
+  document.getElementById('docs-modal-entity-id').value = entityId;
+  document.getElementById('docs-modal-title').innerText = '📁 ' + docsModalTitleFor(entityType, entityId);
+  renderDocsModalBody();
+  openModal('docs-modal');
+}
+
+function docsModalTitleFor(entityType, entityId) {
+  if (entityType === 'service') {
+    const s = servicesData.find(x => x.id === entityId);
+    return s ? s.service_name : 'Documents';
+  }
+  if (entityType === 'company_doc') {
+    const d = companyDocsData.find(x => x.id === entityId);
+    return d ? d.title : 'Documents';
+  }
+  return 'Documents';
+}
+
+function renderDocsModalBody() {
+  const entityType = document.getElementById('docs-modal-entity-type').value;
+  const entityId = Number(document.getElementById('docs-modal-entity-id').value);
+  const atts = getAttachments(entityType, entityId);
+  const body = document.getElementById('docs-modal-body');
+
+  if (!atts.length) {
+    body.innerHTML = `<p class="text-sub" style="margin:8px 0;">No documents yet.
+      Bills captured from email land here automatically; you can also attach files from
+      the row's <strong>Edit</strong> screen.</p>`;
+    return;
+  }
+
+  body.innerHTML = `
+    <p class="text-sub" style="margin:0 0 10px;">${atts.length} document${atts.length > 1 ? 's' : ''}</p>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${atts.map(a => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
+                    border:1px solid var(--border-color);border-radius:6px;">
+          <div style="flex:0 0 auto;">${attachmentThumb(a)}</div>
+          <div style="flex:1 1 auto;min-width:0;">
+            <a href="/api/attachments/${a.id}" target="_blank"
+               style="color:var(--primary);word-break:break-all;">${escapeHtml(a.original_filename)}</a>
+            <div class="text-sub" style="font-size:11px;">${escapeHtml(String(a.uploaded_at || '').slice(0, 16))}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-secondary" style="color:var(--danger);flex:0 0 auto;"
+                  onclick="deleteAttachmentFromDocsModal(${a.id})">🗑️</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function deleteAttachmentFromDocsModal(attId) {
+  if (!confirm('Delete this file?')) return;
+  await fetch(`/api/attachments/${attId}`, { method: 'DELETE' });
+  await fetchAttachments();
+  renderDocsModalBody();
+  renderServicesTable();
+  renderSecurityTable();
+  renderCompanyDocsTable();
 }
 
 // Renders the editable attachment list (with remove buttons) shown inside a modal
@@ -781,7 +851,7 @@ function renderServicesTable() {
         <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
         <td>
           <button class="btn btn-sm btn-secondary" onclick="editService(${s.id})">✏️ Edit</button>
-          ${attachmentChips('service', s.id)}
+          ${attachmentFolderButton('service', s.id)}
           <button class="btn btn-sm btn-secondary" style="color:var(--danger)" onclick="deleteService(${s.id})">🗑️</button>
         </td>
       </tr>
@@ -817,7 +887,7 @@ function renderSecurityTable() {
         <td>${escapeHtml(s.notes || '')}</td>
         <td>
           <button class="btn btn-sm btn-secondary" onclick="editService(${s.id})">✏️ Edit</button>
-          ${attachmentChips('service', s.id)}
+          ${attachmentFolderButton('service', s.id)}
           <button class="btn btn-sm btn-secondary" style="color:var(--danger)" onclick="deleteService(${s.id})">🗑️</button>
         </td>
       </tr>
@@ -1232,7 +1302,7 @@ function renderCompanyDocsTable() {
       <td><strong>${escapeHtml(d.title)}</strong></td>
       <td><span class="badge" style="background:#334155;color:#f8fafc;">${escapeHtml(d.category || 'Other')}</span></td>
       <td>${escapeHtml(d.notes || '')}</td>
-      <td>${attachmentChips('company_doc', d.id)}</td>
+      <td>${attachmentFolderButton('company_doc', d.id)}</td>
       <td>
         <button class="btn btn-sm btn-secondary" onclick="editCompanyDoc(${d.id})">✏️ Edit</button>
         <button class="btn btn-sm btn-secondary" style="color:var(--danger)" onclick="deleteCompanyDoc(${d.id})">🗑️</button>
