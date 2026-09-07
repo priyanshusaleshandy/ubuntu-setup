@@ -120,8 +120,9 @@ OPTIONS=(
     "Action1 Agent (RMM)"
     "ClamAV Antivirus (clamav & clamav-daemon)"
     "ESET Endpoint Antivirus + PROTECT Agent"
+    "ManageEngine Endpoint Central Agent"
 )
-SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
+SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
@@ -963,6 +964,119 @@ install_eset() {
     return 0
 }
 
+# ── ManageEngine Endpoint Central agent ───────────────────────────────────────
+# The zip from the console holds three things: the .bin, a serverinfo.json that
+# carries this tenant's auth key and certificates, and a README. The installer
+# reads serverinfo.json from its own directory — separate the two and the agent
+# installs but never enrols, which looks like success until you check the
+# console. So they are always unzipped together and run from that directory.
+#
+# The zip is per remote office. This one enrols into "Default Remote Office";
+# a machine that belongs in Pilot needs Pilot's own zip from the console.
+UEMS_ZIP_URL="http://192.168.126.21:8000/DefaultRemoteOffice_UEMSLinuxAgent_X64.zip"
+UEMS_ZIP_SHA256="aa1c88ae332bed759395121a1d036ff080d735b80af2ddd2220641d6a6f1fb30"
+UEMS_DIR="/usr/local/manageengine/uems_agent"
+
+install_uems_agent() {
+    log_section "ManageEngine Endpoint Central Agent"
+
+    if [ -d "$UEMS_DIR" ]; then
+        log_ok "Agent already installed at $UEMS_DIR — nothing to do."
+        return 0
+    fi
+
+    # The cached zip is the x64 build. Anything else needs its own download
+    # from the console (the README lists x86, ARM and ARM64 variants).
+    local arch; arch="$(uname -m)"
+    if [ "$arch" != "x86_64" ] && [ "$arch" != "amd64" ]; then
+        log_error "This machine is $arch, but the cached agent is x64 only."
+        log_error "Download the matching build from the console:"
+        log_error "  Agent > Download Agent > Linux, then pick your architecture."
+        return 1
+    fi
+
+    log_info "Installing prerequisites..."
+    sudo apt-get install -y unzip curl >/dev/null 2>&1 || {
+        log_error "Could not install unzip/curl."; return 1; }
+
+    local tmp; tmp="$(mktemp -d)"
+    local zip="$tmp/agent.zip"
+
+    log_info "Downloading agent from the NAS..."
+    if ! curl -fsSL --max-time 300 -o "$zip" "$UEMS_ZIP_URL"; then
+        log_error "Download failed. The NAS is only reachable on the office LAN —"
+        log_error "off-site, download the zip from the console and install by hand."
+        rm -rf "$tmp"; return 1
+    fi
+
+    if [ "$(sha256sum "$zip" | awk '{print $1}')" != "$UEMS_ZIP_SHA256" ]; then
+        log_error "SHA256 mismatch — refusing to run this file."
+        log_warn  "If the agent was re-downloaded from the console, update"
+        log_warn  "UEMS_ZIP_SHA256 in this script to match."
+        rm -rf "$tmp"; return 1
+    fi
+    log_ok "Downloaded and verified."
+
+    unzip -qo "$zip" -d "$tmp" || { log_error "Unzip failed."; rm -rf "$tmp"; return 1; }
+
+    local bin="$tmp/UEMS_LinuxAgent_x64.bin"
+    if [ ! -f "$bin" ] || [ ! -f "$tmp/serverinfo.json" ]; then
+        log_error "Zip did not contain both UEMS_LinuxAgent_x64.bin and serverinfo.json."
+        rm -rf "$tmp"; return 1
+    fi
+
+    log_info "Installing (this takes a minute)..."
+    chmod +x "$bin"
+    ( cd "$tmp" && sudo ./UEMS_LinuxAgent_x64.bin )
+    local rc=$?
+    rm -rf "$tmp"
+
+    if [ $rc -ne 0 ] || [ ! -d "$UEMS_DIR" ]; then
+        log_error "Agent installation failed (exit $rc)."
+        return 1
+    fi
+
+    log_ok "Agent installed at $UEMS_DIR"
+    echo ""
+    echo -e "  The machine appears in the console within a few minutes, under"
+    echo -e "  ${BOLD}Agent > Computers${NC}, in the ${BOLD}Default Remote Office${NC}."
+    echo -e "  The first inventory and patch scan follow shortly after."
+    echo ""
+    return 0
+}
+
+uninstall_uems_agent() {
+    log_section "Removing ManageEngine Endpoint Central Agent"
+
+    if [ ! -d "$UEMS_DIR" ]; then
+        log_warn "Agent is not installed here."
+        return 0
+    fi
+
+    local remover="$UEMS_DIR/RemoveUEMSAgent.sh"
+    if [ ! -f "$remover" ]; then
+        log_error "Uninstaller not found at $remover — remove it from the console instead."
+        return 1
+    fi
+
+    log_warn "Agent uninstall protection is enabled on this tenant, so this will"
+    log_warn "ask for a one-time code. Get it from the console:"
+    log_warn "  Agent > Scope of Management > Computers > View OTP"
+    echo ""
+
+    sudo chmod +x "$remover"
+    ( cd "$UEMS_DIR" && sudo ./RemoveUEMSAgent.sh )
+
+    if [ -d "$UEMS_DIR" ]; then
+        log_error "Agent directory still present — uninstall did not complete."
+        log_info  "A wrong or expired OTP is the usual reason."
+        return 1
+    fi
+    log_ok "Agent removed."
+    log_info "The device stays listed in the console until you delete it there."
+    return 0
+}
+
 uninstall_eset() {
     log_section "Removing ESET"
 
@@ -1152,6 +1266,7 @@ is_installed() {
         13) dpkg -l 2>/dev/null | grep -qi action1 ;;
         14) command -v clamscan &>/dev/null || systemctl is-active --quiet clamav-daemon 2>/dev/null ;;
         15) [ -d /opt/eset/eea ] || systemctl is-active --quiet eset 2>/dev/null ;;
+        16) [ -d /usr/local/manageengine/uems_agent ] ;;
         *) return 1 ;;
     esac
 }
@@ -1174,6 +1289,7 @@ install_component() {
         13) install_action1_agent ;;
         14) install_clamav ;;
         15) install_eset ;;
+        16) install_uems_agent ;;
     esac
 }
 
@@ -1195,6 +1311,7 @@ uninstall_component() {
         13) uninstall_action1_agent ;;
         14) uninstall_clamav ;;
         15) uninstall_eset ;;
+        16) uninstall_uems_agent ;;
     esac
 }
 
