@@ -119,8 +119,9 @@ OPTIONS=(
     "GNOME Screen Blank Timeout (14 minutes)"
     "Action1 Agent (RMM)"
     "ClamAV Antivirus (clamav & clamav-daemon)"
+    "ESET Endpoint Antivirus + PROTECT Agent"
 )
-SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
+SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
@@ -749,6 +750,259 @@ FRESHCLAM_EOF
     fi
 }
 
+# ── ESET Endpoint Antivirus + PROTECT Agent ───────────────────────────────────
+# One "Live Installer" .bin from ESET PROTECT bundles both the Management Agent
+# and Endpoint Antivirus, already tied to the "Ikigai Infotech LLP" group and
+# the "Linux - USB Block + Locked Settings" policy. Nothing to configure here.
+#
+# The download link is generated per-tenant and EXPIRES AFTER 6 MONTHS. When it
+# stops working, regenerate it in ESET PROTECT > Installers and update both the
+# URL and the checksum below. The NAS copy is checked first and does not expire,
+# so keeping that fresh is the durable path.
+ESET_URL="https://redirector.eset.systems/li-handler/?uuid=epi_lin-16af0fe6-c949-4461-8dd7-3d81156e18a4"
+ESET_SHA256="9a73bd184b21c2be76dd650a65d52098c987e8aa1528c35d55a5b2fa21aa1ae1"
+ESET_BIN="/tmp/eset_live_installer.bin"
+
+# The NAS copies live on the :8000 Script/ server, not the :8001 app cache that
+# LOCAL_APPS_BASE points at — `priyanshu data/` is read-only over SMB, so
+# nothing new can be placed there from Windows.
+ESET_NAS_URL="http://192.168.126.21:8000/eset_live_installer.bin"
+
+# Offline pair, preferred over the Live Installer whenever the NAS is reachable.
+# The Live Installer is a 4 MB stub that pulls the actual product from ESET at
+# install time — fine for one machine, but across a hundred it means the same
+# few hundred MB crossing the office WAN link a hundred times. These two come
+# off the LAN instead.
+#
+#   PROTECTAgentInstaller.sh - ESET Management Agent. Carries this tenant's
+#     server address, certificates and policy, and picks the right architecture
+#     itself from `uname -m` (do NOT substitute agent_linux_i386.sh by hand -
+#     that is only the script's 32-bit fallback and will not run on x86_64).
+#   eeau_x86_64.bin          - ESET Endpoint Antivirus, full offline package.
+ESET_AGENT_NAS_URL="http://192.168.126.21:8000/PROTECTAgentInstaller.sh"
+ESET_AGENT_SHA256="d1c10d5cce01dbe73b2b370a3769156a4e01b2f9768c5f49cb24165208e0778c"
+ESET_AV_NAS_URL="http://192.168.126.21:8000/eeau_x86_64.bin"
+ESET_AV_SHA256="bbee1ca1ace44be0b9b764a8e3fd456697634a16825c06a751ffde490435ba0d"
+
+install_eset() {
+    log_section "ESET Endpoint Antivirus + PROTECT Agent"
+
+    if [ -d /opt/eset/eea ]; then
+        log_ok "ESET is already installed at /opt/eset/eea — nothing to do."
+        return 0
+    fi
+
+    # ── Secure Boot check, up front ───────────────────────────────────────────
+    # ESET's real-time protection is a kernel module. Under Secure Boot an
+    # unsigned module will not load, so the machine would end up with ESET
+    # installed but no on-access scanning — silently. Find out now, not later.
+    local secureboot="off"
+    if command -v mokutil &>/dev/null && mokutil --sb-state 2>/dev/null | grep -qi "enabled"; then
+        secureboot="on"
+    fi
+
+    local mokpass=""
+    if [ "$secureboot" = "on" ]; then
+        log_warn "Secure Boot is ENABLED on this machine."
+        echo ""
+        echo -e "  ${BOLD}ESET's real-time protection needs a signed kernel module.${NC}"
+        echo -e "  You will set a password now, and type it again on the blue"
+        echo -e "  ${BOLD}MOK Manager${NC} screen after the reboot. It is used once, for"
+        echo -e "  enrolling the key — it is not an account password."
+        echo ""
+        while :; do
+            read -rsp "  MOK password (8-16 chars): " mokpass < /dev/tty; echo ""
+            read -rsp "  Confirm password:          " mokpass2 < /dev/tty; echo ""
+            if [ "$mokpass" != "$mokpass2" ]; then
+                log_error "Passwords do not match. Try again."
+            elif [ ${#mokpass} -lt 8 ]; then
+                log_error "Too short — use at least 8 characters."
+            else
+                break
+            fi
+        done
+        log_ok "Password captured. Write it down; you need it at the reboot screen."
+        echo ""
+    else
+        log_info "Secure Boot is off — no module signing needed."
+    fi
+
+    # ── Prerequisites ─────────────────────────────────────────────────────────
+    # lshw: hardware inventory the agent reports upstream.
+    # openssl: TLS for agent <-> ESET PROTECT. mokutil//dev/tty for signing.
+    log_info "Installing prerequisites (lshw, openssl, mokutil)..."
+    sudo apt-get update -y >/dev/null 2>&1
+    sudo apt-get install -y lshw openssl mokutil curl || {
+        log_error "Could not install prerequisites."; return 1; }
+
+    # ── Preferred path: offline pair off the NAS ──────────────────────────────
+    local agent_sh="/tmp/PROTECTAgentInstaller.sh"
+    local av_bin="/tmp/eeau_x86_64.bin"
+    local installed=0
+
+    log_info "Checking the NAS for the offline packages..."
+    if curl -fsSL --max-time 20 -o "$agent_sh" "$ESET_AGENT_NAS_URL" 2>/dev/null \
+       && [ "$(sha256sum "$agent_sh" | awk '{print $1}')" = "$ESET_AGENT_SHA256" ]; then
+        log_ok "Agent installer fetched and verified."
+        log_info "Fetching the antivirus package (1.2 GB from the LAN)..."
+        if curl -fSL --max-time 1800 -o "$av_bin" "$ESET_AV_NAS_URL" \
+           && [ "$(sha256sum "$av_bin" | awk '{print $1}')" = "$ESET_AV_SHA256" ]; then
+            log_ok "Antivirus package fetched and verified."
+            chmod +x "$agent_sh" "$av_bin"
+
+            log_info "1/2 — Installing ESET Management Agent..."
+            if sudo sh "$agent_sh" --skip-license; then
+                log_ok "Agent installed."
+                log_info "2/2 — Installing ESET Endpoint Antivirus (a few minutes)..."
+                if sudo "$av_bin" -y; then
+                    installed=1
+                else
+                    log_error "Antivirus installation failed."
+                fi
+            else
+                log_error "Agent installation failed."
+            fi
+        else
+            log_warn "Antivirus package missing or checksum mismatch on the NAS."
+        fi
+    else
+        log_warn "Agent installer missing or checksum mismatch on the NAS."
+    fi
+    rm -f "$agent_sh" "$av_bin"
+
+    # ── Fallback: Live Installer, pulls the product from ESET over the WAN ────
+    if [ $installed -eq 0 ]; then
+        log_warn "Falling back to the Live Installer (downloads from ESET)."
+        rm -f "$ESET_BIN"
+        if curl -fsSL --max-time 15 -o "$ESET_BIN" "$ESET_NAS_URL" 2>/dev/null; then
+            log_ok "Live Installer fetched from NAS."
+        elif curl -fsSL --max-time 8 -o "$ESET_BIN" "$LOCAL_APPS_BASE/eset_live_installer.bin" 2>/dev/null; then
+            log_ok "Live Installer fetched from NAS app cache."
+        elif curl -fsSL -o "$ESET_BIN" "$ESET_URL"; then
+            log_ok "Live Installer fetched from ESET."
+        else
+            log_error "Could not obtain any installer, from the NAS or from ESET."
+            log_error "If the link has expired (they last 6 months), regenerate it in"
+            log_error "ESET PROTECT > Installers and update ESET_URL and ESET_SHA256."
+            return 1
+        fi
+
+        if [ "$(sha256sum "$ESET_BIN" | awk '{print $1}')" != "$ESET_SHA256" ]; then
+            log_error "SHA256 mismatch on the Live Installer — refusing to run it."
+            log_warn  "If you regenerated it, update ESET_SHA256 in this script."
+            rm -f "$ESET_BIN"
+            return 1
+        fi
+        chmod +x "$ESET_BIN"
+
+        # ESET documents silent switches for the Windows Live Installer only.
+        # The Linux build uses the same InstallBuilder wrapper, so try those
+        # first and fall back to the product's own documented -y.
+        log_info "Installing — this needs internet and takes a few minutes..."
+        if sudo "$ESET_BIN" --mode unattended --silent --accepteula; then
+            installed=1
+        else
+            log_warn "Unattended switches were rejected, retrying with -y..."
+            sudo "$ESET_BIN" -y && installed=1
+        fi
+        rm -f "$ESET_BIN"
+    fi
+
+    if [ $installed -ne 1 ] || [ ! -d /opt/eset/eea ]; then
+        log_error "ESET installation failed."
+        return 1
+    fi
+    log_ok "ESET installed."
+
+    # ── Sign the kernel module, if Secure Boot demands it ─────────────────────
+    if [ "$secureboot" = "on" ]; then
+        local signer="/opt/eset/eea/lib/install_scripts/sign_modules.sh"
+        if [ -x "$signer" ]; then
+            log_info "Generating and enrolling the signing key..."
+            # sign_modules.sh asks: reuse existing keys? (n) then the password twice.
+            if printf 'n\n%s\n%s\n' "$mokpass" "$mokpass" | sudo "$signer" >/dev/null 2>&1; then
+                log_ok "Key generated and queued for enrollment."
+            else
+                log_warn "Automated signing did not complete. Run it by hand:"
+                echo -e "    ${BOLD}sudo $signer${NC}"
+                echo -e "    (answer 'No' to reusing keys, then set the same password)"
+            fi
+        else
+            log_warn "Signing script not found at $signer — check the ESET install."
+        fi
+    fi
+
+    # ── What happens next ─────────────────────────────────────────────────────
+    echo ""
+    log_section "Next steps"
+    if [ "$secureboot" = "on" ]; then
+        echo -e "  ${YELLOW}${BOLD}This machine must be rebooted to finish.${NC}"
+        echo ""
+        echo -e "  1. Reboot now."
+        echo -e "  2. A blue ${BOLD}MOK Manager${NC} screen appears. Press any key within"
+        echo -e "     ${BOLD}10 seconds${NC} — if you miss it, the key is not enrolled and"
+        echo -e "     you have to run the signing script again."
+        echo -e "  3. Choose ${BOLD}Enroll MOK${NC} → ${BOLD}Continue${NC} → ${BOLD}Yes${NC}"
+        echo -e "  4. Enter the password you just set."
+        echo -e "  5. Reboot again when it asks."
+        echo ""
+        echo -e "  Verify afterwards with:"
+        echo -e "    ${BOLD}systemctl status eset${NC}"
+        echo -e "    ${BOLD}/opt/eset/eea/bin/upd --list-modules${NC}"
+        echo ""
+        log_warn "Until this is done, ESET runs WITHOUT real-time protection."
+    else
+        echo -e "  Nothing else needed. Verify with:"
+        echo -e "    ${BOLD}systemctl status eset${NC}"
+        echo ""
+        echo -e "  The machine should appear in ESET PROTECT within a few minutes,"
+        echo -e "  under the ${BOLD}Ikigai Infotech LLP${NC} group, with the"
+        echo -e "  ${BOLD}Linux - USB Block + Locked Settings${NC} policy applied."
+    fi
+    echo ""
+    return 0
+}
+
+uninstall_eset() {
+    log_section "Removing ESET"
+
+    if [ ! -d /opt/eset ]; then
+        log_warn "ESET is not installed here."
+        return 0
+    fi
+
+    log_warn "If the ESET policy has settings protection enabled, removal may ask"
+    log_warn "for the ESET password — that comes from ESET PROTECT, not this script."
+
+    # Antivirus first, then the agent — the agent can otherwise reinstall it.
+    local eea_uninst="/opt/eset/eea/lib/uninstall.sh"
+    if [ -x "$eea_uninst" ]; then
+        log_info "Removing ESET Endpoint Antivirus..."
+        sudo "$eea_uninst" || log_warn "EEA uninstaller returned an error."
+    else
+        log_info "EEA uninstaller not found, trying package manager..."
+        sudo apt-get remove --purge -y eea 2>/dev/null || true
+    fi
+
+    local agent_uninst="/opt/eset/RemoteAdministrator/Agent/setup/installer_backup.sh"
+    if [ -x "$agent_uninst" ]; then
+        log_info "Removing ESET Management Agent..."
+        sudo "$agent_uninst" --uninstall || log_warn "Agent uninstaller returned an error."
+    else
+        sudo apt-get remove --purge -y eset-management-agent 2>/dev/null || true
+    fi
+
+    sudo rm -rf /opt/eset 2>/dev/null || true
+
+    if [ -d /opt/eset ]; then
+        log_error "Some ESET files remain under /opt/eset — check manually."
+        return 1
+    fi
+    log_ok "ESET removed."
+    log_info "The device stays listed in ESET PROTECT until you delete it there."
+    return 0
+}
+
 install_timedoctor() {
     log_info "Installing Time Doctor..."
     if curl -fsSL --max-time 5 -o /tmp/sfproc "$LOCAL_APPS_BASE/sfproc-3.16.69-x86_64.run" 2>/dev/null || \
@@ -897,6 +1151,7 @@ is_installed() {
         12) [[ "$(gsettings get org.gnome.desktop.session idle-delay 2>/dev/null)" == *"840"* ]] ;;
         13) dpkg -l 2>/dev/null | grep -qi action1 ;;
         14) command -v clamscan &>/dev/null || systemctl is-active --quiet clamav-daemon 2>/dev/null ;;
+        15) [ -d /opt/eset/eea ] || systemctl is-active --quiet eset 2>/dev/null ;;
         *) return 1 ;;
     esac
 }
@@ -918,6 +1173,7 @@ install_component() {
         12) set_screen_time_14m ;;
         13) install_action1_agent ;;
         14) install_clamav ;;
+        15) install_eset ;;
     esac
 }
 
@@ -938,6 +1194,7 @@ uninstall_component() {
         12) reset_screen_time ;;
         13) uninstall_action1_agent ;;
         14) uninstall_clamav ;;
+        15) uninstall_eset ;;
     esac
 }
 
