@@ -851,11 +851,18 @@ install_eset() {
             log_ok "Antivirus package fetched and verified."
             chmod +x "$agent_sh" "$av_bin"
 
+            # PROTECTAgentInstaller.sh takes no arguments of its own - it passes
+            # --skip-license and the rest through to the agent build it fetches.
+            # Handing it flags directly does nothing useful.
             log_info "1/2 — Installing ESET Management Agent..."
-            if sudo sh "$agent_sh" --skip-license; then
+            if sudo sh "$agent_sh"; then
                 log_ok "Agent installed."
+                # -y only accepts the licence; the package-manager step still
+                # asks for confirmation and there is nobody here to answer it.
+                # -f is what makes that step non-interactive. Both are needed,
+                # and any flag the installer does not recognise exits 2.
                 log_info "2/2 — Installing ESET Endpoint Antivirus (a few minutes)..."
-                if sudo "$av_bin" -y; then
+                if sudo "$av_bin" -y -f; then
                     installed=1
                 else
                     log_error "Antivirus installation failed."
@@ -896,15 +903,16 @@ install_eset() {
         fi
         chmod +x "$ESET_BIN"
 
-        # ESET documents silent switches for the Windows Live Installer only.
-        # The Linux build uses the same InstallBuilder wrapper, so try those
-        # first and fall back to the product's own documented -y.
+        # Switches taken from the binary itself, not from the Windows docs -
+        # it is an ELF that understands --unattended and --accept-license.
+        # (--mode unattended / --accepteula are Windows spellings and are not
+        # recognised here.)
         log_info "Installing — this needs internet and takes a few minutes..."
-        if sudo "$ESET_BIN" --mode unattended --silent --accepteula; then
+        if sudo "$ESET_BIN" --unattended --accept-license; then
             installed=1
         else
-            log_warn "Unattended switches were rejected, retrying with -y..."
-            sudo "$ESET_BIN" -y && installed=1
+            log_warn "Unattended install failed; retrying interactively."
+            sudo "$ESET_BIN" --accept-license && installed=1
         fi
         rm -f "$ESET_BIN"
     fi
