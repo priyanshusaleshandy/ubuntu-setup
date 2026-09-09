@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const db = require('./database');
+const serviceStatus = require('./status');
 const { startScheduler, checkExpiringServices } = require('./scheduler');
 
 const app = express();
@@ -423,15 +424,27 @@ app.post('/api/payments', (req, res) => {
     [service_id, vendor_id, amount, currency || 'INR', payment_date, payment_method, invoice_no, receipt_note],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ id: this.lastID, message: 'Payment recorded successfully' });
+      const paymentId = this.lastID;
+      // Paying for a contract is what marks it Done - the status is derived, so
+      // it also drops back to Upcoming by itself when next year's period starts.
+      serviceStatus.recomputeOne(service_id, () => {
+        res.json({ id: paymentId, message: 'Payment recorded successfully' });
+      });
     }
   );
 });
 
 app.delete('/api/payments/:id', (req, res) => {
-  db.run(`DELETE FROM payment_history WHERE id = ?`, [req.params.id], function (err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Payment record deleted' });
+  // Read the link first: once the row is gone there is no way back to the
+  // contract whose status has to be recomputed.
+  db.get(`SELECT service_id FROM payment_history WHERE id = ?`, [req.params.id], (e0, pay) => {
+    db.run(`DELETE FROM payment_history WHERE id = ?`, [req.params.id], function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      // Deleting a payment can un-settle a contract, so it must go back to Upcoming.
+      serviceStatus.recomputeOne(pay && pay.service_id, () => {
+        res.json({ message: 'Payment record deleted' });
+      });
+    });
   });
 });
 

@@ -816,6 +816,17 @@ function serviceStatusBadge(status) {
   return { badgeClass: 'badge-active', statusLabel: status };
 }
 
+// A contract is "finished" once its period is over AND it needs nothing more:
+// settled, or expired and not renewed. Those are hidden by default so last
+// year's paperwork stops competing with what actually needs attention - they are
+// hidden, never deleted, and "All Statuses" brings them straight back.
+function isFinishedContract(s) {
+  const done = s.status === 'Done' || s.status === 'Completed' || s.status === 'Expired';
+  if (!done) return false;
+  if (!s.expiry_date) return false;
+  return s.expiry_date < new Date().toISOString().slice(0, 10);
+}
+
 function renderServicesTable() {
   const search = document.getElementById('service-search').value.toLowerCase();
   const filter = document.getElementById('service-status-filter').value;
@@ -826,6 +837,7 @@ function renderServicesTable() {
                           (s.vendor_name && s.vendor_name.toLowerCase().includes(search)) ||
                           s.category.toLowerCase().includes(search);
     const matchesFilter = filter === 'ALL' ||
+                          (filter === 'ACTIVE' && !isFinishedContract(s)) ||
                           s.status === filter ||
                           (filter === 'Upcoming' && (s.status === 'Upcoming' || s.status === 'Upcomming')) ||
                           (filter === 'Done' && (s.status === 'Done' || s.status === 'Completed'));

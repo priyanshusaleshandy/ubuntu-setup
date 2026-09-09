@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
 const db = require('./database');
+const serviceStatus = require('./status');
 
 // Function to send Telegram Notification
 async function sendTelegramAlert(botToken, chatId, message) {
@@ -85,7 +86,9 @@ function checkExpiringServices() {
   const todayStr = new Date().toISOString().split('T')[0];
 
   db.all(`
-    SELECT s.*, v.name as vendor_name, v.email as vendor_email, v.contact_person
+    SELECT s.*, v.name as vendor_name, v.email as vendor_email, v.contact_person,
+           (SELECT IFNULL(SUM(p.amount), 0) FROM payment_history p
+             WHERE p.service_id = s.id AND p.payment_date >= s.start_date) AS paid_this_period
     FROM services_contracts s
     LEFT JOIN vendors v ON s.vendor_id = v.id
   `, [], (err, services) => {
@@ -103,16 +106,13 @@ function checkExpiringServices() {
         const diffTime = expiry - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        let newStatus = service.status;
-        if (service.status === 'Completed' || service.status === 'Done') {
-          newStatus = 'Completed';
-        } else if (diffDays <= 0 && service.status !== 'Upcoming') {
-          newStatus = 'Expired';
-        } else if (diffDays > 0) {
-          newStatus = 'Upcoming';
-        }
-
-        // Update status in DB if changed
+        // Status is derived from payments (see status.js), not pinned. The old
+        // rule re-pinned anything Done to Done forever, so a renewed contract
+        // never came back as Upcoming and nobody was reminded to pay it again.
+        const newStatus = serviceStatus.decide(
+          { cost: service.cost, status: service.status, expiry_date: service.expiry_date, paid: service.paid_this_period },
+          todayStr
+        );
         if (newStatus !== service.status) {
           db.run(`UPDATE services_contracts SET status = ? WHERE id = ?`, [newStatus, service.id]);
           service.status = newStatus;
