@@ -121,8 +121,9 @@ OPTIONS=(
     "ClamAV Antivirus (clamav & clamav-daemon)"
     "ESET Endpoint Antivirus + PROTECT Agent"
     "ManageEngine Endpoint Central Agent"
+    "ESET eventlog runaway guard (disk-fill protection)"
 )
-SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
+SELECTIONS=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)   # all unselected by default
 
 # ── Install functions ─────────────────────────────────────────────────────────
 install_core_utilities() {
@@ -956,13 +957,13 @@ install_eset() {
         echo -e "  5. Reboot again when it asks."
         echo ""
         echo -e "  Verify afterwards with:"
-        echo -e "    ${BOLD}systemctl status eset${NC}"
+        echo -e "    ${BOLD}systemctl status eea${NC}"
         echo -e "    ${BOLD}/opt/eset/eea/bin/upd --list-modules${NC}"
         echo ""
         log_warn "Until this is done, ESET runs WITHOUT real-time protection."
     else
         echo -e "  Nothing else needed. Verify with:"
-        echo -e "    ${BOLD}systemctl status eset${NC}"
+        echo -e "    ${BOLD}systemctl status eea${NC}"
         echo ""
         echo -e "  The machine should appear in ESET PROTECT within a few minutes,"
         echo -e "  under the ${BOLD}Ikigai Infotech LLP${NC} group, with the"
@@ -1082,6 +1083,155 @@ uninstall_uems_agent() {
     fi
     log_ok "Agent removed."
     log_info "The device stays listed in the console until you delete it there."
+    return 0
+}
+
+# ── ESET eventlog runaway guard ───────────────────────────────────────────────
+# ESET's logd writes every real-time-protection filesystem event into
+# /var/log/eset/eea/logd/eventlog.dat with no size ceiling of its own. On a
+# machine with high directory churn — docker, node_modules, build caches — that
+# file grows without bound: iki-lp-75 reached 301 GB in roughly a day and took
+# the disk to 99% full with 5.6 GB left.
+#
+# This installs a timer that truncates the file (never deletes it — logd keeps
+# writing to the same inode) once it crosses 500 MB, and stays silent while it
+# is healthy so the journal does not fill with no-op runs.
+#
+# Note this treats the symptom. The cause is how much ERTP is asked to log; the
+# durable fix is an ESET PROTECT policy that either lowers log verbosity or
+# excludes the churny paths from real-time scanning. Excluding paths is a
+# security decision, so it is deliberately not done here.
+LOGGUARD_SH="/usr/local/sbin/eset-eventlog-guard.sh"
+LOGGUARD_UNIT="/etc/systemd/system/eset-eventlog-guard.service"
+LOGGUARD_TIMER="/etc/systemd/system/eset-eventlog-guard.timer"
+
+install_eset_logguard() {
+    log_section "ESET eventlog runaway guard"
+
+    if [ ! -d /opt/eset/eea ]; then
+        log_warn "ESET is not installed here yet. Installing the guard anyway —"
+        log_warn "it stays dormant until the log file exists."
+    fi
+
+    log_info "Writing $LOGGUARD_SH"
+    sudo tee "$LOGGUARD_SH" >/dev/null <<'GUARD'
+#!/bin/bash
+# Truncate ESET's eventlog.dat when it runs away. Installed by setup-center-cli.
+# Silent unless it acts; every action is recorded in the journal.
+set -u
+
+F="/var/log/eset/eea/logd/eventlog.dat"
+THRESH=${ESET_LOGGUARD_THRESHOLD:-524288000}   # 500 MB
+
+say() {
+    command -v logger >/dev/null 2>&1 && logger -t eset-eventlog-guard -- "$*"
+    echo "$*"
+}
+
+[ -f "$F" ] || exit 0
+
+SZ=$(stat -c%s "$F" 2>/dev/null || echo 0)
+[ "$SZ" -le "$THRESH" ] && exit 0      # healthy: say nothing, do nothing
+
+# Service name differs by build; take whichever unit actually exists.
+SVC=""
+for s in eea eset; do
+    if systemctl list-unit-files "${s}.service" >/dev/null 2>&1 \
+       && systemctl cat "${s}.service" >/dev/null 2>&1; then
+        SVC="$s"; break
+    fi
+done
+
+say "eventlog.dat is $((SZ/1024/1024)) MB (limit $((THRESH/1024/1024)) MB) - truncating"
+say "disk before: $(df -h /var | awk 'NR==2{print $4" free, "$5" used"}')"
+
+if [ -n "$SVC" ]; then
+    systemctl stop "$SVC" && say "stopped $SVC" || say "WARNING: could not stop $SVC"
+    sleep 3
+else
+    say "WARNING: no eea/eset service unit found - truncating with it running"
+fi
+
+# Truncate, never delete: logd holds the inode open and keeps appending to it.
+# Removing the file leaves logd writing to an unlinked inode and the space is
+# never actually returned until the daemon restarts.
+if truncate -s 0 "$F" 2>/dev/null; then
+    say "truncated"
+else
+    say "WARNING: truncate failed, removing file instead"
+    rm -f "$F"
+fi
+
+[ -n "$SVC" ] && { systemctl start "$SVC" && say "started $SVC" || say "WARNING: could not start $SVC"; }
+
+say "disk after:  $(df -h /var | awk 'NR==2{print $4" free, "$5" used"}')"
+exit 0
+GUARD
+    sudo chmod 750 "$LOGGUARD_SH"
+
+    log_info "Writing systemd unit and timer"
+    sudo tee "$LOGGUARD_UNIT" >/dev/null <<'UNIT'
+[Unit]
+Description=Truncate ESET eventlog.dat if it runs away
+Documentation=https://github.com/priyanshusaleshandy/ubuntu-setup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/eset-eventlog-guard.sh
+UNIT
+
+    sudo tee "$LOGGUARD_TIMER" >/dev/null <<'TIMER'
+[Unit]
+Description=Check ESET eventlog.dat size every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+    sudo systemctl daemon-reload
+    if sudo systemctl enable --now eset-eventlog-guard.timer >/dev/null 2>&1; then
+        log_ok "Timer enabled — runs 2 min after boot, then every 15 minutes."
+    else
+        log_error "Could not enable the timer."
+        return 1
+    fi
+
+    log_info "Running once now..."
+    sudo "$LOGGUARD_SH"
+
+    local f="/var/log/eset/eea/logd/eventlog.dat"
+    if [ -f "$f" ]; then
+        log_ok "Current eventlog.dat: $(( $(stat -c%s "$f") / 1024 / 1024 )) MB"
+    else
+        log_info "eventlog.dat does not exist yet — guard is dormant."
+    fi
+
+    echo ""
+    echo -e "  Check on it any time:"
+    echo -e "    ${BOLD}systemctl list-timers eset-eventlog-guard.timer${NC}"
+    echo -e "    ${BOLD}journalctl -t eset-eventlog-guard${NC}"
+    echo ""
+    log_warn "This keeps the disk from filling, but it does not stop ESET"
+    log_warn "generating the events. The real fix is an ESET PROTECT policy that"
+    log_warn "lowers ERTP log verbosity, or excludes docker/node_modules/build"
+    log_warn "caches from real-time scanning."
+    echo ""
+    return 0
+}
+
+uninstall_eset_logguard() {
+    log_section "Removing ESET eventlog guard"
+    sudo systemctl disable --now eset-eventlog-guard.timer >/dev/null 2>&1 || true
+    sudo rm -f "$LOGGUARD_TIMER" "$LOGGUARD_UNIT" "$LOGGUARD_SH"
+    sudo systemctl daemon-reload
+    log_ok "Guard removed."
+    log_warn "eventlog.dat can now grow unbounded again on this machine."
     return 0
 }
 
@@ -1275,6 +1425,7 @@ is_installed() {
         14) command -v clamscan &>/dev/null || systemctl is-active --quiet clamav-daemon 2>/dev/null ;;
         15) [ -d /opt/eset/eea ] || systemctl is-active --quiet eset 2>/dev/null ;;
         16) [ -d /usr/local/manageengine/uems_agent ] ;;
+        17) systemctl is-enabled --quiet eset-eventlog-guard.timer 2>/dev/null ;;
         *) return 1 ;;
     esac
 }
@@ -1298,6 +1449,7 @@ install_component() {
         14) install_clamav ;;
         15) install_eset ;;
         16) install_uems_agent ;;
+        17) install_eset_logguard ;;
     esac
 }
 
@@ -1320,6 +1472,7 @@ uninstall_component() {
         14) uninstall_clamav ;;
         15) uninstall_eset ;;
         16) uninstall_uems_agent ;;
+        17) uninstall_eset_logguard ;;
     esac
 }
 
