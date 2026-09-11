@@ -794,12 +794,25 @@ install_eset() {
         return 0
     fi
 
-    # ── Secure Boot check, up front ───────────────────────────────────────────
+    # ── Prerequisites, before anything that depends on them ───────────────────
+    # mokutil has to be here and not further down: the Secure Boot check below
+    # calls it, and on a fresh machine it is not installed yet. When it was
+    # installed later, `command -v mokutil` failed, secureboot was read as
+    # "off", and ESET went on without a signed module — the exact silent
+    # failure the check exists to prevent.
+    # lshw: hardware inventory the agent reports upstream.
+    # openssl: TLS between the agent and ESET PROTECT.
+    log_info "Installing prerequisites (lshw, openssl, mokutil, curl)..."
+    sudo apt-get update -y >/dev/null 2>&1
+    sudo apt-get install -y lshw openssl mokutil curl || {
+        log_error "Could not install prerequisites."; return 1; }
+
+    # ── Secure Boot check ─────────────────────────────────────────────────────
     # ESET's real-time protection is a kernel module. Under Secure Boot an
     # unsigned module will not load, so the machine would end up with ESET
     # installed but no on-access scanning — silently. Find out now, not later.
     local secureboot="off"
-    if command -v mokutil &>/dev/null && mokutil --sb-state 2>/dev/null | grep -qi "enabled"; then
+    if command -v mokutil >/dev/null 2>&1 && mokutil --sb-state 2>/dev/null | grep -qi "enabled"; then
         secureboot="on"
     fi
 
@@ -829,53 +842,98 @@ install_eset() {
         log_info "Secure Boot is off — no module signing needed."
     fi
 
-    # ── Prerequisites ─────────────────────────────────────────────────────────
-    # lshw: hardware inventory the agent reports upstream.
-    # openssl: TLS for agent <-> ESET PROTECT. mokutil//dev/tty for signing.
-    log_info "Installing prerequisites (lshw, openssl, mokutil)..."
-    sudo apt-get update -y >/dev/null 2>&1
-    sudo apt-get install -y lshw openssl mokutil curl || {
-        log_error "Could not install prerequisites."; return 1; }
-
     # ── Preferred path: offline pair off the NAS ──────────────────────────────
-    local agent_sh="/tmp/PROTECTAgentInstaller.sh"
-    local av_bin="/tmp/eeau_x86_64.bin"
+    # /var/tmp, not /tmp: the antivirus package is 1.2 GB, and /tmp is small or
+    # RAM-backed on plenty of installs. /var/tmp is on real disk and is not
+    # wiped mid-run.
+    local work="/var/tmp"
+    local agent_sh="$work/PROTECTAgentInstaller.sh"
+    local av_bin="$work/eeau_x86_64.bin"
     local installed=0
 
-    log_info "Checking the NAS for the offline packages..."
-    if curl -fsSL --max-time 20 -o "$agent_sh" "$ESET_AGENT_NAS_URL" 2>/dev/null \
-       && [ "$(sha256sum "$agent_sh" | awk '{print $1}')" = "$ESET_AGENT_SHA256" ]; then
-        log_ok "Agent installer fetched and verified."
-        log_info "Fetching the antivirus package (1.2 GB from the LAN)..."
-        if curl -fSL --max-time 1800 -o "$av_bin" "$ESET_AV_NAS_URL" \
-           && [ "$(sha256sum "$av_bin" | awk '{print $1}')" = "$ESET_AV_SHA256" ]; then
-            log_ok "Antivirus package fetched and verified."
-            chmod +x "$agent_sh" "$av_bin"
+    # Two things that fail confusingly if not checked first: not enough room for
+    # a 1.2 GB download, and a noexec mount that lets the file land but refuses
+    # to run it.
+    local free_mb
+    free_mb=$(df -Pm "$work" 2>/dev/null | awk 'NR==2{print $4}')
+    if [ -n "$free_mb" ] && [ "$free_mb" -lt 1600 ]; then
+        log_error "Only ${free_mb} MB free on $work — the antivirus package needs ~1.5 GB."
+        log_error "Free up space and re-run. Nothing has been changed."
+        df -h "$work" | sed 's/^/      /'
+        return 1
+    fi
+    if ! ( printf '#!/bin/sh\nexit 0\n' > "$work/.exectest" && chmod +x "$work/.exectest" \
+           && "$work/.exectest" ) 2>/dev/null; then
+        rm -f "$work/.exectest"
+        log_error "$work is mounted noexec — the installer cannot be run from there."
+        log_error "Remount it with exec, or install by hand from a different path."
+        return 1
+    fi
+    rm -f "$work/.exectest"
 
-            # PROTECTAgentInstaller.sh takes no arguments of its own - it passes
-            # --skip-license and the rest through to the agent build it fetches.
-            # Handing it flags directly does nothing useful.
-            log_info "1/2 — Installing ESET Management Agent..."
-            if sudo sh "$agent_sh"; then
-                log_ok "Agent installed."
-                # -y only accepts the licence; the package-manager step still
-                # asks for confirmation and there is nobody here to answer it.
-                # -f is what makes that step non-interactive. Both are needed,
-                # and any flag the installer does not recognise exits 2.
-                log_info "2/2 — Installing ESET Endpoint Antivirus (a few minutes)..."
-                if sudo "$av_bin" -y -f; then
-                    installed=1
-                else
-                    log_error "Antivirus installation failed."
-                fi
-            else
-                log_error "Agent installation failed."
-            fi
+    log_info "Checking the NAS for the offline packages (${free_mb} MB free on $work)..."
+
+    local got_agent=0 got_av=0
+
+    # Each failure is reported for what it is. Collapsing "download failed" and
+    # "checksum mismatch" into one message blamed the NAS for problems that were
+    # usually local - no disk space, no route to the LAN.
+    if curl -fSL --max-time 60 -o "$agent_sh" "$ESET_AGENT_NAS_URL"; then
+        if [ "$(sha256sum "$agent_sh" | awk '{print $1}')" = "$ESET_AGENT_SHA256" ]; then
+            log_ok "Agent installer fetched and verified."
+            got_agent=1
         else
-            log_warn "Antivirus package missing or checksum mismatch on the NAS."
+            log_error "Agent installer downloaded but the checksum does not match."
+            log_error "  expected $ESET_AGENT_SHA256"
+            log_error "  got      $(sha256sum "$agent_sh" | awk '{print $1}')"
+            log_warn  "If it was re-downloaded from ESET PROTECT, update ESET_AGENT_SHA256."
         fi
     else
-        log_warn "Agent installer missing or checksum mismatch on the NAS."
+        log_error "Could not download the agent installer from the NAS."
+        log_error "  $ESET_AGENT_NAS_URL"
+        log_warn  "The NAS is office-LAN only — off-site this always fails, and the"
+        log_warn  "Live Installer fallback below is the right path."
+    fi
+
+    if [ $got_agent -eq 1 ]; then
+        log_info "Fetching the antivirus package (1.2 GB from the LAN, give it a minute)..."
+        if curl -fSL --max-time 1800 -o "$av_bin" "$ESET_AV_NAS_URL"; then
+            if [ "$(sha256sum "$av_bin" | awk '{print $1}')" = "$ESET_AV_SHA256" ]; then
+                log_ok "Antivirus package fetched and verified."
+                got_av=1
+            else
+                log_error "Antivirus package downloaded but the checksum does not match."
+                log_error "  size on disk: $(stat -c%s "$av_bin" 2>/dev/null) bytes (expected 1312487571)"
+                log_warn  "A short file means the download was cut off, not that the NAS copy is bad."
+            fi
+        else
+            log_error "Could not download the antivirus package from the NAS."
+            log_error "  $ESET_AV_NAS_URL"
+        fi
+    fi
+
+    if [ $got_agent -eq 1 ] && [ $got_av -eq 1 ]; then
+        chmod +x "$agent_sh" "$av_bin"
+
+        # PROTECTAgentInstaller.sh takes no arguments of its own - it passes
+        # --skip-license and the rest through to the agent build it fetches.
+        # Handing it flags directly does nothing useful.
+        log_info "1/2 — Installing ESET Management Agent..."
+        if sudo sh "$agent_sh"; then
+            log_ok "Agent installed."
+            # -y only accepts the licence; the package-manager step still
+            # asks for confirmation and there is nobody here to answer it.
+            # -f is what makes that step non-interactive. Both are needed,
+            # and any flag the installer does not recognise exits 2.
+            log_info "2/2 — Installing ESET Endpoint Antivirus (a few minutes)..."
+            if sudo "$av_bin" -y -f; then
+                installed=1
+            else
+                log_error "Antivirus installation failed."
+            fi
+        else
+            log_error "Agent installation failed."
+        fi
     fi
     rm -f "$agent_sh" "$av_bin"
 
