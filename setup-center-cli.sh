@@ -102,6 +102,36 @@ NTFY_ADMIN_CHANNEL="priyanshu-setup"
 # through to the original web URL if it isn't (laptop off-site, NAS down, etc).
 LOCAL_APPS_BASE="http://192.168.126.21:8001/linux/apps"
 
+# ── Second copy of the NAS packages, on the Mac Mini ──────────────────────────
+# The NAS is the primary source, but two packages had no second source at all:
+# the Endpoint Central agent zip (it carries this tenant's serverinfo.json, so
+# there is no public URL to fall back to) and ESET's offline pair. When the NAS
+# was down, Endpoint Central simply failed, and ESET fell through to its WAN
+# Live Installer — which is checksum-pinned and whose link expires every six
+# months.
+#
+# The Mac Mini holds the second copy. It is on the same office LAN, so it is as
+# fast as the NAS, and it is also a tailnet node — and the tailnet ACL permits
+# TCP 8000-9000, so the same files are reachable off-site with no policy change.
+# Order is always: NAS, then Mac Mini over the LAN, then Mac Mini over tailnet.
+MIRROR_LAN="http://192.168.126.101:8009"
+MIRROR_TS="http://100.64.0.29:8009"
+
+# Try each URL in turn and keep the first that downloads. The source that won is
+# logged, which is the thing you actually want to know when an install was slow.
+fetch_first() {
+    local dest="$1" timeout="$2"; shift 2
+    local url
+    for url in "$@"; do
+        if curl -fSL --max-time "$timeout" -o "$dest" "$url"; then
+            log_ok "Source used: $url"
+            return 0
+        fi
+        log_warn "Source unavailable: $url"
+    done
+    return 1
+}
+
 # ── Package list & selections ─────────────────────────────────────────────────
 OPTIONS=(
     "Core Utilities & libfuse2 (git, curl, unzip, build-essential, etc.)"
@@ -878,7 +908,9 @@ install_eset() {
     # Each failure is reported for what it is. Collapsing "download failed" and
     # "checksum mismatch" into one message blamed the NAS for problems that were
     # usually local - no disk space, no route to the LAN.
-    if curl -fSL --max-time 60 -o "$agent_sh" "$ESET_AGENT_NAS_URL"; then
+    if fetch_first "$agent_sh" 60 "$ESET_AGENT_NAS_URL" \
+            "$MIRROR_LAN/PROTECTAgentInstaller.sh" \
+            "$MIRROR_TS/PROTECTAgentInstaller.sh"; then
         if [ "$(sha256sum "$agent_sh" | awk '{print $1}')" = "$ESET_AGENT_SHA256" ]; then
             log_ok "Agent installer fetched and verified."
             got_agent=1
@@ -889,15 +921,18 @@ install_eset() {
             log_warn  "If it was re-downloaded from ESET PROTECT, update ESET_AGENT_SHA256."
         fi
     else
-        log_error "Could not download the agent installer from the NAS."
-        log_error "  $ESET_AGENT_NAS_URL"
-        log_warn  "The NAS is office-LAN only — off-site this always fails, and the"
-        log_warn  "Live Installer fallback below is the right path."
+        log_error "Could not download the agent installer from any source."
+        log_warn  "Each source it tried is listed above. The NAS and the Mac Mini's"
+        log_warn  "LAN address are office-LAN only; off-site only the tailnet address"
+        log_warn  "works, and if that is unreachable too the Live Installer fallback"
+        log_warn  "below is the right path."
     fi
 
     if [ $got_agent -eq 1 ]; then
         log_info "Fetching the antivirus package (1.2 GB from the LAN, give it a minute)..."
-        if curl -fSL --max-time 1800 -o "$av_bin" "$ESET_AV_NAS_URL"; then
+        if fetch_first "$av_bin" 1800 "$ESET_AV_NAS_URL" \
+                "$MIRROR_LAN/eeau_x86_64.bin" \
+                "$MIRROR_TS/eeau_x86_64.bin"; then
             if [ "$(sha256sum "$av_bin" | awk '{print $1}')" = "$ESET_AV_SHA256" ]; then
                 log_ok "Antivirus package fetched and verified."
                 got_av=1
@@ -907,8 +942,8 @@ install_eset() {
                 log_warn  "A short file means the download was cut off, not that the NAS copy is bad."
             fi
         else
-            log_error "Could not download the antivirus package from the NAS."
-            log_error "  $ESET_AV_NAS_URL"
+            log_error "Could not download the antivirus package from any source."
+            log_warn  "Each source it tried is listed above."
         fi
     fi
 
@@ -945,10 +980,14 @@ install_eset() {
             log_ok "Live Installer fetched from NAS."
         elif curl -fsSL --max-time 8 -o "$ESET_BIN" "$LOCAL_APPS_BASE/eset_live_installer.bin" 2>/dev/null; then
             log_ok "Live Installer fetched from NAS app cache."
+        elif curl -fsSL --max-time 15 -o "$ESET_BIN" "$MIRROR_LAN/eset_live_installer.bin" 2>/dev/null; then
+            log_ok "Live Installer fetched from the Mac Mini (LAN)."
+        elif curl -fsSL --max-time 20 -o "$ESET_BIN" "$MIRROR_TS/eset_live_installer.bin" 2>/dev/null; then
+            log_ok "Live Installer fetched from the Mac Mini (tailnet)."
         elif curl -fsSL -o "$ESET_BIN" "$ESET_URL"; then
             log_ok "Live Installer fetched from ESET."
         else
-            log_error "Could not obtain any installer, from the NAS or from ESET."
+            log_error "Could not obtain any installer — not from the NAS, the Mac Mini, or ESET."
             log_error "If the link has expired (they last 6 months), regenerate it in"
             log_error "ESET PROTECT > Installers and update ESET_URL and ESET_SHA256."
             return 1
@@ -1069,10 +1108,14 @@ install_uems_agent() {
     local tmp; tmp="$(mktemp -d)"
     local zip="$tmp/agent.zip"
 
-    log_info "Downloading agent from the NAS..."
-    if ! curl -fsSL --max-time 300 -o "$zip" "$UEMS_ZIP_URL"; then
-        log_error "Download failed. The NAS is only reachable on the office LAN —"
-        log_error "off-site, download the zip from the console and install by hand."
+    log_info "Downloading agent (NAS first, then the Mac Mini)..."
+    if ! fetch_first "$zip" 300 "$UEMS_ZIP_URL" \
+            "$MIRROR_LAN/DefaultRemoteOffice_UEMSLinuxAgent_X64.zip" \
+            "$MIRROR_TS/DefaultRemoteOffice_UEMSLinuxAgent_X64.zip"; then
+        log_error "Download failed from every source (listed above)."
+        log_error "The NAS and the Mac Mini's LAN address are office-LAN only; off-site"
+        log_error "only the tailnet address works. If none of them is reachable, download"
+        log_error "the zip from the console and install by hand."
         rm -rf "$tmp"; return 1
     fi
 
