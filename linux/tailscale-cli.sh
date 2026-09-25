@@ -239,7 +239,8 @@ menu_login() {
                 ensure_tailscale_service || { press_enter; continue; }
                 log_section "OFFICIAL TAILSCALE CLOUD LOGIN"
                 sudo tailscale login --login-server="https://controlserver.tailscale.com"
-                sudo tailscale up
+                # `up` resets every pref it is not given, so carry these forward
+                sudo tailscale up --accept-routes --accept-dns --exit-node-allow-lan-access
                 log_ok "Logged in to Official Tailscale!"
                 press_enter ;;
             4)
@@ -366,7 +367,10 @@ menu_exit_nodes() {
                 ;;
             6)
                 log_info "Disabling Exit Node..."
-                sudo tailscale set --exit-node="" 2>/dev/null || sudo tailscale up --exit-node=""
+                # The `up` fallback would also clear accept-routes, DNS, LAN access
+                # and the operator -- pass them so only the exit node is dropped.
+                sudo tailscale set --exit-node="" 2>/dev/null || \
+                    sudo tailscale up --accept-routes --accept-dns --exit-node-allow-lan-access --exit-node=""
                 log_ok "Exit Node disabled. You are now using local internet."
                 press_enter; continue ;;
             7)

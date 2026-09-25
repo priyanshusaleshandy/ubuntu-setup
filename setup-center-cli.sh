@@ -297,6 +297,10 @@ TAILSCALE = shutil.which('tailscale') or '/usr/bin/tailscale'
 APP_ID = 'saleshandy-tailscale-tray'
 LOCK_PATH = os.path.expanduser('~/.cache/saleshandy-tailscale-tray.lock')
 LOGIN_SERVER = 'https://bifrost.saleshandy.com'
+# Intercom allow-lists node-1's egress (44.229.234.59). Any other exit node, or
+# none at all, is rejected as an unauthorized IP -- which is what users actually
+# report, usually as "Intercom stopped working".
+INTERCOM_EXIT_NODE = '100.64.0.1'
 # Auto-sends the login link here instead of leaving it to find in a terminal.
 # Only reachable on the office LAN — off-site this send will just fail quietly
 # and the link is still visible in `tailscale status` / journalctl as before.
@@ -306,7 +310,7 @@ NTFY_URL = 'http://192.168.126.101:8080/priyanshu-setup'
 # Bump this on every change that should roll out automatically. Checked
 # against the same number embedded in whichever copy of this file is fetched
 # below - NAS first (fast, LAN-only), GitHub as the fallback.
-SCRIPT_VERSION = 2
+SCRIPT_VERSION = 3
 UPDATE_CHECK_INTERVAL_SEC = 1800  # 30 minutes
 UPDATE_SOURCES = (
     'http://192.168.126.21:8000/setup-center-cli.sh',
@@ -485,6 +489,10 @@ class TailscaleTray:
         exit_menu_item.set_submenu(exit_submenu)
         self.menu.append(exit_menu_item)
 
+        intercom_item = Gtk.MenuItem(label='Intercom — fix access')
+        intercom_item.connect('activate', self._on_intercom)
+        self.menu.append(intercom_item)
+
         lan_item = Gtk.CheckMenuItem(label='Allow LAN access while using exit node')
         lan_item.set_active(bool((prefs or {}).get('ExitNodeAllowLANAccess')))
         lan_item.connect('toggled', self._on_lan_access)
@@ -529,12 +537,23 @@ class TailscaleTray:
             return
         self._run_set_and_refresh([f'--exit-node={ip or ""}'])
 
+    def _on_intercom(self, _widget):
+        # One `set` call, both prefs: routes Intercom over the allow-listed egress
+        # and keeps the local LAN reachable. `set` only changes what it is given,
+        # so nothing else in the profile is touched.
+        self._run_set_and_refresh([f'--exit-node={INTERCOM_EXIT_NODE}',
+                                   '--exit-node-allow-lan-access=true'])
+        self._notify('Exit node set for Intercom — reload the Intercom tab')
+
     def _on_lan_access(self, widget):
         value = 'true' if widget.get_active() else 'false'
         self._run_set_and_refresh([f'--exit-node-allow-lan-access={value}'])
 
     def _on_connect(self, _widget):
-        r = ts('up')
+        # `tailscale up` resets every pref it is not given, so pass the ones users
+        # lose most often. It still clears the exit node -- that is what the
+        # "Intercom — fix access" item and the Exit node submenu are for.
+        r = ts('up', '--accept-routes', '--accept-dns', '--exit-node-allow-lan-access')
         self.last_error = None if r.returncode == 0 else (r.stderr or 'connect failed').strip().splitlines()[-1][:160]
         GLib.timeout_add(600, lambda: (self.refresh(), False)[1])
 
