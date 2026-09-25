@@ -820,6 +820,66 @@ function Show-Win11BypassMenu {
 }
 
 # =============================================================================
+# [12] BITWARDEN - pinned extension (no auto-update)
+# =============================================================================
+# Store version 2026.8.0 is broken against our Vaultwarden. This downloads the
+# known-good 2026.6.1 build into Downloads (load it via Chrome > Load unpacked)
+# and blocks the Web Store copy by ID so it can never come back / auto-update.
+# An unpacked extension gets a different ID and never auto-updates.
+function Install-BitwardenPinned {
+    Show-Header; Write-Host "  [12] BITWARDEN 2026.6.1 (PINNED, UPDATES BLOCKED)" -ForegroundColor Cyan; Write-Host ""
+    $ver   = '2026.6.1'
+    $url   = "https://github.com/bitwarden/clients/releases/download/browser-v$ver/dist-chrome-$ver.zip"
+    $hash  = 'FCD29C5971D9B218AD9159717A19C38CCA5150F2A0AA909DDF805BD7695D097E'
+    $extId = 'nngceckbapebfimnlniiiahkandclblb'
+    $dl    = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'
+    $zip   = Join-Path $env:TEMP "bw-$ver.zip"
+    $dir   = Join-Path $dl "bitwarden-extension-$ver"
+
+    try {
+        Write-INFO "Downloading Bitwarden $ver from GitHub..."
+        $ProgressPreference = 'SilentlyContinue'
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest $url -OutFile $zip -UseBasicParsing
+        if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $hash) {
+            Remove-Item $zip -Force
+            Write-ERR "Checksum mismatch - nothing installed."; Pause-Menu; return
+        }
+        if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
+        Expand-Archive $zip $dir; Remove-Item $zip -Force
+        Write-OK "Extracted to $dir"
+    } catch { Write-ERR "$($_.Exception.Message)"; Pause-Menu; return }
+
+    Write-INFO "Blocking the Web Store Bitwarden (auto-update) in Chrome & Brave..."
+    foreach ($root in 'HKLM:\SOFTWARE\Policies\Google\Chrome', 'HKLM:\SOFTWARE\Policies\BraveSoftware\Brave') {
+        # Drop our old force-install entry, else it fights the blocklist.
+        $force = "$root\ExtensionInstallForcelist"
+        if (Test-Path $force) {
+            $k = Get-Item $force
+            $k.GetValueNames() | Where-Object { "$($k.GetValue($_))" -like "$extId;*" } |
+                ForEach-Object { Remove-ItemProperty -Path $force -Name $_ -Force }
+        }
+        $block = "$root\ExtensionInstallBlocklist"
+        New-Item -Path $block -Force | Out-Null
+        $k = Get-Item $block
+        if (-not ($k.GetValueNames() | Where-Object { $k.GetValue($_) -eq $extId })) {
+            $used = @($k.GetValueNames() | ForEach-Object { [int]$_ } | Sort-Object)
+            $slot = if ($used.Count) { [string]($used[-1] + 1) } else { '1' }
+            New-ItemProperty -Path $block -Name $slot -Value $extId -PropertyType String -Force | Out-Null
+        }
+    }
+    Write-OK "Store Bitwarden ($extId) blocked - it will not update or reinstall."
+
+    Set-Clipboard $dir
+    Write-Host ""
+    Write-Host "  NEXT (in Chrome/Brave, after a full browser restart):" -ForegroundColor Yellow
+    Write-Host "   1. chrome://extensions -> turn ON Developer mode" -ForegroundColor White
+    Write-Host "   2. Load unpacked -> paste path (already on clipboard): $dir" -ForegroundColor White
+    Write-Host "   3. Bitwarden -> Self-hosted -> https://orion.saleshandyteam.com" -ForegroundColor White
+    Pause-Menu
+}
+
+# =============================================================================
 # MAIN MENU LOOP
 # =============================================================================
 Ensure-PackageManagers
@@ -839,6 +899,7 @@ while ($true) {
         @{K="9";L="Tailscale VPN";             D="Install / Login / Connect / Status / Remove"},
         @{K="10";L="Blockchain Dev Toolkit";    D="Ganache CLI, Truffle, Geth & Node.js"},
         @{K="11";L="Win 11 Setup & OOBE Bypass";D="BypassNRO & Microsoft Account bypass tips"},
+        @{K="12";L="Bitwarden Pinned Ext";      D="2026.6.1 to Downloads + block store auto-update"},
         @{K="0";L="Exit";                       D=""}
     ) | ForEach-Object {
         Write-Host "  [" -NoNewline -ForegroundColor DarkGray
@@ -849,7 +910,7 @@ while ($true) {
     }
     Write-Host ""; Write-Sep "-"
 
-    $opt = (Read-Host "`n  Enter choice [0-11]").Trim()
+    $opt = (Read-Host "`n  Enter choice [0-12]").Trim()
     switch ($opt) {
         '1' { Install-NormalSoftware }
         '2' { Install-MSOffice }
@@ -862,7 +923,8 @@ while ($true) {
         '9' { Show-TailscaleMenu }
         '10' { Show-BlockchainMenu }
         '11' { Show-Win11BypassMenu }
+        '12' { Install-BitwardenPinned }
         '0' { Write-Host "`n  Goodbye!`n" -ForegroundColor Cyan; exit 0 }
-        default { Write-WARN "Invalid choice - enter 0-11."; Start-Sleep -Seconds 1 }
+        default { Write-WARN "Invalid choice - enter 0-12."; Start-Sleep -Seconds 1 }
     }
 }
