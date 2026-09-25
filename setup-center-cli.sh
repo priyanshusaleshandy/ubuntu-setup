@@ -310,7 +310,7 @@ NTFY_URL = 'http://192.168.126.101:8080/priyanshu-setup'
 # Bump this on every change that should roll out automatically. Checked
 # against the same number embedded in whichever copy of this file is fetched
 # below - NAS first (fast, LAN-only), GitHub as the fallback.
-SCRIPT_VERSION = 3
+SCRIPT_VERSION = 4
 UPDATE_CHECK_INTERVAL_SEC = 1800  # 30 minutes
 UPDATE_SOURCES = (
     'http://192.168.126.21:8000/setup-center-cli.sh',
@@ -498,6 +498,11 @@ class TailscaleTray:
         lan_item.connect('toggled', self._on_lan_access)
         self.menu.append(lan_item)
 
+        dns_item = Gtk.CheckMenuItem(label='Accept DNS (MagicDNS)')
+        dns_item.set_active(bool((prefs or {}).get('CorpDNS')))
+        dns_item.connect('toggled', self._on_accept_dns)
+        self.menu.append(dns_item)
+
         self._append_separator()
         down_item = Gtk.MenuItem(label='Disconnect')
         down_item.connect('activate', self._on_disconnect)
@@ -538,16 +543,24 @@ class TailscaleTray:
         self._run_set_and_refresh([f'--exit-node={ip or ""}'])
 
     def _on_intercom(self, _widget):
-        # One `set` call, both prefs: routes Intercom over the allow-listed egress
-        # and keeps the local LAN reachable. `set` only changes what it is given,
-        # so nothing else in the profile is touched.
-        self._run_set_and_refresh([f'--exit-node={INTERCOM_EXIT_NODE}',
+        # Everything node-1 needs, in one `set` call. Accept-routes and accept-DNS
+        # are part of it because the exit node does not actually carry traffic
+        # without them -- fixing only the exit node leaves the user just as stuck.
+        # `set` changes only what it is given, so the rest of the profile survives.
+        self._run_set_and_refresh(['--accept-routes=true',
+                                   '--accept-dns=true',
+                                   f'--exit-node={INTERCOM_EXIT_NODE}',
                                    '--exit-node-allow-lan-access=true'])
-        self._notify('Exit node set for Intercom — reload the Intercom tab')
+        self._notify('Routes, DNS and exit node set for Intercom — reload the tab')
 
     def _on_lan_access(self, widget):
         value = 'true' if widget.get_active() else 'false'
         self._run_set_and_refresh([f'--exit-node-allow-lan-access={value}'])
+
+    def _on_accept_dns(self, widget):
+        # node-1 and node-2 do not resolve anything with this off.
+        value = 'true' if widget.get_active() else 'false'
+        self._run_set_and_refresh([f'--accept-dns={value}'])
 
     def _on_connect(self, _widget):
         # `tailscale up` resets every pref it is not given, so pass the ones users
