@@ -194,7 +194,7 @@ menu_login() {
                 log_section "HEADSCALE AUTO-LINK LOGIN"
                 log_info "Requesting login link for server: ${HEADSCALE_SERVER}..."
                 TS_LOG="$(mktemp)"
-                sudo tailscale up --login-server="${HEADSCALE_SERVER}" --accept-routes --accept-dns --force-reauth > "$TS_LOG" 2>&1 &
+                sudo tailscale up --operator="${SUDO_USER:-$USER}" --login-server="${HEADSCALE_SERVER}" --accept-routes --accept-dns --force-reauth > "$TS_LOG" 2>&1 &
                 TS_PID=$!
                 LOGIN_URL=""
                 for _ in $(seq 1 25); do
@@ -231,7 +231,7 @@ menu_login() {
                         srv_flag="--login-server=${HEADSCALE_SERVER}"
                     fi
                     log_info "Authenticating node with Auth Key..."
-                    sudo tailscale up --authkey="$authKey" $srv_flag --accept-routes --accept-dns --force-reauth
+                    sudo tailscale up --operator="${SUDO_USER:-$USER}" --authkey="$authKey" $srv_flag --accept-routes --accept-dns --force-reauth
                     log_ok "Node registered with Auth Key!"
                 fi
                 press_enter ;;
@@ -240,7 +240,7 @@ menu_login() {
                 log_section "OFFICIAL TAILSCALE CLOUD LOGIN"
                 sudo tailscale login --login-server="https://controlserver.tailscale.com"
                 # `up` resets every pref it is not given, so carry these forward
-                sudo tailscale up --accept-routes --accept-dns --exit-node-allow-lan-access
+                sudo tailscale up --operator="${SUDO_USER:-$USER}" --accept-routes --accept-dns
                 log_ok "Logged in to Official Tailscale!"
                 press_enter ;;
             4)
@@ -248,7 +248,7 @@ menu_login() {
                 log_section "CUSTOM CONTROL SERVER LOGIN"
                 read -rp "  Enter Control Server URL [e.g. https://vpn.domain.com]: " customSrv < /dev/tty
                 if [[ -n "$customSrv" ]]; then
-                    sudo tailscale up --login-server="$customSrv" --accept-routes --accept-dns --force-reauth
+                    sudo tailscale up --operator="${SUDO_USER:-$USER}" --login-server="$customSrv" --accept-routes --accept-dns --force-reauth
                 fi
                 press_enter ;;
             0) return ;;
@@ -370,7 +370,7 @@ menu_exit_nodes() {
                 # The `up` fallback would also clear accept-routes, DNS, LAN access
                 # and the operator -- pass them so only the exit node is dropped.
                 sudo tailscale set --exit-node="" 2>/dev/null || \
-                    sudo tailscale up --accept-routes --accept-dns --exit-node-allow-lan-access --exit-node=""
+                    sudo tailscale up --operator="${SUDO_USER:-$USER}" --accept-routes --accept-dns --exit-node=""
                 log_ok "Exit Node disabled. You are now using local internet."
                 press_enter; continue ;;
             7)
@@ -386,7 +386,7 @@ menu_exit_nodes() {
 
             # 2. Ensure routing flags are enabled
             log_info "Ensuring routing & DNS flags are active..."
-            sudo tailscale up --accept-routes --accept-dns >/dev/null 2>&1 || true
+            sudo tailscale up --operator="${SUDO_USER:-$USER}" --accept-routes --accept-dns >/dev/null 2>&1 || true
 
             # 3. Connect to Exit Node
             log_info "Connecting to Exit Node '$target_node'..."
@@ -394,7 +394,7 @@ menu_exit_nodes() {
                 log_ok "Exit Node active: $target_node"
             else
                 log_info "Retrying with full tailscale up..."
-                if sudo tailscale up --accept-dns --accept-routes --exit-node="$target_node" --exit-node-allow-lan-access; then
+                if sudo tailscale up --operator="${SUDO_USER:-$USER}" --accept-dns --accept-routes --exit-node="$target_node" --exit-node-allow-lan-access; then
                     log_ok "Exit Node active via full up: $target_node"
                 else
                     log_error "Failed to activate exit node '$target_node'. It may be offline, or (on Headscale) its route needs admin approval on the server side."
@@ -434,7 +434,7 @@ menu_quick_actions() {
             1)
                 ensure_tailscale_service || { press_enter; continue; }
                 log_info "Connecting Tailscale..."
-                sudo tailscale up --accept-routes --accept-dns
+                sudo tailscale up --operator="${SUDO_USER:-$USER}" --accept-routes --accept-dns
                 log_ok "Tailscale connected!"
                 press_enter ;;
             2)
@@ -445,7 +445,7 @@ menu_quick_actions() {
             3)
                 ensure_tailscale_service || { press_enter; continue; }
                 log_info "Resetting Tailscale connection flags..."
-                sudo tailscale up --reset --accept-routes --accept-dns
+                sudo tailscale up --operator="${SUDO_USER:-$USER}" --reset --accept-routes --accept-dns
                 log_ok "Tailscale connection reset."
                 press_enter ;;
             4)

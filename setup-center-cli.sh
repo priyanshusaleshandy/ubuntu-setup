@@ -282,6 +282,7 @@ import fcntl
 import json
 import os
 import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -310,7 +311,7 @@ NTFY_URL = 'http://192.168.126.101:8080/priyanshu-setup'
 # Bump this on every change that should roll out automatically. Checked
 # against the same number embedded in whichever copy of this file is fetched
 # below - NAS first (fast, LAN-only), GitHub as the fallback.
-SCRIPT_VERSION = 4
+SCRIPT_VERSION = 5
 UPDATE_CHECK_INTERVAL_SEC = 1800  # 30 minutes
 UPDATE_SOURCES = (
     'http://192.168.126.21:8000/setup-center-cli.sh',
@@ -563,10 +564,32 @@ class TailscaleTray:
         self._run_set_and_refresh([f'--accept-dns={value}'])
 
     def _on_connect(self, _widget):
-        # `tailscale up` resets every pref it is not given, so pass the ones users
-        # lose most often. It still clears the exit node -- that is what the
-        # "Intercom — fix access" item and the Exit node submenu are for.
-        r = ts('up', '--accept-routes', '--accept-dns', '--exit-node-allow-lan-access')
+        # `tailscale up` refuses to run when the stored prefs differ from the
+        # flag defaults; it prints the command that would preserve them. Two
+        # traps, both hit on 1.102.4 and both verified here:
+        #   - on a custom control server a bare `up` fails with a login-server
+        #     error and prints no suggestion at all, so pass --login-server;
+        #   - the suggestion it prints can carry --exit-node-allow-lan-access
+        #     with no --exit-node, which `up` then rejects. Omitting it is no
+        #     good either -- that trips "mention all non-default flags".
+        #     Passing it as =false satisfies both checks, and `set` (which has
+        #     no such restriction) puts the real value back afterwards.
+        EXIT = '--exit-node='
+        LAN = '--exit-node-allow-lan-access'
+        r = ts('up')
+        if r.returncode != 0:
+            r = ts('up', f'--login-server={LOGIN_SERVER}')
+            m = re.search(r'^\s*tailscale up (.+)$',
+                          (r.stderr or '') + (r.stdout or ''), re.MULTILINE)
+            if m:
+                sug = shlex.split(m.group(1))
+                forced = LAN in sug and not any(
+                    a.startswith(EXIT) and len(a) > len(EXIT) for a in sug)
+                if forced:
+                    sug = [LAN + '=false' if a == LAN else a for a in sug]
+                r = ts('up', *sug, timeout=30)
+                if r.returncode == 0 and forced:
+                    ts('set', LAN + '=true')
         self.last_error = None if r.returncode == 0 else (r.stderr or 'connect failed').strip().splitlines()[-1][:160]
         GLib.timeout_add(600, lambda: (self.refresh(), False)[1])
 
@@ -1809,7 +1832,7 @@ menu_tailscale() {
                     log_info "Requesting login link (will auto-send to '$NTFY_TOPIC')..."
                     log_warn "This forces a fresh login even if already connected — if you're SSH'd in over Tailscale right now, that session may drop."
                     TS_LOG="$(mktemp)"
-                    sudo tailscale up --login-server="$server" --accept-routes --accept-dns --force-reauth > "$TS_LOG" 2>&1 &
+                    sudo tailscale up --operator="${SUDO_USER:-$USER}" --login-server="$server" --accept-routes --accept-dns --force-reauth > "$TS_LOG" 2>&1 &
                     TS_PID=$!
                     LOGIN_URL=""
                     for _ in $(seq 1 30); do
@@ -1838,18 +1861,18 @@ menu_tailscale() {
                         log_warn "Cancelled."
                     else
                         log_info "Registering node using Auth Key..."
-                        sudo tailscale up --authkey="$authKey" --login-server="$server" --accept-routes --accept-dns --force-reauth
+                        sudo tailscale up --operator="${SUDO_USER:-$USER}" --authkey="$authKey" --login-server="$server" --accept-routes --accept-dns --force-reauth
                         log_ok "Node successfully registered with Auth Key!"
                     fi
                 fi
                 press_enter ;;
             3)
                 ensure_tailscale_service || { press_enter; continue; }
-                sudo tailscale up --accept-routes --accept-dns --login-server="$server"
+                sudo tailscale up --operator="${SUDO_USER:-$USER}" --accept-routes --accept-dns --login-server="$server"
                 press_enter ;;
             4)
                 ensure_tailscale_service || { press_enter; continue; }
-                sudo tailscale up --login-server="$server" --reset --accept-dns --accept-routes
+                sudo tailscale up --operator="${SUDO_USER:-$USER}" --login-server="$server" --reset --accept-dns --accept-routes
                 press_enter ;;
             5)
                 ensure_tailscale_service || { press_enter; continue; }
@@ -1890,7 +1913,7 @@ menu_tailscale() {
                         log_ok "Exit Node active: $target_node"
                     else
                         log_info "Retrying with full tailscale up..."
-                        sudo tailscale up --login-server="$server" --accept-dns --accept-routes --exit-node="$target_node" --exit-node-allow-lan-access
+                        sudo tailscale up --operator="${SUDO_USER:-$USER}" --login-server="$server" --accept-dns --accept-routes --exit-node="$target_node" --exit-node-allow-lan-access
                     fi
                     log_info "Current Public IP:"
                     curl -s --max-time 5 https://ifconfig.me || true; echo ""
