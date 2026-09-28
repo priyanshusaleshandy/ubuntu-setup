@@ -311,7 +311,7 @@ NTFY_URL = 'http://192.168.126.101:8080/priyanshu-setup'
 # Bump this on every change that should roll out automatically. Checked
 # against the same number embedded in whichever copy of this file is fetched
 # below - NAS first (fast, LAN-only), GitHub as the fallback.
-SCRIPT_VERSION = 5
+SCRIPT_VERSION = 6
 UPDATE_CHECK_INTERVAL_SEC = 1800  # 30 minutes
 UPDATE_SOURCES = (
     'http://192.168.126.21:8000/setup-center-cli.sh',
@@ -499,10 +499,15 @@ class TailscaleTray:
         lan_item.connect('toggled', self._on_lan_access)
         self.menu.append(lan_item)
 
-        dns_item = Gtk.CheckMenuItem(label='Accept DNS (MagicDNS)')
-        dns_item.set_active(bool((prefs or {}).get('CorpDNS')))
-        dns_item.connect('toggled', self._on_accept_dns)
-        self.menu.append(dns_item)
+        self._append_separator()
+
+        reconnect_item = Gtk.MenuItem(label='Reconnect (accept routes & DNS)')
+        reconnect_item.connect('activate', self._on_reconnect)
+        self.menu.append(reconnect_item)
+
+        reset_item = Gtk.MenuItem(label='Full Reset + Connect')
+        reset_item.connect('activate', self._on_full_reset)
+        self.menu.append(reset_item)
 
         self._append_separator()
         down_item = Gtk.MenuItem(label='Disconnect')
@@ -558,40 +563,65 @@ class TailscaleTray:
         value = 'true' if widget.get_active() else 'false'
         self._run_set_and_refresh([f'--exit-node-allow-lan-access={value}'])
 
-    def _on_accept_dns(self, widget):
-        # node-1 and node-2 do not resolve anything with this off.
-        value = 'true' if widget.get_active() else 'false'
-        self._run_set_and_refresh([f'--accept-dns={value}'])
+    def _up_preserving(self):
+        """`tailscale up` without losing the stored preferences.
+
+        Two traps, both hit on 1.102.4 and both verified by hand:
+          - on a custom control server a bare `up` fails with a login-server
+            error and prints no suggestion, so retry naming --login-server;
+          - the suggestion it then prints can carry --exit-node-allow-lan-access
+            with no --exit-node, which `up` rejects. Dropping it instead trips
+            "mention all non-default flags". Passing it as =false clears both
+            checks, and `set` (which has no such restriction) puts the real
+            value back afterwards.
+        """
+        EXIT, LAN = '--exit-node=', '--exit-node-allow-lan-access'
+        r = ts('up')
+        if r.returncode == 0:
+            return r
+        r = ts('up', f'--login-server={LOGIN_SERVER}')
+        m = re.search(r'^\s*tailscale up (.+)$',
+                      (r.stderr or '') + (r.stdout or ''), re.MULTILINE)
+        if not m:
+            return r
+        sug = shlex.split(m.group(1))
+        forced = LAN in sug and not any(
+            a.startswith(EXIT) and len(a) > len(EXIT) for a in sug)
+        if forced:
+            sug = [LAN + '=false' if a == LAN else a for a in sug]
+        r = ts('up', *sug, timeout=30)
+        if r.returncode == 0 and forced:
+            ts('set', LAN + '=true')
+        return r
+
+    def _finish(self, r, failmsg):
+        self.last_error = None if r.returncode == 0 else \
+            (r.stderr or failmsg).strip().splitlines()[-1][:160]
+        GLib.timeout_add(600, lambda: (self.refresh(), False)[1])
 
     def _on_connect(self, _widget):
-        # `tailscale up` refuses to run when the stored prefs differ from the
-        # flag defaults; it prints the command that would preserve them. Two
-        # traps, both hit on 1.102.4 and both verified here:
-        #   - on a custom control server a bare `up` fails with a login-server
-        #     error and prints no suggestion at all, so pass --login-server;
-        #   - the suggestion it prints can carry --exit-node-allow-lan-access
-        #     with no --exit-node, which `up` then rejects. Omitting it is no
-        #     good either -- that trips "mention all non-default flags".
-        #     Passing it as =false satisfies both checks, and `set` (which has
-        #     no such restriction) puts the real value back afterwards.
-        EXIT = '--exit-node='
-        LAN = '--exit-node-allow-lan-access'
-        r = ts('up')
-        if r.returncode != 0:
-            r = ts('up', f'--login-server={LOGIN_SERVER}')
-            m = re.search(r'^\s*tailscale up (.+)$',
-                          (r.stderr or '') + (r.stdout or ''), re.MULTILINE)
-            if m:
-                sug = shlex.split(m.group(1))
-                forced = LAN in sug and not any(
-                    a.startswith(EXIT) and len(a) > len(EXIT) for a in sug)
-                if forced:
-                    sug = [LAN + '=false' if a == LAN else a for a in sug]
-                r = ts('up', *sug, timeout=30)
-                if r.returncode == 0 and forced:
-                    ts('set', LAN + '=true')
-        self.last_error = None if r.returncode == 0 else (r.stderr or 'connect failed').strip().splitlines()[-1][:160]
-        GLib.timeout_add(600, lambda: (self.refresh(), False)[1])
+        self._finish(self._up_preserving(), 'connect failed')
+
+    def _on_reconnect(self, _widget):
+        # Same as menu [3] in setup-center-cli.sh, but it survives the flag
+        # traps above instead of erroring out the way the raw command does.
+        r = self._up_preserving()
+        self._finish(r, 'reconnect failed')
+        if r.returncode == 0:
+            self._notify('Reconnected with routes and DNS')
+
+    def _on_full_reset(self, _widget):
+        # Menu [4]: the one that actually clears a wedged profile. --reset
+        # skips the "mention all non-default flags" check entirely, which is
+        # why plain Reconnect can fail where this succeeds. --operator is named
+        # so sudo-free control survives the reset; the exit node does not, by
+        # design, so say so rather than leave the user wondering.
+        r = ts('up', f'--operator={GLib.get_user_name()}',
+               f'--login-server={LOGIN_SERVER}',
+               '--reset', '--accept-dns', '--accept-routes', timeout=60)
+        self._finish(r, 'reset failed')
+        if r.returncode == 0:
+            self._notify('Reset done — exit node cleared. Use "Intercom — fix access" to set it again.')
 
     def _on_disconnect(self, _widget):
         r = ts('down')
