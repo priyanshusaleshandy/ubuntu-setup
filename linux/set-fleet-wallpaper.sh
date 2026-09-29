@@ -5,16 +5,16 @@
 # ==============================================================================
 set -euo pipefail
 
-WALLPAPER_URL="https://raw.githubusercontent.com/priyanshusaleshandy/ubuntu-setup/biomax-console/windows/wallpapers/saleshandy-wallpaper.jpg"
-DEST_PATH="/usr/share/backgrounds/saleshandy-wallpaper.jpg"
+WALLPAPER_URL="https://raw.githubusercontent.com/priyanshusaleshandy/ubuntu-setup/biomax-console/windows/wallpapers/saleshandy-wallpaper-1080p.png"
+DEST_PATH="/usr/share/backgrounds/saleshandy-wallpaper-1080p.png"
 
-echo "=== Setting Fleet Wallpaper ==="
+echo "=== Setting Fleet Wallpaper (1080p Locked) ==="
 
 # 1. Download/Copy wallpaper to system backgrounds
 mkdir -p /usr/share/backgrounds
-if [ -f "saleshandy-wallpaper.jpg" ]; then
+if [ -f "saleshandy-wallpaper-1080p.png" ]; then
     echo "Using local dependency file..."
-    cp -f "saleshandy-wallpaper.jpg" "$DEST_PATH"
+    cp -f "saleshandy-wallpaper-1080p.png" "$DEST_PATH"
 else
     echo "Downloading wallpaper from GitHub..."
     curl -fsSL "$WALLPAPER_URL" -o "$DEST_PATH"
