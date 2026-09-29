@@ -10,6 +10,23 @@ DEST_PATH="/usr/share/backgrounds/saleshandy-wallpaper-1080p.png"
 
 echo "=== Setting Fleet Wallpaper (1080p Locked) ==="
 
+# Exemption check: If machine is IKI-LP-22 (admin/personal laptop), unlock and restore normal control
+CURRENT_HOST="$(hostname -s 2>/dev/null || uname -n)"
+if [[ "${CURRENT_HOST^^}" == "IKI-LP-22" ]]; then
+    echo "Machine $CURRENT_HOST is exempt from fleet wallpaper lockdown."
+    echo "Removing all wallpaper dconf locks and restoring user control..."
+    rm -f /etc/dconf/db/local.d/locks/wallpaper /etc/dconf/db/local.d/00-wallpaper /etc/dconf/profile/user 2>/dev/null || true
+    if command -v dconf &>/dev/null; then
+        dconf update 2>/dev/null || true
+    fi
+    for u in $(who | awk '{print $1}' | sort -u); do
+        uid=$(id -u "$u" 2>/dev/null) || continue
+        pkill -u "$uid" dconf-service 2>/dev/null || true
+    done
+    echo "Lock removed successfully on $CURRENT_HOST."
+    exit 0
+fi
+
 # 1. Download/Copy wallpaper to system backgrounds
 mkdir -p /usr/share/backgrounds
 if [ -f "saleshandy-wallpaper-1080p.png" ]; then
