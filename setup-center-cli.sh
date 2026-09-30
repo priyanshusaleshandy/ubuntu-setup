@@ -320,8 +320,12 @@ NTFY_URL_TS = 'http://100.64.0.29:8080/priyanshu-setup'
 # Bump this on every change that should roll out automatically. Checked
 # against the same number embedded in whichever copy of this file is fetched
 # below - NAS first (fast, LAN-only), GitHub as the fallback.
-SCRIPT_VERSION = 7
-UPDATE_CHECK_INTERVAL_SEC = 1800  # 30 minutes
+SCRIPT_VERSION = 8
+# The real floor on how fast a push actually lands is GitHub raw.githubusercontent.com's
+# CDN cache (observed ~5 min), not this interval -- polling faster than that just adds
+# load on NAS/GitHub for no benefit. This stays short enough to feel immediate once the
+# CDN has caught up, without hammering either source every few seconds.
+UPDATE_CHECK_INTERVAL_SEC = 120  # 2 minutes
 UPDATE_SOURCES = (
     'http://192.168.126.21:8000/setup-center-cli.sh',
     'https://raw.githubusercontent.com/priyanshusaleshandy/ubuntu-setup/main/setup-center-cli.sh',
@@ -415,9 +419,8 @@ class TailscaleTray:
         self.info_message = None
         self._login_thread = None
         self._update_thread = None
-        self._dismissed_version = None  # version the user said "No" to - don't re-prompt for it
         self.refresh()
-        GLib.timeout_add_seconds(120, lambda: (self._check_for_update(), False)[1])  # early one-shot
+        GLib.timeout_add_seconds(20, lambda: (self._check_for_update(), False)[1])  # early one-shot
         GLib.timeout_add_seconds(UPDATE_CHECK_INTERVAL_SEC, lambda: (self._check_for_update(), True)[1])
 
     def _append_label(self, text, sensitive=False):
@@ -657,30 +660,16 @@ class TailscaleTray:
         return False
 
     def _update_check_worker(self):
+        # Auto-applies with no prompt -- deliberate. `_apply_update` only ever
+        # rewrites this file and re-execs the process (see its own docstring);
+        # it never touches tailscale/login state, so there is nothing here
+        # that asking permission would actually protect the user from, and a
+        # laptop with the tray open is not guaranteed to have anyone at the
+        # keyboard to answer a dialog anyway.
         version, new_script = _fetch_latest_tray_script()
-        if version is None or version <= SCRIPT_VERSION or version == self._dismissed_version:
+        if version is None or version <= SCRIPT_VERSION:
             return
-        GLib.idle_add(self._prompt_update, version, new_script)
-
-    def _prompt_update(self, version, new_script):
-        dialog = Gtk.MessageDialog(
-            message_type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.NONE,
-            text='Saleshandy Tailscale Tray update available')
-        dialog.format_secondary_text(f'Version {version} is available (you have {SCRIPT_VERSION}). Update now?')
-        dialog.add_button('Remind me later', Gtk.ResponseType.CANCEL)
-        dialog.add_button('No', Gtk.ResponseType.NO)
-        dialog.add_button('Yes', Gtk.ResponseType.YES)
-        dialog.set_default_response(Gtk.ResponseType.YES)
-        response = dialog.run()
-        dialog.destroy()
-
-        if response == Gtk.ResponseType.YES:
-            self._apply_update(version, new_script)
-        elif response == Gtk.ResponseType.NO:
-            self._dismissed_version = version  # don't ask again until a newer one shows up
-        # "Remind me later" (or closing the dialog): do nothing - the next
-        # periodic check will just ask again.
-        return False
+        GLib.idle_add(self._apply_update, version, new_script)
 
     def _apply_update(self, version, new_script):
         """The *only* thing an update ever does: write this file and re-exec
