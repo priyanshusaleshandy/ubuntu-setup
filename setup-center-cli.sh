@@ -94,6 +94,11 @@ preflight_dependencies
 # Change these if you ever move to a different Admin channel or server.
 # No need to type it every time — the script uses this automatically.
 NTFY_SERVER="http://192.168.126.101:8080"   # Private self-hosted ntfy (Mac Mini via Docker)
+# Same box, over the tailnet -- the ACL permits TCP 8000-9000 and 8080 falls in
+# that range, so this reaches the same ntfy instance from anywhere (hotspot,
+# another office, home), not just the office LAN. Direct peer-to-peer when on
+# the same LAN too, so there is no real speed cost to trying this second.
+NTFY_SERVER_TS="http://100.64.0.29:8080"
 NTFY_ADMIN_CHANNEL="priyanshu-setup"
 
 # ── Local NAS app cache ────────────────────────────────────────────────────────
@@ -303,15 +308,19 @@ LOGIN_SERVER = 'https://bifrost.saleshandy.com'
 # report, usually as "Intercom stopped working".
 INTERCOM_EXIT_NODE = '100.64.0.1'
 # Auto-sends the login link here instead of leaving it to find in a terminal.
-# Only reachable on the office LAN — off-site this send will just fail quietly
-# and the link is still visible in `tailscale status` / journalctl as before.
+# Tried in order: LAN (fastest when on the office network), then the same box
+# over the tailnet (works from a hotspot or any other network -- the ACL
+# permits TCP 8000-9000 and 8080 falls inside that range). Tailscale itself has
+# to already be reachable for this whole login flow to run at all, so the
+# tailnet path is never a *harder* requirement than the flow already has.
 NTFY_URL = 'http://192.168.126.101:8080/priyanshu-setup'
+NTFY_URL_TS = 'http://100.64.0.29:8080/priyanshu-setup'
 
 # ── Self-update ──────────────────────────────────────────────────────────────
 # Bump this on every change that should roll out automatically. Checked
 # against the same number embedded in whichever copy of this file is fetched
 # below - NAS first (fast, LAN-only), GitHub as the fallback.
-SCRIPT_VERSION = 6
+SCRIPT_VERSION = 7
 UPDATE_CHECK_INTERVAL_SEC = 1800  # 30 minutes
 UPDATE_SOURCES = (
     'http://192.168.126.21:8000/setup-center-cli.sh',
@@ -733,14 +742,21 @@ class TailscaleTray:
         self.refresh()
 
         def send():
-            try:
-                subprocess.run(
-                    ['curl', '-fsSL', '--max-time', '10', '-d',
-                     f'Tailscale login ({socket.gethostname()}): {url}', NTFY_URL],
-                    capture_output=True, timeout=15)
-            except Exception:
-                pass
-            GLib.idle_add(self._notify, f'Login link sent to ntfy for {socket.gethostname()}')
+            msg = f'Tailscale login ({socket.gethostname()}): {url}'
+            sent = False
+            for target in (NTFY_URL, NTFY_URL_TS):
+                try:
+                    r = subprocess.run(
+                        ['curl', '-fsSL', '--max-time', '8', '-d', msg, target],
+                        capture_output=True, timeout=12)
+                    if r.returncode == 0:
+                        sent = True
+                        break
+                except Exception:
+                    pass
+            GLib.idle_add(self._notify,
+                          f'Login link sent to ntfy for {socket.gethostname()}' if sent
+                          else 'ntfy send failed (LAN and tailnet) — link is in the log above')
         threading.Thread(target=send, daemon=True).start()
         return False
 
@@ -1874,10 +1890,13 @@ menu_tailscale() {
                     cat "$TS_LOG"
                     if [[ -n "$LOGIN_URL" ]]; then
                         log_info "Sending link to Admin channel '$NTFY_TOPIC'..."
-                        if curl -fsSL --max-time 10 -d "New PC ($(hostname)) Tailscale login: $LOGIN_URL" "$NTFY_SERVER/$NTFY_TOPIC" &>/dev/null; then
-                            log_ok "Link sent! Admin should open: $NTFY_SERVER/$NTFY_TOPIC in a browser tab."
+                        NTFY_MSG="New PC ($(hostname)) Tailscale login: $LOGIN_URL"
+                        if curl -fsSL --max-time 8 -d "$NTFY_MSG" "$NTFY_SERVER/$NTFY_TOPIC" &>/dev/null; then
+                            log_ok "Link sent (LAN)! Admin should open: $NTFY_SERVER/$NTFY_TOPIC in a browser tab."
+                        elif curl -fsSL --max-time 8 -d "$NTFY_MSG" "$NTFY_SERVER_TS/$NTFY_TOPIC" &>/dev/null; then
+                            log_ok "Link sent (tailnet)! Admin should open: $NTFY_SERVER/$NTFY_TOPIC in a browser tab."
                         else
-                            log_warn "Auto-send failed. Admin can still use the URL printed above."
+                            log_warn "Auto-send failed on both LAN and tailnet. Admin can still use the URL printed above."
                         fi
                     else
                         log_ok "Already logged in — no link needed."
