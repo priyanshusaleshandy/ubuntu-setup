@@ -26,3 +26,7 @@ data.sqlite*
 
 # Uploaded bills/attachments live on the NAS, not in git
 it-billing-console/uploads/
+
+# Python build artifacts
+__pycache__/
+*.pyc
