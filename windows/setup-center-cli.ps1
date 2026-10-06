@@ -639,6 +639,15 @@ function Invoke-TailscaleLogin {
         $topic = $topic -replace [regex]::Escape("$NtfyServer/"), '' -replace '^https?://ntfy\.sh/', '' -replace '^ntfy\.sh/', '' -replace '/$', ''
         Write-INFO "Requesting login link (will auto-send to '$topic')..."
         Write-WARN "This forces a fresh login even if already connected."
+
+        # If a previous login attempt got killed before the browser step finished
+        # (e.g. this window was closed), tailscaled is left thinking that dead
+        # process's login is still "in progress" and refuses to start a new one -
+        # the next 'up' fails with a stale-PID error and never prints a link.
+        # Clearing with 'down' first guarantees a clean slate every time.
+        Write-INFO "Clearing any stuck previous login session..."
+        tailscale down 2>&1 | Out-Null
+
         $logFile = [System.IO.Path]::GetTempFileName()
         $errFile = [System.IO.Path]::GetTempFileName()
         try {
@@ -664,8 +673,11 @@ function Invoke-TailscaleLogin {
                 } catch {
                     Write-WARN "Auto-send failed (server unreachable - check VPN/Tailscale connection to $NtfyServer). Admin can still use the URL printed above."
                 }
-            } else {
+                Write-WARN "Do NOT close this window until login completes in the browser - closing it now orphans this login and the next attempt will fail."
+            } elseif ($proc.HasExited) {
                 Write-OK "Already logged in - no link needed."
+            } else {
+                Write-WARN "No login link appeared within 30s - still waiting below. Do NOT close this window."
             }
             if (-not $proc.HasExited) { $proc.WaitForExit() }
         } catch { Write-ERR "Login failed: $($_.Exception.Message)" }
