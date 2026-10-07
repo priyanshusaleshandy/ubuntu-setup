@@ -70,6 +70,124 @@ they post to the LAN URL and `base-url` only affects generated links.
 
 ---
 
+## Reload behaviour and speed (01-10-2026)
+
+Two complaints, both real, both measured before touching anything.
+
+**A refresh used to land you back on the dashboard.** The active tab lived only in
+a JS variable. It is now in `location.hash`, written with `history.replaceState`
+rather than by assigning `location.hash` — the latter pushes a history entry per
+click, so Back would walk you through every tab you had visited. On load,
+`tabFromUrl()` restores it, and a hash naming a tab that no longer exists falls
+back to the dashboard instead of rendering a blank page.
+
+**Reloads were slow because of round trips, not payload size.** Measured:
+
+| | |
+|---|---|
+| API call, on the LAN | 3-7 ms |
+| Same call through the tunnel | **700-1400 ms** |
+
+Cloudflare was already compressing (`content-encoding: br`), so size was not the
+problem — the count of round trips was. Two fixes:
+
+- `express.static` was sending `Cache-Control: public, max-age=0`, so `app.js`
+  (89 KB) and `style.css` were revalidated on **every** reload: two extra round
+  trips for two 304s. Those files are requested as `?v=<mtime>`, so a given URL can
+  never change contents and they are now `max-age=1y, immutable`. `index.html`
+  stays `no-store`, so a deploy is still picked up immediately, and `login.html` is
+  explicitly excluded because it carries no version stamp.
+- `loadAllData()` awaited `fetchAttachments()` alone before everything else,
+  costing a whole extra round trip. It now runs in the same `Promise.all` and
+  redraws the two tables that show bill chips when it lands — either completion
+  order works.
+
+Net effect: roughly three fewer tunnel round trips per reload, so about three
+seconds.
+
+## Sign-in (added 01-10-2026) — and what it deliberately does not cover
+
+Until this went in the console had **no authentication at all**, and it is published
+through a Cloudflare tunnel: `https://it.saleshandy.dev/api/vendors` returned the
+whole vendor list to anyone who asked, and accepted writes too. That is the hole
+this closes.
+
+Flow is password, then a 6-digit code emailed through the SMTP already configured
+in Alert Settings (Gmail, `priyanshu.k@`, sending to `notification_email`).
+
+| | |
+|---|---|
+| Tables | `users`, `auth_sessions`, `login_otps` |
+| Routes | `POST /api/auth/login`, `/verify`, `/logout`; `GET /api/auth/me` |
+| Page | `public/login.html`; sign-out button sits under the sidebar status widget |
+| Session | 12 hours, random token, sha256 in the DB, `HttpOnly` cookie |
+| Code | 6 digits, 10 minutes, single use, 5 wrong tries then dead |
+| Seeded from | `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env` (gitignored, mode 600), **only when `users` is empty** |
+
+**Passwords are scrypt, sessions are HMAC-free random tokens, and both come from
+node's own `crypto` — no new dependency.** bcrypt/argon2 are the conventional
+choice and were deliberately avoided: they are native modules, and this image is
+alpine/arm64, which is exactly where that breaks a deploy at the worst moment.
+
+### The part to understand before changing it
+
+**n8n drives this API from 25 nodes and Hermes uses a dozen endpoints.** Putting a
+session in front of all of it would have broken every automation the moment it
+deployed. So the rule is split:
+
+- **Page loads always need a session** — a browser gets the login screen anywhere.
+- **`/api/*` also passes** if the request did **not** arrive through the tunnel
+  (no `CF-Ray` / `CF-Connecting-IP` header), or carries `X-API-Key` matching `API_KEY`.
+
+So the public door is shut and the LAN is exactly as open as it was yesterday.
+**That means the office network is now the weak path**, by choice. Closing it means
+issuing an API key and editing those 25 n8n nodes plus Hermes' notes — a separate
+job, not a side effect of this one.
+
+That split is also the break-glass: if Gmail's app password ever dies, no code can
+be sent and nobody can sign in from outside — but the console still answers on the
+LAN, so you are never locked out of your own data.
+
+### Found while testing: nodemailer had no timeout
+Tested against an SMTP server that accepted the connection and then went silent.
+The login request **hung forever** and the browser just spun. `connectionTimeout`,
+`greetingTimeout` and `socketTimeout` are now set, so a stalled Gmail fails in
+seconds with a message instead.
+
+### Changing the password
+There is no UI for it yet. Edit `.env`, delete the row from `users`, restart —
+`initAuth()` reseeds only when the table is empty, so changing `ADMIN_PASSWORD`
+alone does nothing.
+
+## Firewall tab — DHCP MAC/IP bindings (added 30-09-2026)
+
+The firewall already knows which MAC gets which IP. What it cannot tell you is
+*whose* machine that is, so this tab holds the part the reservation leaves out:
+device name, who has it, where it sits, and why it needed a fixed address.
+
+- Table `dhcp_bindings`, created on boot by `database.js` like every other table.
+  Nothing to migrate by hand - `data.sqlite` is a bind mount, so the table
+  appeared on the first restart after the rebuild.
+- `GET/POST/PUT/DELETE /api/dhcp-bindings`.
+- UI: nav item **Firewall — DHCP Bindings**, with a text search across device,
+  MAC, IP, person, location and notes, plus an Active/Inactive filter.
+
+**MAC addresses are normalised before they are stored.** People paste them in
+whatever the source gave them - colons from the Sophos UI, hyphens from Windows,
+bare hex off a label. Stored raw, the `UNIQUE` constraint is worthless: the same
+device gets in three times. `normaliseMac()` strips everything that is not hex,
+insists on 12 characters, and rebuilds one way, so `a4-bb-6d-11-22-33` and
+`A4BB6D112233` both collide with `A4:BB:6D:11:22:33` and come back **409** naming
+the MAC. A bad MAC or IP is a **400** with the reason, and the form shows it -
+without that the Save button just appears to do nothing.
+
+Deleting a row only removes the record here. **The firewall keeps its
+reservation** - the confirm dialog says so, because the two are not linked.
+
+This is a register, not a sync. Nothing reads the Sophos DHCP table yet; if that
+is wanted later it can fill this same table (there is a documented XML API, and
+`~/sophos.sh` on `.101` and `.180`).
+
 ## Read this before deploying anything
 
 > **The console deploys by rebuilding the image, not `docker cp`.**

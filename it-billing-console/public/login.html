@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in — IT Ops Console</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --border-color: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --danger: #ef4444;
+      --success: #10b981;
+      --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg-dark); color: var(--text-main);
+      font-family: var(--font-main); padding: 20px;
+    }
+    .card {
+      width: 100%; max-width: 400px;
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 14px; padding: 32px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+    .brand .mark {
+      width: 42px; height: 42px; border-radius: 11px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .brand h1 { font-size: 17px; margin: 0; }
+    .brand p { font-size: 12px; margin: 2px 0 0; color: var(--text-muted); }
+    label { display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-muted); }
+    input {
+      width: 100%; padding: 11px 13px; margin-bottom: 16px;
+      background: var(--bg-dark); color: var(--text-main);
+      border: 1px solid var(--border-color); border-radius: 8px;
+      font-size: 14px; font-family: inherit;
+    }
+    input:focus { outline: none; border-color: var(--primary); }
+    #code { letter-spacing: 8px; text-align: center; font-size: 22px; font-weight: 600; }
+    button {
+      width: 100%; padding: 12px; border: 0; border-radius: 8px;
+      background: var(--primary); color: #fff; font-size: 15px; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+    }
+    button:hover { background: var(--primary-hover); }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .msg { font-size: 13px; padding: 10px 12px; border-radius: 8px; margin-bottom: 16px; display: none; }
+    .msg.err { display: block; background: rgba(239,68,68,.12); color: #fca5a5; border: 1px solid rgba(239,68,68,.35); }
+    .msg.ok  { display: block; background: rgba(16,185,129,.12); color: #6ee7b7; border: 1px solid rgba(16,185,129,.35); }
+    .link { background: none; border: 0; color: var(--text-muted); font-size: 12px;
+            margin-top: 14px; cursor: pointer; text-decoration: underline; padding: 0; width: auto; }
+    .link:hover { background: none; color: var(--text-main); }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="mark">⚡</div>
+      <div>
+        <h1>CoreLabs IT Ops</h1>
+        <p>Billing &amp; Renewals</p>
+      </div>
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <form id="step-password">
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" required>
+      <button type="submit" id="btn-password">Continue</button>
+    </form>
+
+    <form id="step-code" class="hidden">
+      <label for="code">6-digit code sent to your email</label>
+      <input type="text" id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+             autocomplete="one-time-code" required>
+      <button type="submit" id="btn-code">Sign in</button>
+      <button type="button" class="link" id="back">Use a different account</button>
+    </form>
+  </div>
+
+<script>
+  const msg = document.getElementById('msg');
+  const stepPassword = document.getElementById('step-password');
+  const stepCode = document.getElementById('step-code');
+
+  function say(text, kind) {
+    msg.className = 'msg ' + kind;
+    msg.textContent = text;
+  }
+  function clearMsg() { msg.className = 'msg'; msg.textContent = ''; }
+
+  stepPassword.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-password');
+    btn.disabled = true; btn.textContent = 'Sending code...';
+    clearMsg();
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: document.getElementById('email').value,
+          password: document.getElementById('password').value
+        })
+      });
+      const body = await res.json();
+      if (!res.ok) { say(body.error || 'Could not sign in.', 'err'); return; }
+      say('Code sent to ' + body.sent_to + '. It expires in ' + body.expires_in_minutes + ' minutes.', 'ok');
+      stepPassword.classList.add('hidden');
+      stepCode.classList.remove('hidden');
+      document.getElementById('code').focus();
+    } catch (err) {
+      say('Could not reach the server.', 'err');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Continue';
+    }
+  });
+
+  stepCode.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-code');
+    btn.disabled = true; btn.textContent = 'Checking...';
+    try {
+      const res = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: document.getElementById('email').value,
+          code: document.getElementById('code').value
+        })
+      });
+      const body = await res.json();
+      if (!res.ok) { say(body.error || 'Could not sign in.', 'err'); return; }
+      window.location.href = '/';
+    } catch (err) {
+      say('Could not reach the server.', 'err');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Sign in';
+    }
+  });
+
+  document.getElementById('back').addEventListener('click', () => {
+    stepCode.classList.add('hidden');
+    stepPassword.classList.remove('hidden');
+    document.getElementById('code').value = '';
+    clearMsg();
+  });
+</script>
+</body>
+</html>

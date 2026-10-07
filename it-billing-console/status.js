@@ -21,6 +21,7 @@ const TOLERANCE = 1;
 
 const SQL = `
   SELECT s.id, s.cost, s.status, s.start_date, s.expiry_date,
+         s.status_override, s.status_override_period,
          (SELECT IFNULL(SUM(p.amount), 0) FROM payment_history p
            WHERE p.service_id = s.id AND p.payment_date >= s.start_date) AS paid
   FROM services_contracts s`;
@@ -28,6 +29,17 @@ const SQL = `
 function decide(row, todayStr) {
   const cost = Number(row.cost) || 0;
   const paid = Number(row.paid) || 0;
+
+  // A status set by hand wins over the payments - but only for the period it was
+  // set in. Some money never reaches this console (cash, an adjustment, a
+  // contract settled elsewhere), so the override has to exist; making it
+  // permanent would bring back the original bug, where a pinned Done meant the
+  // renewal never came back as Upcoming. Comparing against the start_date it was
+  // stored with retires it automatically when the period rolls forward.
+  if (row.status_override &&
+      String(row.status_override_period || '') === String(row.start_date || '')) {
+    return row.status_override;
+  }
 
   // Cost 0 means nobody has filled the amount in yet (or the service is free).
   // There is nothing to settle, so leave whatever a human chose.

@@ -110,7 +110,10 @@ function checkExpiringServices() {
         // rule re-pinned anything Done to Done forever, so a renewed contract
         // never came back as Upcoming and nobody was reminded to pay it again.
         const newStatus = serviceStatus.decide(
-          { cost: service.cost, status: service.status, expiry_date: service.expiry_date, paid: service.paid_this_period },
+          {
+            cost: service.cost, status: service.status, expiry_date: service.expiry_date, paid: service.paid_this_period,
+            start_date: service.start_date, status_override: service.status_override, status_override_period: service.status_override_period
+          },
           todayStr
         );
         if (newStatus !== service.status) {
@@ -185,16 +188,34 @@ function checkExpiringServices() {
   });
 }
 
+// Statuses are derived from payments, but recording a payment is the only thing
+// that used to trigger that - recomputeAll was written for this sweep and then
+// never wired in. So nothing moved on time alone: a contract whose period had
+// rolled over stayed Done instead of coming back as Upcoming, and one that had
+// expired stayed Upcoming, until somebody happened to touch a payment on it.
+// Sweep first, then alert, so the reminder reads the fresh status.
+function runDailySweep() {
+  serviceStatus.recomputeAll((err, changed) => {
+    if (err) {
+      console.error('[Scheduler] Status sweep failed:', err.message);
+    } else if (changed && changed.length) {
+      console.log('[Scheduler] Status sweep moved ' + changed.length + ' contract(s): ' +
+        changed.map(c => '#' + c.id + ' ' + c.from + '->' + c.to).join(', '));
+    }
+    checkExpiringServices();
+  });
+}
+
 function startScheduler() {
   // 09:00 IST. The container used to run UTC, which made this fire at 14:30 IST
   // while the UI claimed 09:00 - the image now sets TZ=Asia/Kolkata.
   cron.schedule('0 9 * * *', () => {
-    checkExpiringServices();
+    runDailySweep();
   });
   console.log('[Scheduler] Daily cron initialized (09:00 ' + (process.env.TZ || 'server local') + ')');
 
   // Run once immediately on server startup
-  setTimeout(checkExpiringServices, 3000);
+  setTimeout(runDailySweep, 3000);
 }
 
 module.exports = { startScheduler, checkExpiringServices };

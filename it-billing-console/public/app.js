@@ -9,16 +9,41 @@ let mailboxesData = [];
 let domainsData = [];
 let attachmentsData = [];
 let rentalsData = [];
+let dhcpBindingsData = [];
 let rentalPaymentsData = [];
 let categoryChartInstance = null;
 let monthlyChartInstance = null;
 
 // DOM Initialization
 document.addEventListener('DOMContentLoaded', () => {
+  setupSignOut();
   setupNavigation();
   setupFormListeners();
+  switchTab(tabFromUrl());
+  window.addEventListener('hashchange', () => switchTab(tabFromUrl()));
   loadAllData();
 });
+
+// Shows who is signed in and lets them drop the session. On the LAN the API
+// stays reachable without a session by design (see auth.js), so signing out
+// returns you to the login page rather than locking the machine out.
+function setupSignOut() {
+  const btn = document.getElementById('signout-btn');
+  if (!btn) return;
+
+  fetch('/api/auth/me')
+    .then(r => r.ok ? r.json() : null)
+    .then(me => {
+      const label = document.getElementById('signed-in-as');
+      if (me && me.email && label) label.innerText = '\u00B7 ' + me.email;
+    })
+    .catch(() => {});
+
+  btn.addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login.html';
+  });
+}
 
 // Navigation Setup
 function setupNavigation() {
@@ -41,6 +66,8 @@ function setupNavigation() {
   document.getElementById('worklog-bill-status-filter').addEventListener('change', renderWorkLogTable);
   document.getElementById('company-doc-search').addEventListener('input', renderCompanyDocsTable);
   document.getElementById('rental-search').addEventListener('input', renderRentalsTable);
+  document.getElementById('dhcp-search').addEventListener('input', renderDhcpTable);
+  document.getElementById('dhcp-status-filter').addEventListener('change', renderDhcpTable);
   document.getElementById('domain-search').addEventListener('input', renderDomainsTable);
   document.getElementById('domain-detail-mailbox-search').addEventListener('input', () => {
     const primary = domainsData.find(x => x.id === currentOpenPrimaryId);
@@ -62,6 +89,7 @@ function switchTab(tabId) {
     overview: 'Dashboard Overview',
     services: 'Renewals & Services',
     security: 'Security & Antivirus Licenses',
+    firewall: 'Firewall \u2014 DHCP MAC/IP Bindings',
     vendors: 'Vendor Directory',
     mailboxes: 'Domains & Mailboxes',
     payments: 'Payment History',
@@ -74,12 +102,31 @@ function switchTab(tabId) {
   document.getElementById('page-title').innerText = titles[tabId] || 'Dashboard';
 
   if (tabId === 'overview') loadDashboardStats();
+
+  // Keep the tab in the URL so a refresh comes back here instead of dropping
+  // you on the dashboard. replaceState rather than assigning location.hash:
+  // the latter pushes a history entry for every click, so Back would walk you
+  // through each tab you happened to visit.
+  history.replaceState(null, '', '#' + tabId);
+}
+
+// A tab is only restorable if the markup for it actually exists - a stale
+// bookmark for a tab that has since been renamed should land on the dashboard,
+// not on a blank page.
+function tabFromUrl() {
+  const id = (location.hash || '').replace(/^#/, '');
+  return id && document.getElementById('tab-' + id) ? id : 'overview';
 }
 
 // Data Fetching
 async function loadAllData() {
-  await fetchAttachments(); // must be loaded before services/worklog tables render their bill chips
+  // Attachments used to be awaited on its own before everything else, because
+  // the services and worklog tables draw bill chips from it. Over the Cloudflare
+  // tunnel a round trip is about a second, so that ordering cost a full second
+  // on every load. It now runs alongside the rest and redraws those two tables
+  // itself once it lands - see fetchAttachments.
   await Promise.all([
+    fetchAttachments(),
     loadDashboardStats(),
     fetchServices(),
     fetchVendors(),
@@ -87,6 +134,7 @@ async function loadAllData() {
     fetchWorkLog(),
     fetchCompanyDocuments(),
     fetchRentals(),
+    fetchDhcpBindings(),
     fetchRentalPayments(),
     fetchDomains(),
     fetchMailboxes(),
@@ -98,6 +146,11 @@ async function fetchAttachments() {
   try {
     const res = await fetch('/api/attachments');
     attachmentsData = await res.json();
+    // These two render bill chips out of attachmentsData. Whichever of the three
+    // requests finishes last, the chips end up drawn - guarded because on the
+    // very first load the other fetches may not have populated their arrays yet.
+    if (servicesData.length) { renderServicesTable(); renderSecurityTable(); }
+    if (workLogData.length) renderWorkLogTable();
   } catch (err) {
     console.error('Error fetching attachments:', err);
   }
@@ -307,6 +360,64 @@ async function fetchWorkLog() {
   } catch (err) {
     console.error('Error fetching work log:', err);
   }
+}
+
+async function fetchDhcpBindings() {
+  try {
+    const res = await fetch('/api/dhcp-bindings');
+    dhcpBindingsData = await res.json();
+    renderDhcpTable();
+  } catch (err) {
+    console.error('Error fetching DHCP bindings:', err);
+  }
+}
+
+function ipToNumber(ip) {
+  const parts = String(ip || '').split('.');
+  if (parts.length !== 4) return Number.MAX_SAFE_INTEGER; // anything odd sorts last
+  return parts.reduce((acc, p) => acc * 256 + (Number(p) || 0), 0);
+}
+
+function renderDhcpTable() {
+  const search = document.getElementById('dhcp-search').value.toLowerCase();
+  const statusFilter = document.getElementById('dhcp-status-filter').value;
+  const tbody = document.getElementById('dhcp-table-body');
+
+  const filtered = dhcpBindingsData.filter(b => {
+    const haystack = [b.device_name, b.mac_address, b.ip_address, b.assigned_to, b.location, b.notes]
+      .filter(Boolean).join(' ').toLowerCase();
+    if (search && !haystack.includes(search)) return false;
+    if (statusFilter && (b.status || 'Active') !== statusFilter) return false;
+    return true;
+  });
+
+  // Sorted by address, and numerically - a plain string sort puts .100 ahead of
+  // .2, which is exactly the jumble this table showed before. Each octet is
+  // packed into one number so the whole address compares in one go.
+  filtered.sort((a, b) => ipToNumber(a.ip_address) - ipToNumber(b.ip_address));
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-sub">No DHCP bindings recorded yet. Click "Add Binding" to record one.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(b => {
+    const active = (b.status || 'Active') === 'Active';
+    return `
+    <tr>
+      <td><strong>${escapeHtml(b.device_name)}</strong></td>
+      <td><code>${escapeHtml(b.mac_address)}</code></td>
+      <td><code>${escapeHtml(b.ip_address)}</code></td>
+      <td>${escapeHtml(b.device_type || 'Other')}</td>
+      <td>${escapeHtml(b.assigned_to || '')}</td>
+      <td>${escapeHtml(b.location || '')}</td>
+      <td><span class="badge" style="background:${active ? '#166534' : '#334155'};color:#f8fafc;">${escapeHtml(b.status || 'Active')}</span></td>
+      <td>
+        <button class="btn btn-sm btn-secondary" onclick="editDhcpBinding(${b.id})">\u270F\uFE0F Edit</button>
+        <button class="btn btn-sm btn-secondary" style="color:var(--danger)" onclick="deleteDhcpBinding(${b.id})">\uD83D\uDDD1\uFE0F</button>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 async function fetchCompanyDocuments() {
@@ -1351,7 +1462,8 @@ function setupFormListeners() {
       start_date: document.getElementById('service-start-date').value,
       expiry_date: document.getElementById('service-expiry-date').value,
       auto_renew: document.getElementById('service-auto-renew').checked,
-      notes: document.getElementById('service-notes').value
+      notes: document.getElementById('service-notes').value,
+      status_override: document.getElementById('service-status-override').value
     };
 
     const url = id ? `/api/services/${id}` : '/api/services';
@@ -1525,6 +1637,38 @@ function setupFormListeners() {
     fetchCompanyDocuments();
   });
 
+  document.getElementById('dhcp-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('dhcp-id').value;
+    const payload = {
+      device_name: document.getElementById('dhcp-device-name').value,
+      mac_address: document.getElementById('dhcp-mac').value,
+      ip_address: document.getElementById('dhcp-ip').value,
+      device_type: document.getElementById('dhcp-device-type').value,
+      assigned_to: document.getElementById('dhcp-assigned-to').value,
+      location: document.getElementById('dhcp-location').value,
+      status: document.getElementById('dhcp-status').value,
+      notes: document.getElementById('dhcp-notes').value
+    };
+
+    const res = await fetch(id ? `/api/dhcp-bindings/${id}` : '/api/dhcp-bindings', {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    // A bad MAC or a duplicate is rejected by the server. Without this the Save
+    // button would just appear to do nothing.
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      alert(body.error || 'Could not save this binding.');
+      return;
+    }
+
+    closeModal('dhcp-modal');
+    fetchDhcpBindings();
+  });
+
   document.getElementById('rental-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('rental-id').value;
@@ -1642,6 +1786,11 @@ function closeModal(id) {
     document.getElementById('company-doc-modal-title').innerText = '📁 Add Company Document';
     document.getElementById('company-doc-current').innerHTML = '';
   }
+  if (id === 'dhcp-modal') {
+    document.getElementById('dhcp-form').reset();
+    document.getElementById('dhcp-id').value = '';
+    document.getElementById('dhcp-modal-title').innerText = '\uD83D\uDD25 Add DHCP Binding';
+  }
   if (id === 'rental-modal') {
     document.getElementById('rental-form').reset();
     document.getElementById('rental-id').value = '';
@@ -1670,6 +1819,34 @@ function closeModal(id) {
   }
   if (id === 'subdomain-modal') {
     currentOpenSubdomainId = null;
+  }
+}
+
+function openAddDhcpBinding() {
+  openModal('dhcp-modal');
+}
+
+function editDhcpBinding(id) {
+  const b = dhcpBindingsData.find(x => x.id === id);
+  if (!b) return;
+  document.getElementById('dhcp-id').value = b.id;
+  document.getElementById('dhcp-device-name').value = b.device_name;
+  document.getElementById('dhcp-mac').value = b.mac_address;
+  document.getElementById('dhcp-ip').value = b.ip_address;
+  document.getElementById('dhcp-device-type').value = b.device_type || 'Other';
+  document.getElementById('dhcp-assigned-to').value = b.assigned_to || '';
+  document.getElementById('dhcp-location').value = b.location || '';
+  document.getElementById('dhcp-status').value = b.status || 'Active';
+  document.getElementById('dhcp-notes').value = b.notes || '';
+  document.getElementById('dhcp-modal-title').innerText = '\u270F\uFE0F Edit DHCP Binding';
+  openModal('dhcp-modal');
+}
+
+async function deleteDhcpBinding(id) {
+  const b = dhcpBindingsData.find(x => x.id === id);
+  if (confirm(`Delete the binding for ${b ? b.device_name : 'this device'}? This only removes the record here - the firewall keeps its reservation.`)) {
+    await fetch(`/api/dhcp-bindings/${id}`, { method: 'DELETE' });
+    fetchDhcpBindings();
   }
 }
 
@@ -1710,6 +1887,11 @@ function editService(id) {
   document.getElementById('service-expiry-date').value = s.expiry_date;
   document.getElementById('service-auto-renew').checked = !!s.auto_renew;
   document.getElementById('service-notes').value = s.notes || '';
+  // Only show the override as selected while it still belongs to this period;
+  // a stale one is ignored by the server too, so showing it would be a lie.
+  const liveOverride = s.status_override &&
+    String(s.status_override_period || '') === String(s.start_date || '');
+  document.getElementById('service-status-override').value = liveOverride ? s.status_override : '';
   renderAttachmentList('service-bill-current', 'service', s.id);
   document.getElementById('service-modal-title').innerText = '✏️ Edit Contract';
   openModal('service-modal');

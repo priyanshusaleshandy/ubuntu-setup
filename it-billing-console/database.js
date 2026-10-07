@@ -50,6 +50,14 @@ db.serialize(() => {
     if (!names.includes('bill_filename')) db.run("ALTER TABLE services_contracts ADD COLUMN bill_filename TEXT");
     if (!names.includes('bill_stored_name')) db.run("ALTER TABLE services_contracts ADD COLUMN bill_stored_name TEXT");
     if (!names.includes('bill_uploaded_at')) db.run("ALTER TABLE services_contracts ADD COLUMN bill_uploaded_at DATETIME");
+    // A hand-picked status, for money the console cannot see - cash, an
+    // adjustment, a contract settled outside it. It is stored WITH the period it
+    // was chosen in (the start_date at the time), because a permanent manual
+    // Done is exactly the bug the derived status was built to kill: the row
+    // would never return to Upcoming and next year's renewal would go unnoticed.
+    // Once start_date moves on, the override no longer matches and is ignored.
+    if (!names.includes('status_override')) db.run("ALTER TABLE services_contracts ADD COLUMN status_override TEXT");
+    if (!names.includes('status_override_period')) db.run("ALTER TABLE services_contracts ADD COLUMN status_override_period TEXT");
   });
 
   db.run(`
@@ -252,6 +260,86 @@ db.serialize(() => {
     const names = columns.map(c => c.name);
     if (!names.includes('folder')) db.run("ALTER TABLE attachments ADD COLUMN folder TEXT");
   });
+
+  // Things the automations could not decide on their own, parked here until a
+  // human answers. Before this existed, a capture workflow that could not tell
+  // which contract a payment settled simply threw: an ntfy alert went out, the
+  // mail was consumed, and the work fell back on whoever happened to read the
+  // notification. A row here is a question with enough context attached that it
+  // can be answered from a phone, and answering it is what completes the job.
+  //
+  // `question` is what to ask, `context` the JSON the workflow already parsed
+  // (vendor, amount, invoice no, candidate contracts) so nothing has to be
+  // re-derived, and `suggestion` what the workflow would have done if it were
+  // allowed to guess - shown, never applied on its own.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS pending_decisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL,
+      source TEXT,
+      subject TEXT,
+      question TEXT NOT NULL,
+      context TEXT,
+      suggestion TEXT,
+      status TEXT NOT NULL DEFAULT 'Open',
+      answer TEXT,
+      resolution TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      resolved_at DATETIME,
+      dedupe_key TEXT UNIQUE
+    )
+  `);
+
+  // Sign-in. Passwords are scrypt hashes, never the password itself; the OTP is
+  // stored as a sha256 of the code for the same reason. See auth.js.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      token_hash TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME NOT NULL
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS login_otps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      expires_at DATETIME NOT NULL,
+      attempts INTEGER DEFAULT 0,
+      consumed INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // The firewall already knows which MAC gets which IP. What it cannot tell you
+  // is whose machine that is, so this holds the part the binding leaves out.
+  // mac_address is UNIQUE because a MAC can only be bound once - the server
+  // normalises it first, otherwise aa:bb:.. and AA-BB-.. would both get in.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS dhcp_bindings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_name TEXT NOT NULL,
+      mac_address TEXT NOT NULL UNIQUE,
+      ip_address TEXT NOT NULL,
+      device_type TEXT DEFAULT 'Other',
+      assigned_to TEXT,
+      location TEXT,
+      status TEXT DEFAULT 'Active',
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
   // One-time carry-over: pull any bill already uploaded under the old
   // one-file-per-entry columns into the new multi-attachment table.

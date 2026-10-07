@@ -24,4 +24,11 @@ services:
       # at 14:30 IST, and any date derived after midnight was a day behind.
       - TZ=Asia/Kolkata
       - NAS_DOCS_DIR=/mnt/nas-docs
+      # Sign-in. These come from .env next to this file, which is gitignored -
+      # the credentials are never committed. ADMIN_* only seeds the very first
+      # user; after that the stored hash is what counts. API_KEY is optional and
+      # lets a machine caller through from outside the LAN.
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - API_KEY=${API_KEY:-}
       # - GDRIVE_DOCS_DIR=/mnt/gdrive-docs

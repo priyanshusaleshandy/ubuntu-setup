@@ -34,6 +34,9 @@
         <button class="nav-item" data-tab="security">
           <span class="icon">🛡️</span> Security & Antivirus
         </button>
+        <button class="nav-item" data-tab="firewall">
+          <span class="icon">🔥</span> Firewall — DHCP Bindings
+        </button>
         <button class="nav-item" data-tab="vendors">
           <span class="icon">🏢</span> Vendor Directory
         </button>
@@ -67,6 +70,10 @@
           <span class="status-sub">Cron Active (Daily 09:00)</span>
         </div>
       </div>
+
+      <button id="signout-btn" class="btn btn-secondary" style="margin-top:10px;width:100%;">
+        Sign out <span id="signed-in-as" class="text-sub"></span>
+      </button>
     </aside>
 
     <!-- Main Content Area -->
@@ -224,6 +231,41 @@
       </section>
 
       <!-- TAB 3: VENDOR DIRECTORY -->
+      <!-- TAB: FIREWALL / DHCP BINDINGS -->
+      <section id="tab-firewall" class="tab-page">
+        <div class="table-card">
+          <div class="table-header">
+            <input type="text" id="dhcp-search" class="form-input" placeholder="🔍 Search device, MAC, IP, person, location...">
+            <select id="dhcp-status-filter" class="form-select" style="max-width:160px;">
+              <option value="">All Status</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+            <button class="btn btn-primary" onclick="openAddDhcpBinding()">🔥 Add Binding</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Device</th>
+                  <th>MAC Address</th>
+                  <th>IP Address</th>
+                  <th>Type</th>
+                  <th>Assigned To</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="dhcp-table-body">
+                <tr><td colspan="8" class="text-center">Loading DHCP bindings...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section id="tab-vendors" class="tab-page">
         <div class="table-card">
           <div class="table-header">
@@ -611,6 +653,22 @@
         <div class="form-group checkbox-group">
           <input type="checkbox" id="service-auto-renew">
           <label for="service-auto-renew">Auto-Renewal Enabled</label>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="service-status-override" class="form-select">
+            <option value="">Auto — decide from payments (recommended)</option>
+            <option value="Done">Done — paid, but outside this console</option>
+            <option value="Upcoming">Upcoming — still to be paid</option>
+            <option value="Expired">Expired</option>
+            <option value="Completed">Completed — finished, not renewing</option>
+          </select>
+          <div class="text-sub" style="margin-top:6px;">
+            Leave on <strong>Auto</strong> unless the money never reached this console.
+            A status you set here applies to the <strong>current period only</strong> — once the
+            start date moves to the next term it goes back to Auto by itself, so the renewal
+            still shows up as Upcoming.
+          </div>
         </div>
         <div class="form-group">
           <label>Notes / Policy Number / PO Details</label>
@@ -1076,6 +1134,66 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('company-doc-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Document</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="dhcp-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="dhcp-modal-title">🔥 Add DHCP Binding</h3>
+        <button class="modal-close" onclick="closeModal('dhcp-modal')">&times;</button>
+      </div>
+      <form id="dhcp-form">
+        <input type="hidden" id="dhcp-id">
+        <div class="form-group">
+          <label>Device Name *</label>
+          <input type="text" id="dhcp-device-name" class="form-input" required placeholder="e.g. Reception Printer, Ravi Laptop">
+        </div>
+        <div class="form-group">
+          <label>MAC Address *</label>
+          <input type="text" id="dhcp-mac" class="form-input" required placeholder="A4:BB:6D:11:22:33 — hyphens or bare hex also fine">
+        </div>
+        <div class="form-group">
+          <label>Reserved IP *</label>
+          <input type="text" id="dhcp-ip" class="form-input" required placeholder="e.g. 192.168.126.50">
+        </div>
+        <div class="form-group">
+          <label>Device Type</label>
+          <select id="dhcp-device-type" class="form-select">
+            <option value="Laptop">Laptop</option>
+            <option value="Desktop">Desktop</option>
+            <option value="Printer">Printer</option>
+            <option value="Access Point">Access Point</option>
+            <option value="Camera">Camera</option>
+            <option value="Server">Server</option>
+            <option value="Switch / Router">Switch / Router</option>
+            <option value="Other" selected>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Assigned To</label>
+          <input type="text" id="dhcp-assigned-to" class="form-input" placeholder="Person or team using it">
+        </div>
+        <div class="form-group">
+          <label>Location</label>
+          <input type="text" id="dhcp-location" class="form-input" placeholder="e.g. 2nd Floor, Server Room">
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="dhcp-status" class="form-select">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="dhcp-notes" class="form-input" rows="2" placeholder="e.g. why it needs a fixed IP, port forwards, asset tag"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('dhcp-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Binding</button>
         </div>
       </form>
     </div>

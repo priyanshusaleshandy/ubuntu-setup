@@ -1,6 +1,6 @@
 [
   {
-    "updatedAt": "2026-09-01T08:06:26.000Z",
+    "updatedAt": "2026-09-02T09:30:37.000Z",
     "createdAt": "2026-08-26T18:54:31.782Z",
     "id": "Ncx7r0VcoxUfO6hF",
     "name": "Weekly IT Spend Summary",
@@ -140,7 +140,7 @@
     "nodeGroups": [],
     "pinData": null,
     "versionId": "0bbc5086-a96a-4fa9-bbd4-0e65988eceef",
-    "activeVersionId": null,
+    "activeVersionId": "0bbc5086-a96a-4fa9-bbd4-0e65988eceef",
     "versionCounter": 3,
     "triggerCount": 1,
     "sourceWorkflowId": null,
@@ -171,7 +171,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-04T10:36:42.000Z",
+    "updatedAt": "2026-09-12T18:38:53.000Z",
     "createdAt": "2026-08-27T07:31:43.646Z",
     "id": "t4Pui7NwhNkRoabs",
     "name": "Gmail Invoice Auto-Capture",
@@ -184,7 +184,9 @@
           "pollTimes": {
             "item": [
               {
-                "mode": "everyMinute"
+                "mode": "everyX",
+                "value": 5,
+                "unit": "minutes"
               }
             ]
           },
@@ -504,10 +506,10 @@
     "staticData": {
       "node:Gmail Trigger": {
         "Gmail Trigger": {
-          "lastTimeChecked": 1788505604,
+          "lastTimeChecked": 1790334075,
           "possibleDuplicates": [
-            "1a06b3e50beead48",
-            "1a06a7872ef3b304"
+            "1a0d83a0cd8c8ef0",
+            "1a0d375321303834"
           ]
         }
       }
@@ -515,9 +517,9 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": {},
-    "versionId": "bd298298-4c06-409f-abe3-99bda56a885e",
-    "activeVersionId": "bd298298-4c06-409f-abe3-99bda56a885e",
-    "versionCounter": 11,
+    "versionId": "b3c09c0d-16cb-4659-817a-5503fca4b02b",
+    "activeVersionId": "b3c09c0d-16cb-4659-817a-5503fca4b02b",
+    "versionCounter": 12,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
@@ -547,7 +549,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T08:06:29.000Z",
+    "updatedAt": "2026-09-22T13:29:15.766Z",
     "createdAt": "2026-08-27T07:52:30.839Z",
     "id": "qZ3Gn6zzCACqfweL",
     "name": "Auto-Delete Basecamp Notification Emails",
@@ -575,8 +577,8 @@
         "type": "n8n-nodes-base.gmailTrigger",
         "typeVersion": 1.2,
         "position": [
-          240,
-          300
+          16,
+          208
         ],
         "credentials": {
           "gmailOAuth2": {
@@ -587,7 +589,6 @@
       },
       {
         "parameters": {
-          "resource": "message",
           "operation": "delete",
           "messageId": "={{ $json.id }}"
         },
@@ -596,16 +597,16 @@
         "type": "n8n-nodes-base.gmail",
         "typeVersion": 2.1,
         "position": [
-          460,
-          300
+          496,
+          192
         ],
+        "webhookId": "2dcb16eb-547c-4fc3-8ba5-2d042766e7e6",
         "credentials": {
           "gmailOAuth2": {
             "id": "vtDw4Vtd1koXODAF",
             "name": "Gmail account"
           }
-        },
-        "webhookId": "2dcb16eb-547c-4fc3-8ba5-2d042766e7e6"
+        }
       }
     ],
     "connections": {
@@ -622,24 +623,26 @@
       }
     },
     "settings": {
-      "errorWorkflow": "syncFailAlert01"
+      "errorWorkflow": "syncFailAlert01",
+      "executionOrder": "v1",
+      "binaryMode": "separate"
     },
     "staticData": {
       "node:Gmail Trigger": {
         "Gmail Trigger": {
-          "lastTimeChecked": 1788248555,
+          "lastTimeChecked": 1790384499,
           "possibleDuplicates": [
-            "1a05beb82da7feae"
+            "1a0db3b7041aa271"
           ]
         }
       }
     },
     "meta": null,
     "nodeGroups": [],
-    "pinData": null,
-    "versionId": "c857e13b-b867-41fb-ba99-507f583149ce",
-    "activeVersionId": null,
-    "versionCounter": 2,
+    "pinData": {},
+    "versionId": "161cbca8-80e8-46f6-b9f7-44d0816861d8",
+    "activeVersionId": "c857e13b-b867-41fb-ba99-507f583149ce",
+    "versionCounter": 8,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
@@ -669,7 +672,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T08:06:30.000Z",
+    "updatedAt": "2026-09-10T08:54:06.000Z",
     "createdAt": "2026-08-28T19:44:10.152Z",
     "id": "shSheetSync001",
     "name": "Saleshandy User List -> G Suite Sheet",
@@ -724,7 +727,7 @@
       },
       {
         "parameters": {
-          "jsCode": "const TAB = $('Resolve Tab Name').first().json.tab; // resolved from sheetId - survives a rename\n// Column layout of the 'G Suite Main <count>' tab (HR rename it as the count moves,\n// so the name is resolved from its sheetId upstream, never hardcoded):\n//   A-D = regular user list  <- this workflow owns these four columns only\n//   H-K = role / shared mailboxes, maintained by hand  <- never written to\nconst sheet = $input.first().json;\nconst grid = sheet.values || [];\nconst NL = String.fromCharCode(10);\nconst pad = (r, n) => (Array.isArray(r) ? r : []).concat(Array(n).fill('')).slice(0, n);\nconst trimTrailing = (rows) => {\n  const c = rows.slice();\n  while (c.length && c[c.length - 1].every(x => !x)) c.pop();\n  return c;\n};\n\n// GUARD: if someone inserts or renames a column, our fixed A2:D200 range would\n// silently write into the wrong place. Check the headers first and refuse to write.\nconst EXPECTED = ['First Name', 'Last Name', 'Email Address', 'Status'];\nconst actual = pad(grid[0], 4).map(c => String(c || '').trim());\nif (EXPECTED.some((h, i) => h.toLowerCase() !== actual[i].toLowerCase())) {\n  return [{ json: {\n    okFlag: 0,\n    problem: 'Column layout changed. Expected A1:D1 to be [' + EXPECTED.join(' | ') +\n             '] but the sheet has [' + actual.join(' | ') + ']. Nothing was written.'\n  }}];\n}\n\n// Role addresses live in column J of the H-K block; exclude them from A-D.\nconst roleEmails = new Set(\n  grid.slice(1).map(r => String(pad(r, 11)[9] || '').trim().toLowerCase()).filter(Boolean)\n);\n\n// DRIFT CHECK: compare what is in A2:D200 right now against what this workflow\n// wrote last time. Any difference means a person edited the sheet by hand.\nconst store = $getWorkflowStaticData('global');\nconst hadBaseline = Array.isArray(store.lastWritten);\nconst currentAD = trimTrailing(grid.slice(1, 200).map(r => pad(r, 4).map(c => String(c || '').trim())));\nconst drift = [];\nif (hadBaseline) {\n  const prev = store.lastWritten;\n  const n = Math.max(prev.length, currentAD.length);\n  for (let i = 0; i < n; i++) {\n    const was = (prev[i] || ['', '', '', '']).join(' | ');\n    const now = (currentAD[i] || ['', '', '', '']).join(' | ');\n    if (was !== now) drift.push('row ' + (i + 2) + ': we wrote [' + was + '] but sheet had [' + now + ']');\n  }\n}\n\nconst mailboxes = await this.helpers.httpRequest({\n  method: 'GET', url: 'http://192.168.126.101:3000/api/mailboxes', json: true\n});\n\nfunction splitName(full) {\n  const s = String(full || '').trim();\n  if (!s) return ['', ''];\n  const i = s.indexOf(' ');\n  return i === -1 ? [s, ''] : [s.slice(0, i), s.slice(i + 1).trim()];\n}\n\nconst rows = mailboxes\n  .filter(m => String(m.email || '').toLowerCase().endsWith('@saleshandy.com'))\n  .filter(m => !roleEmails.has(String(m.email).toLowerCase()))\n  .map(m => {\n    const [first, last] = splitName(m.current_user);\n    return [first, last, m.email, m.status || ''];\n  })\n  .sort((a, b) =>\n    a[0].toLowerCase().localeCompare(b[0].toLowerCase()) ||\n    a[2].toLowerCase().localeCompare(b[2].toLowerCase())\n  );\n\nconst MAX_ROWS = 199; // A2:D200\nif (rows.length > MAX_ROWS) {\n  return [{ json: { okFlag: 0, problem: rows.length + ' users no longer fit the A2:D200 range. Widen it before the next run. Nothing was written.' } }];\n}\nconst values = rows.concat(Array.from({ length: MAX_ROWS - rows.length }, () => ['', '', '', '']));\n\n// Status colours, matching what is already in the sheet by hand:\n//   Active -> light green RGB(182,215,168), Inactive -> light red RGB(224,102,102)\nconst GREEN = { red: 182/255, green: 215/255, blue: 168/255 };\nconst RED   = { red: 224/255, green: 102/255, blue: 102/255 };\nconst WHITE = { red: 1, green: 1, blue: 1 };\nconst formatRows = values.map(r => {\n  const status = String(r[3] || '').trim().toLowerCase();\n  const bg = status === 'active' ? GREEN : (status ? RED : WHITE);\n  return { values: [{ userEnteredFormat: { backgroundColor: bg } }] };\n});\n\nconst prevWritten = JSON.stringify(store.lastWritten || []);\nstore.lastWritten = trimTrailing(values.map(r => r.map(c => String(c || '').trim())));\nconst contentChanged = JSON.stringify(store.lastWritten) !== prevWritten;\n\n// Built here because n8n expressions cannot hold multi-statement logic.\nlet message = 'Wrote ' + rows.length + ' saleshandy.com users to ' + TAB + ' (columns A-D). ' +\n              roleEmails.size + ' role addresses in H-K left untouched.';\nif (drift.length) {\n  message += NL + NL + 'WARNING - ' + drift.length +\n             ' row(s) had been edited in the sheet by hand since the last sync.' +\n             ' Those edits have now been overwritten:' + NL + drift.slice(0, 15).join(NL);\n  if (drift.length > 15) message += NL + '...and ' + (drift.length - 15) + ' more';\n}\n\nreturn [{ json: {\n  okFlag: 1,\n  contentChanged,\n  reportFlag: (contentChanged || drift.length > 0) ? 1 : 0,\n  message,\n  values, formatRows,\n  userCount: rows.length,\n  roleAddressesExcluded: roleEmails.size,\n  driftCount: drift.length,\n  drift: drift.slice(0, 15),\n  baselineExisted: hadBaseline\n} }];\n"
+          "jsCode": "const TAB = $('Resolve Tab Name').first().json.tab; // resolved from sheetId - survives a rename\n// Column layout of the 'G Suite Main <count>' tab (HR rename it as the count moves,\n// so the name is resolved from its sheetId upstream, never hardcoded):\n//   A-D = regular user list  <- this workflow owns these four columns only\n//   H-K = role / shared mailboxes, maintained by hand  <- never written to\nconst sheet = $input.first().json;\nconst grid = sheet.values || [];\nconst NL = String.fromCharCode(10);\nconst pad = (r, n) => (Array.isArray(r) ? r : []).concat(Array(n).fill('')).slice(0, n);\nconst trimTrailing = (rows) => {\n  const c = rows.slice();\n  while (c.length && c[c.length - 1].every(x => !x)) c.pop();\n  return c;\n};\n\n// GUARD: if someone inserts or renames a column, our fixed A2:D200 range would\n// silently write into the wrong place. Check the headers first and refuse to write.\nconst EXPECTED = ['First Name', 'Last Name', 'Email Address', 'Status'];\nconst actual = pad(grid[0], 4).map(c => String(c || '').trim());\nif (EXPECTED.some((h, i) => h.toLowerCase() !== actual[i].toLowerCase())) {\n  return [{ json: {\n    okFlag: 0,\n    problem: 'Column layout changed. Expected A1:D1 to be [' + EXPECTED.join(' | ') +\n             '] but the sheet has [' + actual.join(' | ') + ']. Nothing was written.'\n  }}];\n}\n\n// Role addresses live in column J of the H-K block; exclude them from A-D.\nconst roleEmails = new Set(\n  grid.slice(1).map(r => String(pad(r, 11)[9] || '').trim().toLowerCase()).filter(Boolean)\n);\n\n// DRIFT CHECK: compare what is in A2:D200 right now against what this workflow\n// wrote last time. Any difference means a person edited the sheet by hand.\nconst store = $getWorkflowStaticData('global');\nconst hadBaseline = Array.isArray(store.lastWritten);\nconst currentAD = trimTrailing(grid.slice(1, 200).map(r => pad(r, 4).map(c => String(c || '').trim())));\nconst drift = [];\nif (hadBaseline) {\n  const prev = store.lastWritten;\n  const n = Math.max(prev.length, currentAD.length);\n  for (let i = 0; i < n; i++) {\n    const was = (prev[i] || ['', '', '', '']).join(' | ');\n    const now = (currentAD[i] || ['', '', '', '']).join(' | ');\n    if (was !== now) drift.push('row ' + (i + 2) + ': we wrote [' + was + '] but sheet had [' + now + ']');\n  }\n}\n\nconst mailboxes = await this.helpers.httpRequest({\n  method: 'GET', url: 'http://192.168.126.101:3000/api/mailboxes', json: true\n});\n\nfunction splitName(full) {\n  const s = String(full || '').trim();\n  if (!s) return ['', ''];\n  const i = s.indexOf(' ');\n  return i === -1 ? [s, ''] : [s.slice(0, i), s.slice(i + 1).trim()];\n}\n\nconst rows = mailboxes\n  .filter(m => String(m.email || '').toLowerCase().endsWith('@saleshandy.com'))\n  .filter(m => !roleEmails.has(String(m.email).toLowerCase()))\n  .map(m => {\n    const [first, last] = splitName(m.current_user);\n    return [first, last, m.email, m.status || ''];\n  })\n  .sort((a, b) =>\n    a[0].toLowerCase().localeCompare(b[0].toLowerCase()) ||\n    a[2].toLowerCase().localeCompare(b[2].toLowerCase())\n  );\n\nconst MAX_ROWS = 199; // A2:D200\nif (rows.length > MAX_ROWS) {\n  return [{ json: { okFlag: 0, problem: rows.length + ' users no longer fit the A2:D200 range. Widen it before the next run. Nothing was written.' } }];\n}\nconst values = rows.concat(Array.from({ length: MAX_ROWS - rows.length }, () => ['', '', '', '']));\n\n// Status colours, matching what is already in the sheet by hand:\n//   Active -> light green RGB(182,215,168), Inactive -> light red RGB(224,102,102)\nconst GREEN = { red: 182/255, green: 215/255, blue: 168/255 };\nconst RED   = { red: 224/255, green: 102/255, blue: 102/255 };\nconst WHITE = { red: 1, green: 1, blue: 1 };\nconst formatRows = values.map(r => {\n  const status = String(r[3] || '').trim().toLowerCase();\n  const bg = status === 'active' ? GREEN : (status ? RED : WHITE);\n  return { values: [{ userEnteredFormat: { backgroundColor: bg } }] };\n});\n\nconst prevWritten = JSON.stringify(store.lastWritten || []);\nstore.lastWritten = trimTrailing(values.map(r => r.map(c => String(c || '').trim())));\nconst contentChanged = JSON.stringify(store.lastWritten) !== prevWritten;\n\n// Built here because n8n expressions cannot hold multi-statement logic.\nlet message = 'Wrote ' + rows.length + ' saleshandy.com users to ' + TAB + ' (columns A-D)' +\n              ' and to the standalone copy (Sheet1). ' +\n              roleEmails.size + ' role addresses in H-K left untouched.';\nif (drift.length) {\n  message += NL + NL + 'WARNING - ' + drift.length +\n             ' row(s) had been edited in the sheet by hand since the last sync.' +\n             ' Those edits have now been overwritten:' + NL + drift.slice(0, 15).join(NL);\n  if (drift.length > 15) message += NL + '...and ' + (drift.length - 15) + ' more';\n}\n\nreturn [{ json: {\n  okFlag: 1,\n  contentChanged,\n  reportFlag: (contentChanged || drift.length > 0) ? 1 : 0,\n  message,\n  values, formatRows,\n  userCount: rows.length,\n  roleAddressesExcluded: roleEmails.size,\n  driftCount: drift.length,\n  drift: drift.slice(0, 15),\n  baselineExisted: hadBaseline\n} }];\n"
         },
         "id": "buildRows",
         "name": "Build User Rows",
@@ -795,7 +798,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          1680,
+          1970,
           220
         ]
       },
@@ -936,7 +939,7 @@
         "type": "n8n-nodes-base.if",
         "typeVersion": 2,
         "position": [
-          1450,
+          1840,
           220
         ]
       },
@@ -977,6 +980,76 @@
           240,
           300
         ]
+      },
+      {
+        "parameters": {
+          "url": "https://sheets.googleapis.com/v4/spreadsheets/19CF1UHlKgrCWNVPMXH-Lj5WTfQeDEyx58ggZ9TfNcN8?fields=sheets(properties(sheetId,title))",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "options": {}
+        },
+        "id": "shSheetSync001Lt",
+        "name": "List Copy Tabs",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1450,
+          220
+        ],
+        "credentials": {
+          "oAuth2Api": {
+            "id": "b1dYZNasS1uLkc9D",
+            "name": "Google Sheets - HR Onboarding"
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000
+      },
+      {
+        "parameters": {
+          "jsCode": "// The copy at 19CF1U... used to pull this list with a single IMPORTRANGE in A1:\n//   =IMPORTRANGE(\"...1wSiyl...\", \"G Suite Main 111!A1:D120\")\n// That hardcoded the tab name, which HR rename as the licence count moves, and\n// capped the list at 120 rows. n8n now writes the copy directly instead, so the\n// tab is resolved from its numeric sheetId here for the same reason as upstream.\nconst SHEET_ID = 0;\nconst sheets = ($input.first().json.sheets || []).map(s => s.properties);\nconst hit = sheets.find(p => Number(p.sheetId) === SHEET_ID);\nif (!hit) {\n  throw new Error('Tab with sheetId ' + SHEET_ID + ' no longer exists in the copy spreadsheet. Tabs present: ' +\n    sheets.map(p => p.title).join(', '));\n}\nreturn [{ json: { tab: hit.title } }];"
+        },
+        "id": "shSheetSync001Rt",
+        "name": "Resolve Copy Tab",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1580,
+          220
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PUT",
+          "url": "=https://sheets.googleapis.com/v4/spreadsheets/19CF1UHlKgrCWNVPMXH-Lj5WTfQeDEyx58ggZ9TfNcN8/values/{{ encodeURIComponent($json.tab) }}!A1:D200?valueInputOption=RAW",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "sendBody": true,
+          "contentType": "json",
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ values: [['First Name','Last Name','Email Address','Status']].concat($('Build User Rows').first().json.values) }) }}",
+          "options": {
+            "timeout": 60000
+          }
+        },
+        "id": "shSheetSync001Wc",
+        "name": "Write Users to Copy (A1-D200)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1710,
+          220
+        ],
+        "credentials": {
+          "oAuth2Api": {
+            "id": "b1dYZNasS1uLkc9D",
+            "name": "Google Sheets - HR Onboarding"
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000
       }
     ],
     "connections": {
@@ -1017,7 +1090,7 @@
         "main": [
           [
             {
-              "node": "Anything to Report?",
+              "node": "List Copy Tabs",
               "type": "main",
               "index": 0
             }
@@ -1091,6 +1164,39 @@
           [
             {
               "node": "Read Sheet (A-K)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "List Copy Tabs": {
+        "main": [
+          [
+            {
+              "node": "Resolve Copy Tab",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Resolve Copy Tab": {
+        "main": [
+          [
+            {
+              "node": "Write Users to Copy (A1-D200)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Write Users to Copy (A1-D200)": {
+        "main": [
+          [
+            {
+              "node": "Anything to Report?",
               "type": "main",
               "index": 0
             }
@@ -1191,12 +1297,6 @@
             "Active"
           ],
           [
-            "Devanshi",
-            "Gokani",
-            "devanshi@saleshandy.com",
-            "Active"
-          ],
-          [
             "Dharmesh",
             "Patel",
             "dharmesh@saleshandy.com",
@@ -1230,6 +1330,12 @@
             "Dhruv",
             "Patel",
             "dhruv@saleshandy.com",
+            "Active"
+          ],
+          [
+            "Divyaprasad",
+            "Pande",
+            "divyaprasad@saleshandy.com",
             "Active"
           ],
           [
@@ -1374,12 +1480,6 @@
             "Mahesh",
             "Vaghela",
             "mahesh@saleshandy.com",
-            "Active"
-          ],
-          [
-            "Mahima",
-            "Sindal",
-            "mahima@saleshandy.com",
             "Active"
           ],
           [
@@ -1587,12 +1687,6 @@
             "Active"
           ],
           [
-            "Saloni",
-            "Dalwadi",
-            "saloni@saleshandy.com",
-            "Active"
-          ],
-          [
             "Sara",
             "Sharma",
             "sara@saleshandy.com",
@@ -1690,12 +1784,6 @@
           ],
           [
             "Yash",
-            "Panchal",
-            "yash.p@saleshandy.com",
-            "Active"
-          ],
-          [
-            "Yash",
             "Thakker",
             "yash.t@saleshandy.com",
             "Active"
@@ -1720,9 +1808,9 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "314edc62-c4d0-4d23-9b93-1847249cf599",
-    "activeVersionId": null,
-    "versionCounter": 7,
+    "versionId": "42e9b194-8b0b-419a-8234-f39e07e016b4",
+    "activeVersionId": "42e9b194-8b0b-419a-8234-f39e07e016b4",
+    "versionCounter": 8,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
@@ -1752,7 +1840,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T08:06:31.000Z",
+    "updatedAt": "2026-09-02T11:03:51.000Z",
     "createdAt": "2026-08-28T20:43:08.188Z",
     "id": "newJoinersAuto",
     "name": "New Joiners Auto Add (SH / HA / TI)",
@@ -2158,7 +2246,8 @@
           "saurav@trulyinbox.com",
           "ife@trulyinbox.com",
           "sneh@trulyinbox.com",
-          "dhruvam@trulyinbox.com"
+          "dhruvam@trulyinbox.com",
+          "divyaprasad@saleshandy.com"
         ],
         "reportedProblems": [
           "TI: kaushal@trulyinbox.com (domain trulyinbox.com not in console)",
@@ -2181,7 +2270,7 @@
     "nodeGroups": [],
     "pinData": null,
     "versionId": "42ddbb91-8ca4-4b06-a4c0-4e890e6c385a",
-    "activeVersionId": null,
+    "activeVersionId": "42ddbb91-8ca4-4b06-a4c0-4e890e6c385a",
     "versionCounter": 4,
     "triggerCount": 1,
     "sourceWorkflowId": null,
@@ -2212,7 +2301,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T08:06:32.000Z",
+    "updatedAt": "2026-09-02T11:03:52.000Z",
     "createdAt": "2026-08-28T20:45:14.798Z",
     "id": "krishnaSheetSync",
     "name": "Krishnabusiness User List -> G Suite Krishna 20",
@@ -2614,7 +2703,7 @@
           "leo@humbersolutions.com": "1 | Active |  | Ravi",
           "dhruv@mysaleshandy.com": "2 | Active | Link Building Outreach | Mohit Nirmal",
           "dhruv@saleshandyinc.net": "3 | Active | Link Building Outreach | Mohit Nirmal",
-          "mona@saleshandy.io": "4 | Active |  | ",
+          "mona@saleshandy.io": "4 | Active | On Trial Sign Ups | Sales",
           "hello@highadvocacy.com": "5 | Active | Face | Face",
           "piyush@mysaleshandy.com": "6 | Active | Link Building Outreach | Mohit Nirmal",
           "piyush@thesaleshandy.com": "7 | Active | Link Building Outreach | Mohit Nirmal",
@@ -2632,7 +2721,8 @@
           "mona@thesaleshandy.com": "19 | Active |  | Sales",
           "raj@thesaleshandy.net": "20 | Active |  | Sales",
           "webmaster@saleshandy.io": "21 | Active | Email account connection | Product",
-          "avinash.v@highadvocacy.com": "22 | Active | His Gmail id created in this | avinash vagh"
+          "avinash.v@highadvocacy.com": "22 | Active | Make alias in piyush@highadvocacy.com | avinash vagh",
+          "piyush@highadvocacy.com": "23 | Active | His Gmail id created in this | piyush patel"
         }
       },
       "node:Every 2 Days": {
@@ -2656,7 +2746,7 @@
     "nodeGroups": [],
     "pinData": null,
     "versionId": "2c67cf15-d495-42ed-b1db-cb1ed1ad4a69",
-    "activeVersionId": null,
+    "activeVersionId": "2c67cf15-d495-42ed-b1db-cb1ed1ad4a69",
     "versionCounter": 5,
     "triggerCount": 1,
     "sourceWorkflowId": null,
@@ -2687,7 +2777,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T08:06:33.000Z",
+    "updatedAt": "2026-09-02T11:03:53.000Z",
     "createdAt": "2026-08-28T21:18:13.789Z",
     "id": "tiSheetSync001",
     "name": "TrulyInbox User List -> TrulyInbox GW",
@@ -3060,7 +3150,7 @@
     "nodeGroups": [],
     "pinData": null,
     "versionId": "1964f6f6-31cf-4370-8d57-163103d1834c",
-    "activeVersionId": null,
+    "activeVersionId": "1964f6f6-31cf-4370-8d57-163103d1834c",
     "versionCounter": 4,
     "triggerCount": 1,
     "sourceWorkflowId": null,
@@ -3091,7 +3181,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T10:03:00.000Z",
+    "updatedAt": "2026-09-02T11:03:54.000Z",
     "createdAt": "2026-08-29T08:01:17.525Z",
     "id": "exitSync00001",
     "name": "Exit Sync - Remove Leavers from Console",
@@ -3461,7 +3551,7 @@
     "nodeGroups": [],
     "pinData": null,
     "versionId": "c9593a04-695e-40d9-ab4b-4513b4825443",
-    "activeVersionId": null,
+    "activeVersionId": "c9593a04-695e-40d9-ab4b-4513b4825443",
     "versionCounter": 3,
     "triggerCount": 1,
     "sourceWorkflowId": null,
@@ -3492,7 +3582,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T08:06:36.000Z",
+    "updatedAt": "2026-09-02T11:03:55.000Z",
     "createdAt": "2026-08-29T17:47:05.713Z",
     "id": "solSheetSync01",
     "name": "Saleshandy Solutions <-> SaleshandySolutions-10",
@@ -4048,7 +4138,7 @@
     "nodeGroups": [],
     "pinData": null,
     "versionId": "9db430fc-b497-4219-8442-6bac9b061e75",
-    "activeVersionId": null,
+    "activeVersionId": "9db430fc-b497-4219-8442-6bac9b061e75",
     "versionCounter": 3,
     "triggerCount": 1,
     "sourceWorkflowId": null,
@@ -4079,7 +4169,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T08:06:37.000Z",
+    "updatedAt": "2026-09-12T18:38:55.000Z",
     "createdAt": "2026-08-31T05:15:42.960Z",
     "id": "racBillCapture",
     "name": "RAC Laptop Bill Auto-Capture",
@@ -4092,7 +4182,9 @@
           "pollTimes": {
             "item": [
               {
-                "mode": "everyMinute"
+                "mode": "everyX",
+                "value": 5,
+                "unit": "minutes"
               }
             ]
           },
@@ -4509,16 +4601,19 @@
     "staticData": {
       "node:Gmail Trigger": {
         "Gmail Trigger": {
-          "lastTimeChecked": 1788153610
+          "lastTimeChecked": 1790059871,
+          "possibleDuplicates": [
+            "1a0c7e2a15f4f9d3"
+          ]
         }
       }
     },
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "0379fb62-8b87-4dce-a3c6-ec04070150b2",
-    "activeVersionId": null,
-    "versionCounter": 10,
+    "versionId": "ebd86979-11f9-42b3-ac3b-833244a635c7",
+    "activeVersionId": "ebd86979-11f9-42b3-ac3b-833244a635c7",
+    "versionCounter": 11,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
@@ -4548,7 +4643,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-01T08:06:38.000Z",
+    "updatedAt": "2026-09-12T18:38:56.000Z",
     "createdAt": "2026-08-31T14:38:16.849Z",
     "id": "racProofCapture",
     "name": "RAC Payment Proof Auto-Capture",
@@ -4561,7 +4656,9 @@
           "pollTimes": {
             "item": [
               {
-                "mode": "everyMinute"
+                "mode": "everyX",
+                "value": 5,
+                "unit": "minutes"
               }
             ]
           },
@@ -4981,16 +5078,19 @@
     "staticData": {
       "node:Gmail Trigger (Sent)": {
         "Gmail Trigger (Sent)": {
-          "lastTimeChecked": 1788187254
+          "lastTimeChecked": 1790334075,
+          "possibleDuplicates": [
+            "1a0d83a0cd8c8ef0"
+          ]
         }
       }
     },
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "f84cc8ec-222c-4b4b-bb86-e8e0c595799b",
-    "activeVersionId": null,
-    "versionCounter": 7,
+    "versionId": "ac6b32c9-cf63-4134-8d0e-cbb2e174774b",
+    "activeVersionId": "ac6b32c9-cf63-4134-8d0e-cbb2e174774b",
+    "versionCounter": 8,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
@@ -5128,7 +5228,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-02T07:48:44.000Z",
+    "updatedAt": "2026-09-21T17:51:31.000Z",
     "createdAt": "2026-09-01T18:49:37.323Z",
     "id": "sysBackupNas1",
     "name": "System Backup to NAS (daily 18:00)",
@@ -5366,6 +5466,19 @@
           1100,
           500
         ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// The failure ntfy has already gone out; this makes the execution itself fail.\n// Until 21-09-2026 this branch ended quietly with status \"success\", so\n// syncFailAlert01 - every workflow's errorWorkflow - never fired, and a backup\n// that never reached the NAS looked identical in the execution list to one that\n// did. The ntfy body was the only place the word FAILED ever appeared, and on\n// 20-09 that was missed: the daily and the Sunday VM image both failed on\n// 'cannot create NAS dir' while n8n reported success for both.\nconst r = $('Build Report').first().json;\nconst problems = (r.problems || []).slice(0, 10).join('; ') ||\n  'no specific problem line was captured';\nthrow new Error('System backup did not complete: ' + problems +\n  ' (NAS dir: ' + (r.nasdir || 'n/a') +\n  ', archives: ' + (r.captured != null ? r.captured : '?') + ')');"
+        },
+        "id": "sysFailHard01",
+        "name": "Fail the Run",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1320,
+          500
+        ]
       }
     ],
     "connections": {
@@ -5463,6 +5576,17 @@
             }
           ]
         ]
+      },
+      "ntfy Failure": {
+        "main": [
+          [
+            {
+              "node": "Fail the Run",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     },
     "settings": {
@@ -5483,9 +5607,9 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "52e2d3ee-3d63-47e5-82e8-cc4c228ec16d",
-    "activeVersionId": "52e2d3ee-3d63-47e5-82e8-cc4c228ec16d",
-    "versionCounter": 10,
+    "versionId": "e36f8d44-29cd-4f32-ad91-228bf9b84b81",
+    "activeVersionId": "e36f8d44-29cd-4f32-ad91-228bf9b84b81",
+    "versionCounter": 11,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
@@ -5515,7 +5639,7 @@
     }
   },
   {
-    "updatedAt": "2026-09-02T12:10:30.000Z",
+    "updatedAt": "2026-09-21T17:51:31.000Z",
     "createdAt": "2026-09-01T18:59:44.234Z",
     "id": "vmImageBkFri1",
     "name": "UTM VM Image Backup (Sunday 06:00)",
@@ -5799,6 +5923,19 @@
           420,
           580
         ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Same reasoning as sysBackupNas1: the failure ntfy is sent by the node before\n// this one, and this turns the run into a real failure so syncFailAlert01 fires.\n// This one matters more - the job stops the VM to image it, so a silent failure\n// means Omada and BioMax were taken down and the 7.3G zip was thrown away.\n// vmBack is carried into the message because a VM left down is the emergency,\n// not the missing image.\nconst r = $('Build Report').first().json;\nconst problems = (r.problems || []).slice(0, 10).join('; ') ||\n  'no specific problem line was captured';\nthrow new Error('VM image backup did not complete: ' + problems +\n  ' (image verified: ' + (r.verified ? 'yes' : 'no') +\n  ', VM restarted: ' + (r.vmBack ? 'yes' : 'NO - CHECK OMADA/BIOMAX') + ')');"
+        },
+        "id": "vmFailHard001",
+        "name": "Fail the Run",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1520,
+          500
+        ]
       }
     ],
     "connections": {
@@ -5912,6 +6049,17 @@
             }
           ]
         ]
+      },
+      "ntfy Image Problem": {
+        "main": [
+          [
+            {
+              "node": "Fail the Run",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     },
     "settings": {
@@ -5940,9 +6088,9 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": null,
-    "versionId": "4b3da79b-a481-4897-815c-f6461e946ba5",
-    "activeVersionId": "4b3da79b-a481-4897-815c-f6461e946ba5",
-    "versionCounter": 4,
+    "versionId": "41fb01b1-d868-489d-b21e-a9efbed4681d",
+    "activeVersionId": "41fb01b1-d868-489d-b21e-a9efbed4681d",
+    "versionCounter": 5,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": [],
@@ -6243,6 +6391,469 @@
         "createdAt": "2026-09-03T05:37:43.425Z",
         "role": "workflow:owner",
         "workflowId": "n8nBundle4h",
+        "projectId": "IgEjm9j7lWKlz3Ja",
+        "project": {
+          "updatedAt": "2026-09-01T18:45:26.728Z",
+          "createdAt": "2026-09-01T18:27:25.462Z",
+          "id": "IgEjm9j7lWKlz3Ja",
+          "name": "Priyanshu kumar <priyanshu.k@saleshandy.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "customTelemetryTags": [],
+          "creatorId": "4a4b1b4a-8a52-4aed-9a17-f5508f43ed2e"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  },
+  {
+    "updatedAt": "2026-09-26T07:05:49.000Z",
+    "createdAt": "2026-09-10T16:42:21.864Z",
+    "id": "vendorPayCap1",
+    "name": "Vendor Payment Proof Auto-Capture",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyX",
+                "value": 5,
+                "unit": "minutes"
+              }
+            ]
+          },
+          "simple": false,
+          "filters": {
+            "q": "has:attachment (payment OR paid OR proof OR remittance OR UTR OR NEFT OR IMPS OR RTGS)",
+            "labelIds": [
+              "SENT"
+            ]
+          },
+          "options": {
+            "downloadAttachments": true
+          }
+        },
+        "id": "vpcTrigger",
+        "name": "Gmail Trigger (Sent)",
+        "type": "n8n-nodes-base.gmailTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          100
+        ],
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "vtDw4Vtd1koXODAF",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {},
+        "id": "vpcManual",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// A fixture that does not mirror the real payload is worse than no fixture: the\n// manual fixtures once passed plain strings for `from`/`to`, so every test was\n// green while production could not have worked at all. Gmail sends these as\n// objects - keep it that way.\nreturn [{\n  json: {\n    subject: 'Payment done - AIPL-PI-141/26-27',\n    text: 'Hi, please find attached the payment proof for the balance. UTR 000542698854. Thanks',\n    from: { value: [{ address: 'priyanshu.k@saleshandy.com', name: 'Priyanshu Kumar' }], text: 'priyanshu.k@saleshandy.com' },\n    to:   { value: [{ address: 'bhavik.rathod@amityinfosoft.com', name: 'Bhavik Rathod' }], text: 'bhavik.rathod@amityinfosoft.com' },\n    cc:   { value: [], text: '' }\n  },\n  binary: {}\n}];"
+        },
+        "id": "vpcFixture",
+        "name": "Test Fixture (manual runs)",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          200,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Mirrors racProofCapture's matcher, but the vendor is not known up front:\n// RAC has one recipient domain, here it has to be recognised from the console.\nconst API = 'http://192.168.126.101:3000';\n\n// Gmail hands from/to/cc over as objects: { value:[{address,name}], html, text }.\n// String() on one yields \"[object Object]\", which silently defeats every address\n// test and makes the workflow quietly process nothing. Always go through this.\nconst addr = (v) => {\n  if (!v) return '';\n  if (typeof v === 'string') return v;\n  if (typeof v.text === 'string') return v.text;\n  if (Array.isArray(v.value)) return v.value.map(x => (x && x.address) || '').join(' ');\n  return '';\n};\n\nconst item = $input.first();\nconst to = addr(item.json.to) + ' ' + addr(item.json.cc);\nconst subject = String(item.json.subject || '');\nconst bodyText = String(item.json.text || item.json.snippet || '');\n\n// Only a mail that actually claims to carry a payment proof should book money.\nif (!/payment|paid|proof|remitt|utr|neft|imps|rtgs/i.test(subject + ' ' + bodyText)) {\n  return [];\n}\n\n// Which vendor was this sent to? Recognise it by the recipient's domain against\n// the vendor list, so adding a vendor needs no edit here.\nconst vendors = await this.helpers.httpRequest({ method: 'GET', url: API + '/api/vendors', json: true });\nconst domainsOf = (v) => {\n  const blob = [v.email, v.notes, v.portal_url].filter(Boolean).join(' ');\n  const found = blob.match(/[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\\.[A-Za-z]{2,})/g) || [];\n  const doms = found.map(e => e.split('@')[1].toLowerCase());\n  const host = String(v.portal_url || '').match(/^https?:\\/\\/(?:www\\.)?([^\\/]+)/i);\n  if (host) doms.push(host[1].toLowerCase());\n  return Array.from(new Set(doms));\n};\nconst toLower = to.toLowerCase();\nconst hits = (vendors || []).filter(v => domainsOf(v).some(d => toLower.includes('@' + d)));\n\nif (hits.length === 0) return [];   // not addressed to a known vendor\nif (hits.length > 1) {\n  throw new Error('This mail is addressed to more than one known vendor (' +\n    hits.map(v => v.name).join(', ') + ') - refusing to guess which one was paid.');\n}\nconst vendor = hits[0];\n\n// Invoice numbers are the strongest link to a contract. Keep the pattern loose:\n// vendors here use AMD/26-27/00669, GSTNW/1205/2627, AIPL-PI-141/26-27, TSLE26-272973.\nconst invRe = /\\b[A-Z]{2,6}[\\/\\-][A-Za-z0-9\\/\\-]{4,24}\\b/g;\nconst invoiceHints = Array.from(new Set(\n  ((subject + ' ' + bodyText).match(invRe) || []).map(x => x.trim())\n));\n\n// The signature logo is an attachment too. Prefer a PDF; among images take the\n// largest and ignore anything small enough to be a logo.\nconst binary = item.binary || {};\nconst approxBytes = (b) => {\n  const m = String(b.fileSize || '').match(/([\\d.]+)\\s*(k|m)?b/i);\n  if (m) {\n    const n = parseFloat(m[1]);\n    const unit = (m[2] || '').toLowerCase();\n    return Math.round(n * (unit === 'm' ? 1048576 : unit === 'k' ? 1024 : 1));\n  }\n  return b.data ? Math.round(String(b.data).length * 0.75) : 0;\n};\nconst keys = Object.keys(binary);\nconst isPdf = k => (binary[k].mimeType || '').includes('pdf') || (binary[k].fileName || '').toLowerCase().endsWith('.pdf');\nconst isImage = k => (binary[k].mimeType || '').startsWith('image/') ||\n  /\\.(jpe?g|png|webp|heic)$/i.test(binary[k].fileName || '');\n// Gmail inlines the signature block and names those parts image001.png,\n// image002.png ... A real attachment keeps its own filename.\nconst looksInlined = k => /^image\\d{3}\\.(png|jpe?g|gif|webp)$/i.test(binary[k].fileName || '');\n\nlet pick = keys.find(isPdf);\nif (!pick) {\n  const rank = k => (looksInlined(k) ? 0 : 1);\n  const imgs = keys.filter(isImage).sort((a, b) =>\n    (rank(b) - rank(a)) || (approxBytes(binary[b]) - approxBytes(binary[a])));\n  pick = imgs.length > 1\n    ? (imgs.filter(k => approxBytes(binary[k]) >= 8000)[0] || imgs[0])\n    : imgs[0];\n}\nif (!pick) return [];   // nothing that could be a proof\n\nlet emailText = String(item.json.text || '');\nif (!emailText && item.json.html) {\n  emailText = String(item.json.html)\n    .replace(/<\\s*(br|\\/tr|\\/p|\\/div)[^>]*>/gi, '\\n')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')\n    .replace(/[ \\t]+/g, ' ').replace(/\\n{3,}/g, '\\n\\n').trim();\n}\nemailText = ('Subject: ' + subject + '\\n\\n' + emailText).slice(0, 8000);\n\nreturn [{\n  json: {\n    to, subject, emailText, invoiceHints,\n    vendorId: vendor.id, vendorName: vendor.name,\n    originalFilename: binary[pick].fileName || 'payment-proof',\n    mimeType: binary[pick].mimeType || '',\n    isPdfFlag: isPdf(pick) ? 1 : 0\n  },\n  binary: { proof: binary[pick] }\n}];"
+        },
+        "id": "vpcMatch",
+        "name": "Match Vendor + Pick File",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          420,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.isPdfFlag }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "vpcIsPdf",
+        "name": "Is PDF?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          640,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "pdf",
+          "binaryPropertyName": "proof"
+        },
+        "id": "vpcExtract",
+        "name": "Extract Proof Text",
+        "type": "n8n-nodes-base.extractFromFile",
+        "typeVersion": 1,
+        "position": [
+          860,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const API = 'http://192.168.126.101:3000';\nconst src = $('Match Vendor + Pick File').first();\nconst meta = src.json;\n\n// Give the parser only this vendor's contracts that still owe money - a proof\n// cannot settle something already paid in full, and a shorter list is a sharper\n// prompt.\nlet openInvoices = [];\ntry {\n  const services = await this.helpers.httpRequest({ method: 'GET', url: API + '/api/services', json: true });\n  const payments = await this.helpers.httpRequest({ method: 'GET', url: API + '/api/payments', json: true });\n  const paidBySvc = {};\n  (payments || []).forEach(p => {\n    paidBySvc[p.service_id] = (paidBySvc[p.service_id] || 0) + (Number(p.amount) || 0);\n  });\n  openInvoices = (services || [])\n    .filter(s => Number(s.vendor_id) === Number(meta.vendorId))\n    .map(s => ({\n      service_id: s.id,\n      service_name: s.service_name,\n      cost: Number(s.cost) || 0,\n      outstanding: Math.round(((Number(s.cost) || 0) - (paidBySvc[s.id] || 0)) * 100) / 100,\n      notes: String(s.notes || '').slice(0, 300)\n    }))\n    .filter(s => s.outstanding > 0);\n} catch (e) {\n  openInvoices = [];\n}\n\nconst body = { openInvoices, emailText: meta.emailText || '' };\n\nif (meta.isPdfFlag === 1) {\n  body.text = $('Extract Proof Text').first().json.text || '';\n} else {\n  let buf;\n  try {\n    buf = await this.helpers.getBinaryDataBuffer(0, 'proof');\n  } catch (e) {\n    buf = Buffer.from(src.binary.proof.data, 'base64');\n  }\n  body.imageBase64 = buf.toString('base64');\n  body.imageMime = meta.mimeType || 'image/png';\n}\n\nreturn [{ json: body }];"
+        },
+        "id": "vpcBuildReq",
+        "name": "Build Proof Request",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1080,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.126.101:4321/parse-payment-proof",
+          "sendBody": true,
+          "contentType": "json",
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json) }}",
+          "options": {
+            "timeout": 240000
+          }
+        },
+        "id": "vpcParse",
+        "name": "AI Parse Payment Proof",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1300,
+          100
+        ],
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Books a vendor payment against the contract it settles. The rule throughout is\n// racProofCapture's: never guess. Booking money against the wrong contract is\n// worse than booking none, because POST /api/payments also flips that contract\n// to Done - a wrong row silently marks the wrong thing paid.\nconst API = 'http://192.168.126.101:3000';\nconst parsed = $input.first().json;\nconst meta = $('Match Vendor + Pick File').first().json;\n\n// Indian calendar date. new Date().toISOString() is the UTC date, which is still\n// yesterday until 05:30 IST.\nconst istToday = () => new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10);\n\nif (parsed.looks_like_payment_proof === false) {\n  throw new Error('The attached file is not a payment proof (parser said so). Nothing was booked. File: ' + (meta.originalFilename || '?'));\n}\nconst amount = Number(parsed.amount);\nif (!(amount > 0)) {\n  throw new Error('No amount could be read off the proof. Nothing was booked. File: ' + (meta.originalFilename || '?'));\n}\n\nconst services = await this.helpers.httpRequest({ method: 'GET', url: API + '/api/services', json: true });\nconst payments = await this.helpers.httpRequest({ method: 'GET', url: API + '/api/payments', json: true });\n\nconst paidBySvc = {};\n(payments || []).forEach(p => {\n  paidBySvc[p.service_id] = (paidBySvc[p.service_id] || 0) + (Number(p.amount) || 0);\n});\nconst mine = (services || []).filter(s => Number(s.vendor_id) === Number(meta.vendorId));\nif (!mine.length) {\n  throw new Error('No contract exists for ' + meta.vendorName + '. Book the contract first, then re-send the proof.');\n}\nconst outstanding = s => Math.round(((Number(s.cost) || 0) - (paidBySvc[s.id] || 0)) * 100) / 100;\nconst open = mine.filter(s => outstanding(s) > 0);\n\n// The same proof mailed twice must not book the money twice. A UTR is unique;\n// fall back to the vendor + amount + date triple when the proof carries none.\nconst ref = String(parsed.bank_ref || parsed.reference_no || '').replace(/\\s+/g, '').toLowerCase();\nconst paidOn = parsed.paid_on || parsed.payment_date || istToday();\nconst already = (payments || []).find(p => {\n  if (ref) {\n    const seen = String(p.invoice_no || '').replace(/\\s+/g, '').toLowerCase();\n    if (seen && seen.includes(ref)) return true;\n  }\n  return Number(p.vendor_id) === Number(meta.vendorId) &&\n         Math.abs((Number(p.amount) || 0) - amount) < 0.01 &&\n         p.payment_date === paidOn;\n});\nif (already) {\n  return [];   // same proof delivered again - nothing to add\n}\n\n// --- pick the contract ---------------------------------------------------\nconst norm = s => String(s || '').replace(/\\s+/g, '').toLowerCase();\nconst hints = [parsed.invoice_number].concat(meta.invoiceHints || []).filter(Boolean).map(norm);\n\nlet chosen = null;\nlet how = '';\n\n// 1. An invoice number quoted in the proof or the mail is the strongest link.\nif (hints.length) {\n  const byInvoice = open.filter(s => {\n    const blob = norm(s.notes) + norm(s.service_name);\n    return hints.some(h => h.length >= 5 && blob.includes(h));\n  });\n  if (byInvoice.length === 1) { chosen = byInvoice[0]; how = 'invoice number'; }\n  else if (byInvoice.length > 1) {\n    throw new Error('Invoice ' + hints.join(' / ') + ' matches more than one open contract for ' +\n      meta.vendorName + ' - refusing to guess. Fix the duplicates in the console.');\n  }\n}\n\n// 2. Otherwise the amount has to identify it on its own, and only if it is unique.\nif (!chosen) {\n  const byAmount = open.filter(s => Math.abs(outstanding(s) - amount) < 1);\n  if (byAmount.length === 1) { chosen = byAmount[0]; how = 'outstanding amount'; }\n  else if (byAmount.length > 1) {\n    throw new Error(byAmount.length + ' open contracts for ' + meta.vendorName +\n      ' each owe exactly Rs.' + amount + ' - refusing to guess which one was paid.');\n  }\n}\n\nif (!chosen) {\n  const summary = open.length\n    ? open.map(s => s.service_name + ' (owes Rs.' + outstanding(s) + ')').join('; ')\n    : 'none - every contract for this vendor is already paid in full';\n  throw new Error('Could not tell which ' + meta.vendorName + ' contract this Rs.' + amount +\n    ' proof settles. Open contracts: ' + summary + '. Book it by hand.');\n}\n\n// --- book it -------------------------------------------------------------\nconst owed = outstanding(chosen);\nconst bits = [];\nif (parsed.method) bits.push(parsed.method);\nif (parsed.bank_ref) bits.push('bank ref ' + parsed.bank_ref);\nif (parsed.reference_no) bits.push('reference no ' + parsed.reference_no);\nif (parsed.beneficiary_account) bits.push('to A/C ' + parsed.beneficiary_account);\n\nconst leftOver = Math.round((owed - amount) * 100) / 100;\nconst tail = leftOver > 0\n  ? ' Part payment - Rs.' + leftOver + ' still outstanding on this contract.'\n  : leftOver < 0\n    ? ' PAID MORE than outstanding by Rs.' + Math.abs(leftOver) + ' - check this.'\n    : ' Settles the contract in full.';\n\nconst created = await this.helpers.httpRequest({\n  method: 'POST', url: API + '/api/payments', json: true,\n  body: {\n    service_id: chosen.id,\n    vendor_id: meta.vendorId,\n    amount: amount,\n    currency: parsed.currency || 'INR',\n    payment_date: paidOn,\n    payment_method: parsed.method || 'Bank Transfer',\n    invoice_no: parsed.bank_ref || parsed.reference_no || parsed.invoice_number || '',\n    receipt_note: '[Auto-captured from your sent mail - please verify] ' +\n      (bits.length ? bits.join(', ') + '.' : '') + tail +\n      ' Matched on ' + how + '. Proof file: ' + (meta.originalFilename || '?')\n  }\n});\n\nreturn [{ json: {\n  paymentId: created.id,\n  serviceId: chosen.id,\n  serviceName: chosen.service_name,\n  vendorName: meta.vendorName,\n  amount, paidOn, how,\n  wasOutstanding: owed,\n  stillOutstanding: leftOver > 0 ? leftOver : 0,\n  method: parsed.method || '',\n  bankRef: parsed.bank_ref || '',\n  referenceNo: parsed.reference_no || ''\n} }];"
+        },
+        "id": "vpcRecord",
+        "name": "Record Payment",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1520,
+          0
+        ],
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const API = 'http://192.168.126.101:3000';\nconst s = $('Record Payment').first().json;\n\nconst services = await this.helpers.httpRequest({ method: 'GET', url: API + '/api/services', json: true });\nconst payments = await this.helpers.httpRequest({ method: 'GET', url: API + '/api/payments', json: true });\n\nconst paidBySvc = {};\n(payments || []).forEach(p => {\n  paidBySvc[p.service_id] = (paidBySvc[p.service_id] || 0) + (Number(p.amount) || 0);\n});\nconst owes = (services || [])\n  .map(x => Math.round(((Number(x.cost) || 0) - (paidBySvc[x.id] || 0)) * 100) / 100)\n  .filter(v => v > 0);\n\nconst d = new Date(s.paidOn);\nconst fyStartYear = d.getMonth() + 1 >= 4 ? d.getFullYear() : d.getFullYear() - 1;\nconst fyStart = fyStartYear + '-04-01', fyEnd = (fyStartYear + 1) + '-03-31';\n\nreturn [{ json: {\n  ...s,\n  outstandingTotal: owes.reduce((t, v) => t + v, 0),\n  outstandingCount: owes.length,\n  fyLabel: 'FY' + String(fyStartYear).slice(2) + '-' + String(fyStartYear + 1).slice(2),\n  fyPaid: (payments || [])\n    .filter(p => p.payment_date >= fyStart && p.payment_date <= fyEnd)\n    .reduce((t, p) => t + (Number(p.amount) || 0), 0)\n} }];"
+        },
+        "id": "vpcSummary",
+        "name": "Build Payment Summary",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1740,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.126.101:8080/it-billing-console",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Title",
+                "value": "=Vendor payment booked - Rs.{{ $json.amount }}"
+              },
+              {
+                "name": "Tags",
+                "value": "white_check_mark,moneybag"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/plain",
+          "body": "={{ (() => { const s = $json;\n  const rs = n => 'Rs.' + Number(n || 0).toLocaleString('en-IN');\n  const L = [];\n  L.push(s.vendorName + '   ' + rs(s.amount) + ' on ' + s.paidOn);\n  L.push('Booked against: ' + s.serviceName);\n  if (s.stillOutstanding > 0) { L.push('Part payment - ' + rs(s.stillOutstanding) + ' still due on this contract.'); }\n  else { L.push('This contract is now paid in full.'); }\n  const ref = [s.method, s.bankRef ? 'ref ' + s.bankRef : null, s.referenceNo ? 'no ' + s.referenceNo : null].filter(Boolean);\n  if (ref.length) { L.push(ref.join(', ')); }\n  L.push('Matched on ' + s.how + '. Verify the row in the console.');\n  L.push('');\n  L.push(s.fyLabel + ' paid so far ' + rs(s.fyPaid) + '   |   ' + s.outstandingCount + ' contract(s) still owe ' + rs(s.outstandingTotal));\n  return L.join('\\n'); })() }}",
+          "options": {}
+        },
+        "id": "vpcNotify",
+        "name": "Notify via ntfy",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1960,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.126.101:8080/it-billing-console",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Title",
+                "value": "Decision needed - payment not booked"
+              },
+              {
+                "name": "Priority",
+                "value": "high"
+              },
+              {
+                "name": "Tags",
+                "value": "warning,moneybag"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/plain",
+          "body": "={{ 'A payment proof could not be booked automatically.' + '\\n\\n' + $json.openCount + ' decision(s) now waiting.' + '\\n\\nAsk Hermes on Telegram for the details - they are deliberately not sent here, this channel has no authentication.' }}",
+          "options": {}
+        },
+        "id": "vpcFail",
+        "name": "Notify Booking Failure",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1740,
+          240
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// A capture that cannot decide used to just throw. That sent an ntfy nobody\n// could reply to, while the mail had already been consumed - so the work fell\n// on whoever happened to read the notification, and often on nobody. Park the\n// question instead, with everything already parsed attached, so it can be\n// answered later from Telegram without re-deriving any of it.\nconst API = 'http://192.168.126.101:3000';\n\nlet meta = {};\ntry { meta = $('Match Vendor + Pick File').first().json || {}; } catch (e) {}\nlet parsed = {};\ntry { parsed = $('AI Parse Payment Proof').first().json || {}; } catch (e) {}\n\nconst err = ($json.error && ($json.error.message || $json.error)) || '';\nconst reason = String(err || 'it could not be matched to a contract').slice(0, 300);\n\n// One question per proof. The Gmail trigger can re-deliver the same sent mail,\n// and a bank reference is unique per payment, so this stops it asking twice.\nconst key = ['vendorpay',\n  meta.vendorId || '?',\n  parsed.bank_ref || parsed.reference_no || meta.originalFilename || meta.subject || 'unknown'\n].join(':').slice(0, 180);\n\nconst body = {\n  kind: 'vendor_payment',\n  source: 'vendorPayCap1',\n  subject: meta.subject || '',\n  question: 'A vendor payment proof arrived but could not be booked automatically: ' + reason,\n  context: {\n    vendor: meta.vendorName || null,\n    vendorId: meta.vendorId || null,\n    amount: parsed.amount != null ? parsed.amount : null,\n    paidOn: parsed.paid_on || parsed.payment_date || null,\n    method: parsed.method || null,\n    bankRef: parsed.bank_ref || parsed.reference_no || null,\n    invoiceHints: meta.invoiceHints || [],\n    proofFile: meta.originalFilename || null,\n    sentTo: meta.to || null\n  },\n  dedupe_key: key\n};\n\nlet parked;\ntry {\n  parked = await this.helpers.httpRequest({ method: 'POST', url: API + '/api/pending', json: true, body });\n} catch (e) {\n  // Never swallow the alert just because the console is unreachable.\n  parked = { error: String((e && e.message) || e) };\n}\n\nlet openCount = 0;\ntry {\n  const open = await this.helpers.httpRequest({ method: 'GET', url: API + '/api/pending', json: true });\n  openCount = (open || []).length;\n} catch (e) {}\n\nreturn [{ json: { parked, openCount, reason } }];"
+        },
+        "id": "vpcPark00001",
+        "name": "Park Pending Decision",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1520,
+          240
+        ]
+      }
+    ],
+    "connections": {
+      "Gmail Trigger (Sent)": {
+        "main": [
+          [
+            {
+              "node": "Match Vendor + Pick File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "Test Fixture (manual runs)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Test Fixture (manual runs)": {
+        "main": [
+          [
+            {
+              "node": "Match Vendor + Pick File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Match Vendor + Pick File": {
+        "main": [
+          [
+            {
+              "node": "Is PDF?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is PDF?": {
+        "main": [
+          [
+            {
+              "node": "Extract Proof Text",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build Proof Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Proof Text": {
+        "main": [
+          [
+            {
+              "node": "Build Proof Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Proof Request": {
+        "main": [
+          [
+            {
+              "node": "AI Parse Payment Proof",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Parse Payment Proof": {
+        "main": [
+          [
+            {
+              "node": "Record Payment",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Park Pending Decision",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Record Payment": {
+        "main": [
+          [
+            {
+              "node": "Build Payment Summary",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Park Pending Decision",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Payment Summary": {
+        "main": [
+          [
+            {
+              "node": "Notify via ntfy",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Park Pending Decision": {
+        "main": [
+          [
+            {
+              "node": "Notify Booking Failure",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "errorWorkflow": "syncFailAlert01"
+    },
+    "staticData": {
+      "node:Gmail Trigger (Sent)": {
+        "lastTimeChecked": 1790334075,
+        "possibleDuplicates": [
+          "1a0d83a0cd8c8ef0",
+          "1a0cd190ccaee4b2"
+        ]
+      }
+    },
+    "meta": null,
+    "nodeGroups": [],
+    "pinData": null,
+    "versionId": "d2b2fed4-9c16-41c8-a52f-866f78e53030",
+    "activeVersionId": "d2b2fed4-9c16-41c8-a52f-866f78e53030",
+    "versionCounter": 3,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-09-10T16:42:21.865Z",
+        "createdAt": "2026-09-10T16:42:21.865Z",
+        "role": "workflow:owner",
+        "workflowId": "vendorPayCap1",
         "projectId": "IgEjm9j7lWKlz3Ja",
         "project": {
           "updatedAt": "2026-09-01T18:45:26.728Z",

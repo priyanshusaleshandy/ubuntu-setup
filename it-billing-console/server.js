@@ -6,12 +6,24 @@ const multer = require('multer');
 const db = require('./database');
 const serviceStatus = require('./status');
 const { startScheduler, checkExpiringServices } = require('./scheduler');
+const { initAuth, registerAuthRoutes, requireAuth } = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Behind the Cloudflare tunnel the socket address is the tunnel's, not the
+// caller's, so req.ip only means anything with this set. It is used as a
+// rate-limit key on the login routes.
+app.set('trust proxy', true);
+
 app.use(cors());
 app.use(express.json());
+
+// Everything below this line needs a session, except the sign-in routes, the
+// login page itself, and API calls that did not arrive through the public
+// tunnel - see auth.js for why the automations are deliberately still allowed.
+registerAuthRoutes(app);
+app.use(requireAuth);
 // Serve index.html ourselves so app.js / style.css can carry a ?v=<mtime> stamp.
 // Without it the browser happily reuses a cached app.js after a UI deploy - which it
 // did, and the new markup silently never appeared. Must sit BEFORE express.static,
@@ -33,7 +45,19 @@ app.get(['/', '/index.html'], (req, res) => {
   res.type('html').send(html);
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+// app.js and style.css are requested with ?v=<mtime>, so a given URL can never
+// change contents - a deploy mints a new URL. That makes them safe to cache hard,
+// and it matters: they were being revalidated on every reload, which over the
+// tunnel is two round trips of roughly a second each for two 304s. index.html
+// itself is still served no-store above, so a new deploy is picked up at once.
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1y',
+  immutable: true,
+  setHeaders: (res, filePath) => {
+    // The login page is not versioned, so it must not be pinned for a year.
+    if (filePath.endsWith('login.html')) res.setHeader('Cache-Control', 'no-store');
+  },
+}));
 
 // Uploaded files are written straight onto the NAS mount (NAS_DOCS_DIR, see
 // docker-compose.yml) under Documents/<Vendor or Company Documents>/ - never
@@ -327,45 +351,66 @@ app.get('/api/services', (req, res) => {
 });
 
 app.post('/api/services', (req, res) => {
-  const { vendor_id, service_name, category, cost, currency, billing_cycle, start_date, expiry_date, auto_renew, notes } = req.body;
+  const { vendor_id, service_name, category, cost, currency, billing_cycle, start_date, expiry_date, auto_renew, notes, status_override } = req.body;
   if (!service_name || !cost || !expiry_date) {
     return res.status(400).json({ error: 'Service name, cost, and expiry date are required' });
   }
 
+  // A brand new contract has no payments yet, so this opening value matches what
+  // decide() would return anyway; recomputeOne below settles it either way.
   const today = new Date();
   const exp = new Date(expiry_date);
   const diffDays = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
   let status = 'Upcoming';
   if (diffDays <= 0) status = 'Expired';
 
+  // The form offers the same status picker when adding, so honour it here too -
+  // otherwise choosing one on a new contract would save and quietly do nothing.
+  const override = String(status_override || '').trim() || null;
+  const overridePeriod = override ? (start_date || '') : null;
+
   db.run(
-    `INSERT INTO services_contracts (vendor_id, service_name, category, cost, currency, billing_cycle, start_date, expiry_date, auto_renew, status, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [vendor_id, service_name, category, cost, currency || 'INR', billing_cycle || 'yearly', start_date, expiry_date, auto_renew ? 1 : 0, status, notes],
+    `INSERT INTO services_contracts (vendor_id, service_name, category, cost, currency, billing_cycle, start_date, expiry_date, auto_renew, status, notes, status_override, status_override_period)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [vendor_id, service_name, category, cost, currency || 'INR', billing_cycle || 'yearly', start_date, expiry_date, auto_renew ? 1 : 0, status, notes, override, overridePeriod],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ id: this.lastID, message: 'Service contract added successfully' });
+      const newId = this.lastID;
+      serviceStatus.recomputeOne(newId, () => {
+        res.json({ id: newId, message: 'Service contract added successfully' });
+      });
     }
   );
 });
 
 app.put('/api/services/:id', (req, res) => {
-  const { vendor_id, service_name, category, cost, currency, billing_cycle, start_date, expiry_date, auto_renew, notes } = req.body;
-  
-  const today = new Date();
-  const exp = new Date(expiry_date);
-  const diffDays = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
-  let status = 'Upcoming';
-  if (diffDays <= 0) status = 'Expired';
+  const { vendor_id, service_name, category, cost, currency, billing_cycle, start_date, expiry_date, auto_renew, notes, status_override } = req.body;
+
+  // `status` is NOT written here. It used to be pinned from the expiry date
+  // alone (Upcoming, or Expired once the date passed), which ignored payments -
+  // so editing anything at all on a fully paid contract, even just a note, threw
+  // away its Done and showed it as unpaid again. recomputeOne below is the only
+  // thing that may set it.
+  //
+  // `status_override` is the one part of the status a human may choose. Empty
+  // means "go back to deciding it from the payments". It is stamped with the
+  // start_date it was chosen against so it retires by itself when the period
+  // rolls forward - see status.js.
+  const override = String(status_override || '').trim() || null;
+  const overridePeriod = override ? (start_date || '') : null;
 
   db.run(
-    `UPDATE services_contracts 
-     SET vendor_id = ?, service_name = ?, category = ?, cost = ?, currency = ?, billing_cycle = ?, start_date = ?, expiry_date = ?, auto_renew = ?, status = ?, notes = ?
+    `UPDATE services_contracts
+     SET vendor_id = ?, service_name = ?, category = ?, cost = ?, currency = ?, billing_cycle = ?, start_date = ?, expiry_date = ?, auto_renew = ?, notes = ?, status_override = ?, status_override_period = ?
      WHERE id = ?`,
-    [vendor_id, service_name, category, cost, currency || 'INR', billing_cycle, start_date, expiry_date, auto_renew ? 1 : 0, status, notes, req.params.id],
+    [vendor_id, service_name, category, cost, currency || 'INR', billing_cycle, start_date, expiry_date, auto_renew ? 1 : 0, notes, override, overridePeriod, req.params.id],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ message: 'Service updated successfully' });
+      // cost, start_date and expiry_date all feed the decision, so any edit can
+      // legitimately move the status in either direction.
+      serviceStatus.recomputeOne(req.params.id, () => {
+        res.json({ message: 'Service updated successfully' });
+      });
     }
   );
 });
@@ -430,6 +475,65 @@ app.post('/api/payments', (req, res) => {
       serviceStatus.recomputeOne(service_id, () => {
         res.json({ id: paymentId, message: 'Payment recorded successfully' });
       });
+    }
+  );
+});
+
+// --- Pending decisions -----------------------------------------------------
+// Questions the automations could not answer themselves. A capture workflow
+// that cannot tell which contract a payment settles parks one here and asks in
+// Telegram instead of throwing, which used to mean an ntfy alert nobody could
+// reply to and a mail that had already been consumed.
+
+app.get('/api/pending', (req, res) => {
+  // Open only by default - the whole point is a short list somebody can clear.
+  const status = req.query.status || 'Open';
+  const where = status === 'all' ? '' : 'WHERE status = ?';
+  const args = status === 'all' ? [] : [status];
+  db.all(`SELECT * FROM pending_decisions ${where} ORDER BY created_at DESC`, args, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/pending', (req, res) => {
+  const { kind, source, subject, question, context, suggestion, dedupe_key } = req.body;
+  if (!kind || !question) {
+    return res.status(400).json({ error: 'kind and question are required' });
+  }
+  // A Gmail trigger can re-deliver the same mail; dedupe_key makes asking twice
+  // about one invoice impossible. Re-posting an existing key is a no-op, not an
+  // error, so a workflow retry stays safe.
+  const ctx = typeof context === 'string' ? context : JSON.stringify(context || {});
+  db.run(
+    `INSERT OR IGNORE INTO pending_decisions (kind, source, subject, question, context, suggestion, dedupe_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [kind, source, subject, question, ctx, suggestion, dedupe_key || null],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      if (this.changes === 0) {
+        return db.get(`SELECT id FROM pending_decisions WHERE dedupe_key = ?`, [dedupe_key],
+          (e, row) => res.json({ id: row && row.id, duplicate: true, message: 'Already asked' }));
+      }
+      res.json({ id: this.lastID, message: 'Pending decision recorded' });
+    }
+  );
+});
+
+app.put('/api/pending/:id', (req, res) => {
+  // Closing one records what was said and what was done about it, so the trail
+  // survives the chat it was answered in.
+  const { status, answer, resolution } = req.body;
+  const next = status || 'Resolved';
+  db.run(
+    `UPDATE pending_decisions
+     SET status = ?, answer = ?, resolution = ?, resolved_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [next, answer || null, resolution || null, req.params.id],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      if (this.changes === 0) return res.status(404).json({ error: 'No such pending decision' });
+      res.json({ message: 'Pending decision closed' });
     }
   );
 });
@@ -659,6 +763,94 @@ app.delete('/api/mailboxes/:id', (req, res) => {
   });
 });
 
+// 8b. FIREWALL / DHCP BINDINGS API (which device holds which reserved IP, and whose it is)
+
+// People paste MACs in whatever the source gave them - colons from the Sophos
+// UI, hyphens from Windows, bare hex from a label. Stored raw, the UNIQUE
+// constraint would happily accept the same device three times, so everything is
+// reduced to 12 hex characters and rebuilt one way.
+function normaliseMac(value) {
+  const hex = String(value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+  if (hex.length !== 12) return null;
+  return hex.match(/.{2}/g).join(':');
+}
+
+function isIpv4(value) {
+  const parts = String(value || '').trim().split('.');
+  if (parts.length !== 4) return false;
+  return parts.every(p => /^\d{1,3}$/.test(p) && Number(p) <= 255);
+}
+
+function readBinding(body) {
+  const mac = normaliseMac(body.mac_address);
+  if (!String(body.device_name || '').trim()) return { error: 'Device name is required' };
+  if (!mac) return { error: 'MAC address must be 12 hex characters, e.g. A4:BB:6D:11:22:33' };
+  if (!isIpv4(body.ip_address)) return { error: 'IP address must look like 192.168.126.50' };
+  return {
+    values: [
+      String(body.device_name).trim(),
+      mac,
+      String(body.ip_address).trim(),
+      body.device_type || 'Other',
+      body.assigned_to || null,
+      body.location || null,
+      body.status || 'Active',
+      body.notes || null,
+    ],
+  };
+}
+
+app.get('/api/dhcp-bindings', (req, res) => {
+  db.all(`SELECT * FROM dhcp_bindings ORDER BY device_name ASC`, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/dhcp-bindings', (req, res) => {
+  const parsed = readBinding(req.body);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+
+  db.run(
+    `INSERT INTO dhcp_bindings (device_name, mac_address, ip_address, device_type, assigned_to, location, status, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    parsed.values,
+    function (err) {
+      // A repeat MAC is the common mistake, not a server fault - say which one.
+      if (err && /UNIQUE/i.test(err.message)) {
+        return res.status(409).json({ error: `MAC ${parsed.values[1]} is already recorded` });
+      }
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id: this.lastID, message: 'Binding added successfully' });
+    }
+  );
+});
+
+app.put('/api/dhcp-bindings/:id', (req, res) => {
+  const parsed = readBinding(req.body);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+
+  db.run(
+    `UPDATE dhcp_bindings SET device_name = ?, mac_address = ?, ip_address = ?, device_type = ?,
+            assigned_to = ?, location = ?, status = ?, notes = ? WHERE id = ?`,
+    parsed.values.concat([req.params.id]),
+    function (err) {
+      if (err && /UNIQUE/i.test(err.message)) {
+        return res.status(409).json({ error: `MAC ${parsed.values[1]} is already recorded on another device` });
+      }
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: 'Binding updated successfully' });
+    }
+  );
+});
+
+app.delete('/api/dhcp-bindings/:id', (req, res) => {
+  db.run(`DELETE FROM dhcp_bindings WHERE id = ?`, [req.params.id], function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Binding deleted' });
+  });
+});
+
 // 9. COMPANY DOCUMENTS API (certificates, registrations, policies - not tied to any vendor/service)
 app.get('/api/company-documents', (req, res) => {
   db.all(`SELECT * FROM company_documents ORDER BY title ASC`, (err, rows) => {
@@ -882,6 +1074,7 @@ app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`🚀 IT Billing Console running on http://localhost:${PORT}`);
   console.log(`====================================================`);
+  initAuth();
   startScheduler();
   setTimeout(migrateAttachmentsToNas, 2000);
 });

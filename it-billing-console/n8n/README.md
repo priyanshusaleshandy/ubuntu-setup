@@ -47,6 +47,7 @@ Useful tables: `workflow_entity` (incl. the `staticData` column), `execution_ent
 | `racBillCapture` | RAC Laptop Bill Auto-Capture | Gmail trigger + manual |
 | `syncFailAlert01` | Sync Failure Alert | error trigger (every other workflow's `errorWorkflow`) |
 | `racProofCapture` | RAC Payment Proof Auto-Capture | Gmail trigger (SENT) + manual |
+| `vendorPayCap1` | Vendor Payment Proof Auto-Capture | Gmail trigger (SENT) + manual |
 
 All eleven are active. `JqFyzAypvj6uMKw3` (Saleshandy joiners) and `haJoinerSync01`
 (HighAdvocacy joiners) were **merged into `newJoinersAuto` on 29-08-2026 and deleted**.
@@ -230,6 +231,84 @@ INFOTECH LLP**, not Saleshandy.
 > that guard one bill is booked twice: once as a rental payment and once as a service
 > contract that then starts firing renewal alerts. **Change both together.**
 
+### Pending decisions
+
+`pending_decisions` in the console, with `GET/POST/PUT /api/pending`. Added
+**26-09-2026**.
+
+A capture workflow that could not decide used to `throw`. That did three things at
+once: it sent an ntfy nobody could reply to, it left the mail already consumed by
+the Gmail trigger, and it put the work on whoever happened to read the
+notification. Often that was nobody, which is how six days of invoices went
+uncaptured behind a broken Gmail credential.
+
+Now the failure branch parks the question first. The row carries the `context` the
+workflow had already parsed - vendor, amount, paid-on, bank reference, invoice
+hints, proof filename - so answering it needs no re-derivation. `dedupe_key` makes
+asking twice about one payment impossible, and re-posting an existing key is a
+no-op rather than an error, so a workflow retry is safe.
+
+`vendorPayCap1` is the first one moved over: both its failure branches now run
+through **`Park Pending Decision`** before the ntfy node.
+
+> [!IMPORTANT] The nudge carries a count and nothing else
+> ntfy has no authentication and is reachable from the internet, so the
+> notification says only how many decisions are waiting. Vendor, amount and
+> reference stay in the console. Hermes reads them out over Telegram, which is
+> private - and answering there is what closes the row.
+
+---
+
+### Vendor Payment Proof Auto-Capture
+
+`Gmail Trigger (Sent) / Manual → Match Vendor + Pick File → Is PDF? → Extract Proof Text
+→ Build Proof Request → AI Parse Payment Proof → Record Payment → Build Payment Summary
+→ Notify via ntfy`  (both failure branches → `Notify Booking Failure`)
+
+Added **10-09-2026**. Until then **nothing wrote to `/api/payments` at all** — invoice
+capture created the *contract* and the RAC pair covered *rentals*, but every row in
+Payment History had been typed by hand, so vendor payments simply stopped appearing
+after the last manual entry.
+
+It is `racProofCapture` re-pointed at contracts instead of rentals: you mail the proof
+to the vendor, the sent copy is picked up, the parser reads the amount, and the payment
+is booked. `POST /api/payments` recomputes contract status, so booking a payment is
+also what flips a contract to **Done**.
+
+The one thing it must do differently is work out *which vendor*, since RAC has a single
+hardcoded recipient domain. `Match Vendor + Pick File` derives each vendor's domains
+from its `email`, `notes` and `portal_url` in the console and matches the recipient
+against them — adding a vendor therefore needs no edit here. Everything else, including
+the inline-signature attachment picker and the `addr()` helper, is RAC's code unchanged.
+
+**Choosing the contract** — two steps, and it refuses to guess at either:
+
+1. An invoice number quoted in the proof, subject or body that appears in exactly one
+   open contract's notes.
+2. Failing that, an outstanding balance (`cost` − payments booked so far) that equals
+   the proof's amount in exactly one open contract.
+
+Anything else — no match, two matches, two vendors on the same mail, an unreadable
+amount, or the parser saying the file is not a proof — throws, writes nothing, and
+sends a high-priority ntfy. Booking against the wrong contract is worse than booking
+nothing precisely *because* the write also marks that contract paid.
+
+Re-sending the same proof is safe: a matching bank ref already on a payment, or the same
+vendor + amount + date, makes it a no-op.
+
+> [!IMPORTANT] The proof file itself is not attached to the row
+> There is no `POST /api/payments/:id/bill` — that endpoint exists for
+> `rental-payments`, `services`, `worklog` and `company-documents`, but not for
+> `payments`. Adding it means a console rebuild, so v1 books the row and names the
+> proof file in `receipt_note` instead.
+
+> [!IMPORTANT] It only sees mail sent after it was activated
+> `gmailTrigger` stamps `lastTimeChecked` on first activation and never looks back, so
+> payments made before 10-09-2026 are not picked up retroactively. That backlog has to
+> be entered once by hand.
+
+---
+
 ### RAC Payment Proof Auto-Capture
 
 `Gmail Trigger (Sent) → Match Proof + Pick File → Is PDF? → (true) Extract Proof Text →
@@ -328,7 +407,8 @@ Baseline captured on 29-08-2026: 51 addresses (SH 46, HA 1, TI 7, minus 3 reject
 ### Saleshandy User List → G Suite Sheet
 
 `Every 30 Minutes / Run Manually → Read Sheet (A-K) → Build User Rows → Layout OK?
-→ Write Users to Sheet (A-D) → Colour Status Column (D) → Anything to Report? → Notify via ntfy`
+→ Write Users to Sheet (A-D) → Colour Status Column (D) → List Copy Tabs → Resolve Copy Tab
+→ Write Users to Copy (A1-D200) → Anything to Report? → Notify via ntfy`
 (`Layout OK?` false branch → `Alert: Layout Changed`)
 
 > [!IMPORTANT] The notify gate exists because of the 30-minute cadence
@@ -353,6 +433,39 @@ Two safety features, both tested by deliberately breaking the sheet:
   compares against the sheet before overwriting. Any hand edit is reported by row,
   with old and new values. It reports, it does not prevent — to actually prevent
   edits, protect `A2:D200` via *Data → Protect sheets and ranges*.
+
+#### The standalone copy (`19CF1U…`)
+
+The same list also has to appear in a second, separate spreadsheet —
+`19CF1UHlKgrCWNVPMXH-Lj5WTfQeDEyx58ggZ9TfNcN8`, its only tab `Sheet1` (sheetId `0`).
+
+Until 10-09-2026 that copy fed itself with **one `IMPORTRANGE` in `A1`**:
+
+```
+=IMPORTRANGE(".../1wSiyl…/edit?gid=708600971", "G Suite Main 111!A1:D120")
+```
+
+Two things were wrong with it, neither of which would have announced itself:
+
+- It **hardcoded the tab title** `G Suite Main 111` — exactly the failure this repo
+  already resolves by `sheetId` everywhere else. The next rename to
+  `G Suite Main 112` turns the whole copy into `#REF!` while `shSheetSync001`
+  carries on succeeding.
+- The range stopped at **row 120**. At 97 users that fit; past 119 the list would
+  have been truncated with no error anywhere.
+
+So n8n owns that range now. `Write Users to Copy (A1-D200)` PUTs the identical
+`values` array with `valueInputOption=RAW`, and it writes the **header row too** —
+that write is what replaced the formula in `A1`, and RAW is what stops the text
+being re-interpreted as one. `Resolve Copy Tab` resolves `Sheet1` from sheetId `0`
+for the same reason as upstream.
+
+> [!IMPORTANT] The copy is now only as alive as this workflow
+> A formula updated itself; a workflow does not. If the second write starts
+> failing, the copy silently goes stale — the exact shape of the 46-failure
+> incident below. It is covered by `syncFailAlert01` (the workflow's
+> `errorWorkflow`) and the googleapis nodes carry `retryOnFail / maxTries 3`, so a
+> Google 503 blip retries rather than alerts.
 
 ---
 
@@ -592,7 +705,7 @@ All joiner tabs share one column layout (0-based indexes):
 
 | Tab | sheetId | Synced by | Write style |
 |---|---|---|---|
-| `G Suite Main 89` | 708600971 | `shSheetSync001` | full rewrite of `A2:D200` |
+| `G Suite Main 111` | 708600971 | `shSheetSync001` | full rewrite of `A2:D200`, mirrored to the `19CF1U…` copy |
 | `G Suite Krishna 20` | 860200999 | `krishnaSheetSync` | **append-only** |
 | `TrulyInbox GW` | 946850404 | `tiSheetSync001` | **append-only** |
 | `G Suite Team 07` | 1240889154 | — | |
@@ -709,6 +822,7 @@ and write-range is built from that:
 | Workflow | sheetId |
 |---|---|
 | `shSheetSync001` | `708600971` |
+| `shSheetSync001` (the `19CF1U…` copy) | `0` |
 | `krishnaSheetSync` | `860200999` |
 | `solSheetSync01` | `623354432` |
 
