@@ -6,7 +6,9 @@
 <p class="subtitle">Pushes an Employee ID + Name directly to the device. Fingerprint enrollment still needs to be done by the person at the device itself.</p>
 
 {% if result %}
-  {% if result.success %}
+  {% if result.queued %}
+  <div class="alert success">📤 Queued for {{ result.device_name }}. This is a pull-based device — it applies the change on its next check-in (usually within ~30s once it's online and pointed at the server). Added <strong>{{ form_values.name }}</strong> (ID {{ form_values.enroll_number }}). Ask them to enroll their fingerprint at the device afterwards.</div>
+  {% elif result.success %}
   <div class="alert success">✅ Pushed to {{ result.device_name }} successfully. Verified on-device name: <strong>{{ form_values.name }}</strong>. Ask the employee to go enroll their fingerprint on the device now.</div>
   {% else %}
   <div class="alert error">❌ {{ result.error if result.error else "Push failed — see details below." }}</div>

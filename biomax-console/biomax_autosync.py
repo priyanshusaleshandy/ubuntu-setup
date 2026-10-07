@@ -26,7 +26,7 @@ import subprocess
 import datetime
 import time
 
-from device_push import list_device_users, copy_fingerprint
+from device_push import list_device_users, copy_fingerprint, delete_user, mbio_delete_user
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "biomax.db")
@@ -37,6 +37,16 @@ CREATE TABLE IF NOT EXISTS fingerprint_seen (
     device_id TEXT,
     employee_code TEXT,
     first_seen_at TEXT,
+    PRIMARY KEY (device_id, employee_code)
+);
+CREATE TABLE IF NOT EXISTS pending_deletes (
+    device_id TEXT,
+    employee_code TEXT,
+    full_delete INTEGER DEFAULT 1,
+    created_at TEXT,
+    attempts INTEGER DEFAULT 0,
+    last_attempt_at TEXT,
+    last_error TEXT,
     PRIMARY KEY (device_id, employee_code)
 );
 """
@@ -84,6 +94,67 @@ def bootstrap_if_needed(conn):
             mark_seen(conn, device["device_id"], u["code"], now)
     conn.commit()
     return True
+
+
+def retry_pending_deletes(conn):
+    """Finish deletes the console couldn't complete because a device was down or
+    refused the SDK session at the time.
+
+    Device 606 sits on Wi-Fi and its SDK handshake fails intermittently even
+    while it still pings, so a "delete from all devices" could leave someone
+    enrolled on it with no further attempt ever made - they kept being able to
+    punch. Anything that fails is queued here and retried every cycle until the
+    device actually confirms.
+
+    Once an employee has no queued devices left, and the original request was a
+    delete-from-all, their console status is set to Deleted - the claim is only
+    made when it is finally true. Returns (completed, still_pending)."""
+    rows = conn.execute("SELECT * FROM pending_deletes").fetchall()
+    if not rows:
+        return 0, 0
+
+    devices = {d["device_id"]: d for d in conn.execute("SELECT * FROM devices")}
+    full_delete_codes = {r["employee_code"] for r in rows if r["full_delete"]}
+    completed = 0
+
+    for row in rows:
+        device = devices.get(row["device_id"])
+        if device is None:  # device row was removed - nothing left to retry against
+            conn.execute("DELETE FROM pending_deletes WHERE device_id=? AND employee_code=?",
+                         (row["device_id"], row["employee_code"]))
+            continue
+        if not ping_ok(device["ip_address"]):
+            continue
+
+        deleter = mbio_delete_user if (device["device_type"] or "") == "mbio" else delete_user
+        result = deleter(device["ip_address"], row["employee_code"])
+        now = datetime.datetime.now().isoformat()
+        if result.get("success"):
+            conn.execute("DELETE FROM pending_deletes WHERE device_id=? AND employee_code=?",
+                         (row["device_id"], row["employee_code"]))
+            completed += 1
+        else:
+            conn.execute(
+                """UPDATE pending_deletes SET attempts = attempts + 1,
+                   last_attempt_at = ?, last_error = ? WHERE device_id=? AND employee_code=?""",
+                (now, result.get("error") or "delete failed",
+                 row["device_id"], row["employee_code"]),
+            )
+        conn.commit()
+
+    for code in full_delete_codes:
+        left = conn.execute(
+            "SELECT COUNT(*) FROM pending_deletes WHERE employee_code=?", (code,)
+        ).fetchone()[0]
+        if left == 0:
+            conn.execute(
+                "UPDATE employees SET status='Deleted', updated_at=? WHERE employee_code=?",
+                (datetime.datetime.now().isoformat(), code),
+            )
+    conn.commit()
+
+    still = conn.execute("SELECT COUNT(*) FROM pending_deletes").fetchone()[0]
+    return completed, still
 
 
 def autosync_once(conn):
@@ -142,6 +213,12 @@ if __name__ == "__main__":
         print(f"[{datetime.datetime.now().isoformat()}] bootstrap: existing enrollments marked as already-seen")
     while True:
         try:
+            # Retries run first: a person queued for deletion must not be seen as a
+            # "new enrollment" by autosync and copied back onto the other devices.
+            done, still = retry_pending_deletes(conn)
+            if done or still:
+                print(f"[{datetime.datetime.now().isoformat()}] "
+                      f"pending deletes: {done} completed, {still} still queued")
             n = autosync_once(conn)
             print(f"[{datetime.datetime.now().isoformat()}] autosync: {n} propagation(s)")
         except Exception as e:

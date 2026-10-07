@@ -6,6 +6,7 @@ Windows PC (.188) being online - this is a fully independent, self-contained
 path: a small compiled Windows console program (fk_push.exe) runs under Wine
 and calls the DLL's official exported functions directly.
 """
+import datetime
 import subprocess
 import re
 
@@ -13,6 +14,11 @@ MAC_HOST = "admin@192.168.126.101"
 WINE_BINARY = "/Users/admin/wine-setup/Wine Devel.app/Contents/Resources/wine/bin/wine"
 WINEPREFIX = "/Users/admin/biomax-push/wineprefix"
 WORKDIR = "/Users/admin/biomax-push"
+
+# Device 604 is a MORX mBio-M18 (EBKN/Realand A30C firmware), not an FK623 - it
+# speaks a different SDK (SBXPCDLL.dll) that lives in its own directory next to
+# the FK one, sharing the same Wine prefix.
+MBIO_WORKDIR = "/Users/admin/mbio-push"
 
 
 def _sq(s):
@@ -97,6 +103,147 @@ def delete_user(device_ip, enroll_number, timeout=30):
         "name_cleared": name_cleared,
         "raw_output": output,
         "stderr": result.stderr,
+    }
+
+
+def _mbio_run(args, timeout):
+    """Run sbxpc_user.exe under Wine on the Mac Mini. Wine has a fixed ~5s
+    cold-start cost per invocation, so callers give this a generous timeout."""
+    remote_cmd = (
+        f"cd {_sq(MBIO_WORKDIR)} && "
+        f"WINEPREFIX={_sq(WINEPREFIX)} WINEDEBUG=-all "
+        + _sq(WINE_BINARY) + " sbxpc_user.exe " + " ".join(_sq(a) for a in args)
+    )
+    return subprocess.run(
+        ["ssh", "-o", "ConnectTimeout=10", MAC_HOST, remote_cmd],
+        capture_output=True, text=True, timeout=timeout,
+    )
+
+
+def mbio_push_user(device_ip, enroll_number, user_name, timeout=60):
+    """Create/rename a user on the mBio-M18 (604) via SBXPCDLL.dll under Wine.
+
+    This only writes the user record (ID + name). Unlike the FK623 devices there
+    is no way to move a fingerprint template onto this device - its templates are
+    a different size and algorithm (1416-byte EBKN vs 1680-byte FK623), and the
+    device will not even read its own back out. The person has to enrol their
+    finger on 604 itself."""
+    if not re.match(r"^[0-9]{1,9}$", enroll_number):
+        return {"success": False, "error": "Invalid enrollNumber format (604 needs a plain number)"}
+    if not user_name or len(user_name) > 100:
+        return {"success": False, "error": "Invalid name"}
+
+    try:
+        result = _mbio_run(["push", device_ip, enroll_number, user_name], timeout)
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "Timed out talking to the push host (Mac Mini)"}
+
+    output = result.stdout
+    connect_ok = "CONNECT 1" in output
+    setname_ok = "SETNAME 1" in output
+    return {
+        "success": connect_ok and setname_ok,
+        "connect_ok": connect_ok,
+        "setname_ok": setname_ok,
+        "raw_output": output,
+        "stderr": result.stderr,
+    }
+
+
+def mbio_delete_user(device_ip, enroll_number, timeout=90):
+    """Delete a user from the mBio-M18 (604): wipe every credential slot, then
+    blank the name (which is what removes a record that never had biometrics)."""
+    if not re.match(r"^[0-9]{1,9}$", enroll_number):
+        return {"success": False, "error": "Invalid enrollNumber format (604 needs a plain number)"}
+
+    try:
+        result = _mbio_run(["delete", device_ip, enroll_number], timeout)
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "Timed out talking to the push host (Mac Mini)"}
+
+    output = result.stdout
+    connect_ok = "CONNECT 1" in output
+    total_match = re.search(r"TOTAL_DELETED (\d+)", output)
+    total_deleted = int(total_match.group(1)) if total_match else 0
+    name_cleared = "CLEARNAME 1" in output
+    return {
+        "success": connect_ok and (total_deleted > 0 or name_cleared),
+        "connect_ok": connect_ok,
+        "any_deleted": total_deleted > 0,
+        "name_cleared": name_cleared,
+        "raw_output": output,
+        "stderr": result.stderr,
+    }
+
+
+def mbio_list_logs(device_ip, timeout=600):
+    """Bulk-pull every attendance log off the mBio-M18 (604) via SBXPCDLL.dll.
+
+    The device's own push channel only trickles one backlog record per ~66s, so
+    with tens of thousands of records on it that path is useless for history -
+    this pulls the whole log memory in one go (~81k records in under a minute).
+
+    Two differences from the FK623 puller next to it:
+      * this SDK's log record carries no in/out field, so `direction` is always
+        "" rather than a guess - the device only reports attendance status in
+        its push XML, not here;
+      * `log_date` is returned as MM/DD/YY HH:MM:SS, which is the format every
+        row already in the attendance table uses and what the console's Logs
+        date filter and CSV export assume.
+
+    Note the SDK disables the device for the duration of the read (the vendor
+    API requires it), so callers should not poll this on a short interval -
+    people can't punch while it runs."""
+    remote_cmd = (
+        f"cd {_sq(MBIO_WORKDIR)} && "
+        f"WINEPREFIX={_sq(WINEPREFIX)} WINEDEBUG=-all "
+        f"{_sq(WINE_BINARY)} sbxpc_getlogs.exe {_sq(device_ip)}"
+    )
+    try:
+        result = subprocess.run(
+            ["ssh", "-o", "ConnectTimeout=10", MAC_HOST, remote_cmd],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "Timed out talking to the push host (Mac Mini)", "logs": []}
+
+    output = result.stdout
+    if "CONNECT 1" not in output:
+        return {"success": False, "error": "Could not connect to device", "logs": [], "raw_output": output[:2000]}
+
+    logs, bad_dates = [], 0
+    for line in output.splitlines():
+        if not line.startswith("LOG|"):
+            continue
+        # LOG|enrollNumber|verifyMode|YYYY-MM-DD HH:MM:SS
+        parts = line.split("|")
+        if len(parts) != 4:
+            continue
+        _, enroll_number, verify_mode, log_date = parts
+        try:
+            dt = datetime.datetime.strptime(log_date, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            bad_dates += 1
+            continue
+        # The device's clock has been reset at some point in its life, leaving a
+        # handful of year-2000 records. They aren't real punches - drop them, but
+        # report the count rather than silently swallowing it.
+        if dt.year < 2015:
+            bad_dates += 1
+            continue
+        logs.append({
+            "enroll_number": enroll_number,
+            "verify_mode": verify_mode,
+            "direction": "",
+            "log_date": dt.strftime("%m/%d/%y %H:%M:%S"),
+        })
+
+    total_match = re.search(r"TOTAL (\d+)", output)
+    return {
+        "success": True,
+        "logs": logs,
+        "device_total": int(total_match.group(1)) if total_match else None,
+        "skipped_bad_dates": bad_dates,
     }
 
 

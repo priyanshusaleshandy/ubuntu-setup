@@ -13,7 +13,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import pyotp
 import qrcode
 
-from device_push import push_user, delete_user, list_device_users, copy_fingerprint
+from device_push import (push_user, delete_user, list_device_users, copy_fingerprint,
+                         mbio_push_user, mbio_delete_user)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "biomax.db")
@@ -124,6 +125,30 @@ def get_db():
                 (DEFAULT_ADMIN_USER, generate_password_hash(seed_password), datetime.datetime.now().isoformat()),
             )
             g.db.commit()
+
+        # Outbound ADMS command queue + a device_type flag so create/delete route
+        # to the right path: FK623 devices are pushed to directly; iclock/ADMS
+        # pull devices (Mantra 604) get a queued command they fetch on their next
+        # check-in. Both idempotent, mirroring what the ADMS listener ensures.
+        g.db.execute(
+            """CREATE TABLE IF NOT EXISTS adms_commands (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   device_id TEXT NOT NULL,
+                   op TEXT,
+                   enroll_number TEXT,
+                   name TEXT,
+                   cmd_text TEXT NOT NULL,
+                   status TEXT NOT NULL DEFAULT 'pending',
+                   return_code TEXT,
+                   created_at TEXT,
+                   sent_at TEXT,
+                   acked_at TEXT
+               )"""
+        )
+        device_cols = {row["name"] for row in g.db.execute("PRAGMA table_info(devices)")}
+        if "device_type" not in device_cols:
+            g.db.execute("ALTER TABLE devices ADD COLUMN device_type TEXT DEFAULT 'fk623'")
+        g.db.commit()
     return g.db
 
 
@@ -132,6 +157,82 @@ def close_db(exc):
     db = g.pop("db", None)
     if db is not None:
         db.close()
+
+
+def _device_type(device):
+    """'fk623' (push straight to the device via FK623Attend.dll), 'mbio' (604 -
+    push straight to it too, but via the EBKN SBXPCDLL.dll bridge), or 'adms'
+    (queue a command the device pulls on its next check-in). Defaults to fk623
+    for any row that predates the device_type column."""
+    try:
+        return device["device_type"] or "fk623"
+    except (KeyError, IndexError):
+        return "fk623"
+
+
+def _adms_cmd_text(op, enroll_number, name=None):
+    """Build the iClock/ADMS command body (the 'C:<id>:' prefix is added by the
+    ADMS listener from the queue row id). Fields are TAB-separated per the
+    standard ZKTeco push spec."""
+    if op == "create":
+        fields = [
+            f"PIN={enroll_number}", f"Name={name or ''}",
+            "Pri=0", "Passwd=", "Card=", "Grp=1", "TZ=0000000000000000",
+        ]
+        return "DATA UPDATE USERINFO " + "\t".join(fields)
+    if op == "delete":
+        return f"DATA DELETE USERINFO PIN={enroll_number}"
+    raise ValueError(f"unknown adms op: {op}")
+
+
+def _enqueue_adms_command(db, device_id, op, enroll_number, name=None):
+    """Queue a user create/delete for a pull-based device. The ADMS listener
+    hands it over on the device's next poll and records the result."""
+    db.execute(
+        """INSERT INTO adms_commands (device_id, op, enroll_number, name, cmd_text, status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'pending', ?)""",
+        (device_id, op, enroll_number, name, _adms_cmd_text(op, enroll_number, name),
+         datetime.datetime.now().isoformat()),
+    )
+    db.commit()
+
+
+def _queue_delete_retry(db, device_id, enroll_number, full_delete, error):
+    """Remember a delete that didn't land so biomax_autosync can keep retrying it.
+    Created here rather than only in the autosync service so a delete attempted
+    before that service has ever run still gets queued."""
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS pending_deletes (
+               device_id TEXT, employee_code TEXT, full_delete INTEGER DEFAULT 1,
+               created_at TEXT, attempts INTEGER DEFAULT 0,
+               last_attempt_at TEXT, last_error TEXT,
+               PRIMARY KEY (device_id, employee_code))"""
+    )
+    now = datetime.datetime.now().isoformat()
+    db.execute(
+        """INSERT INTO pending_deletes
+               (device_id, employee_code, full_delete, created_at, attempts, last_attempt_at, last_error)
+           VALUES (?, ?, ?, ?, 1, ?, ?)
+           ON CONFLICT(device_id, employee_code) DO UPDATE SET
+               attempts = attempts + 1, last_attempt_at = excluded.last_attempt_at,
+               last_error = excluded.last_error,
+               full_delete = MAX(full_delete, excluded.full_delete)""",
+        (device_id, enroll_number, 1 if full_delete else 0, now, now, error),
+    )
+    db.commit()
+
+
+def _clear_delete_retry(db, device_id, enroll_number):
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS pending_deletes (
+               device_id TEXT, employee_code TEXT, full_delete INTEGER DEFAULT 1,
+               created_at TEXT, attempts INTEGER DEFAULT 0,
+               last_attempt_at TEXT, last_error TEXT,
+               PRIMARY KEY (device_id, employee_code))"""
+    )
+    db.execute("DELETE FROM pending_deletes WHERE device_id=? AND employee_code=?",
+               (device_id, enroll_number))
+    db.commit()
 
 
 def _safe_next(path):
@@ -511,6 +612,7 @@ def sync_users():
 
     now = datetime.datetime.now().isoformat()
     synced, skipped = [], []
+    adopted = 0  # device-enrolled people we didn't previously know about
     for device in targets:
         if not ping_ok(device["ip_address"]):
             skipped.append(f"{device['name']} (unreachable)")
@@ -526,11 +628,26 @@ def sync_users():
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (device["device_id"], u["code"], u["name"], u["backup_number"], u["privilege"], u["enabled"], now),
             )
+            # Anyone enrolled by walking up to a device never passes through Create
+            # User, so they never reach `employees` - which is what the Users search,
+            # Copy Fingerprint and Delete User pickers all read from. They were
+            # therefore invisible in those three places despite being on the device.
+            # INSERT OR IGNORE, never UPDATE: an existing row may say 'Deleted' on
+            # purpose, and rewriting it here would silently undo an offboarding.
+            cur = db.execute(
+                """INSERT OR IGNORE INTO employees (employee_code, employee_name, status, updated_at)
+                   VALUES (?, ?, 'Working', ?)""",
+                (u["code"], u["name"] if u["name"] and u["name"] != "-" else None, now),
+            )
+            adopted += cur.rowcount
         db.commit()
         synced.append(f"{device['name']} ({len(result['users'])} users)")
 
     if synced:
         flash(f"✅ Synced: {', '.join(synced)}", "success")
+    if adopted:
+        flash(f"➕ Added {adopted} employee(s) who were enrolled directly at a device — "
+              f"they'll now show up in Users, Copy Fingerprint and Delete User.", "success")
     if skipped:
         flash(f"⚠️ Skipped: {', '.join(skipped)}", "error")
 
@@ -557,10 +674,25 @@ def create_user_page():
             result = {"success": False, "error": "Please select a device."}
         elif not form_values["enroll_number"] or not form_values["name"]:
             result = {"success": False, "error": "Employee ID and name are required."}
+        elif _device_type(device) == "adms":
+            # pull-based device (Mantra 604): can't push to it - queue a
+            # DATA UPDATE USERINFO it'll apply on its next check-in.
+            _enqueue_adms_command(db, device["device_id"], "create",
+                                  form_values["enroll_number"], form_values["name"])
+            db.execute(
+                """INSERT INTO employees (employee_code, employee_name, status, updated_at)
+                   VALUES (?, ?, 'Working', ?)
+                   ON CONFLICT(employee_code) DO UPDATE SET
+                       employee_name=excluded.employee_name, status='Working', updated_at=excluded.updated_at""",
+                (form_values["enroll_number"], form_values["name"], datetime.datetime.now().isoformat()),
+            )
+            db.commit()
+            result = {"success": True, "queued": True, "device_name": device["name"]}
         elif not ping_ok(device["ip_address"]):
             result = {"success": False, "error": f"Device {device['name']} ({device['ip_address']}) is not reachable right now. Not attempting the push."}
         else:
-            result = push_user(device["ip_address"], form_values["enroll_number"], form_values["name"])
+            pusher = mbio_push_user if _device_type(device) == "mbio" else push_user
+            result = pusher(device["ip_address"], form_values["enroll_number"], form_values["name"])
             result["device_name"] = device["name"]
             if result["success"]:
                 # SmartOffice doesn't know about this user (we pushed straight to the
@@ -586,6 +718,7 @@ def delete_user_page():
     db = get_db()
     devices = with_status(db.execute("SELECT * FROM devices ORDER BY name").fetchall())
     results = None
+    summary = None
     form_values = {"device_id": "", "enroll_number": ""}
     selected_employee = None
 
@@ -608,17 +741,63 @@ def delete_user_page():
         else:
             results = []
             for device in targets:
-                if not ping_ok(device["ip_address"]):
+                if _device_type(device) == "adms":
+                    # pull-based device (Mantra 604): queue a DATA DELETE USERINFO
+                    _enqueue_adms_command(db, device["device_id"], "delete",
+                                          form_values["enroll_number"])
                     results.append({
-                        "success": False, "device_name": device["name"],
-                        "error": f"({device['ip_address']}) not reachable right now — skipped.",
+                        "success": True, "queued": True, "device_name": device["name"],
                     })
                     continue
-                r = delete_user(device["ip_address"], form_values["enroll_number"])
+                full = form_values["device_id"] == "all"
+                if not ping_ok(device["ip_address"]):
+                    err = f"({device['ip_address']}) not reachable right now — queued for retry."
+                    _queue_delete_retry(db, device["device_id"],
+                                        form_values["enroll_number"], full, err)
+                    results.append({
+                        "success": False, "device_name": device["name"], "error": err,
+                    })
+                    continue
+                deleter = mbio_delete_user if _device_type(device) == "mbio" else delete_user
+                r = deleter(device["ip_address"], form_values["enroll_number"])
                 r["device_name"] = device["name"]
+                if r.get("success"):
+                    _clear_delete_retry(db, device["device_id"], form_values["enroll_number"])
+                else:
+                    # 606 is on Wi-Fi and its SDK handshake fails intermittently even
+                    # while it still pings, so a failure here is usually temporary.
+                    _queue_delete_retry(db, device["device_id"], form_values["enroll_number"],
+                                        full, r.get("error") or "delete failed")
                 results.append(r)
 
-            if any(r.get("success") for r in results):
+            # Marking someone Deleted locally is a claim that they can no longer
+            # punch anywhere. Previously any single success was enough, so a
+            # delete run while one device happened to be offline marked them
+            # Deleted while they were still enrolled on the device it skipped -
+            # they kept clocking in, and the console hid them from Users, so
+            # nobody could see it. Only make that claim when every targeted
+            # device actually confirmed, and only when all devices were targeted.
+            failed = [r["device_name"] for r in results if not r.get("success")]
+            all_devices_targeted = form_values["device_id"] == "all"
+
+            if failed:
+                reason = ("Still enrolled on " + ", ".join(failed) +
+                          " — queued, and retried automatically every few minutes until "
+                          "that device confirms. They'll be marked Deleted then.")
+            elif not all_devices_targeted:
+                reason = ("Left active because only one device was targeted — "
+                          "the other devices were not part of this delete.")
+            else:
+                reason = None
+
+            summary = {
+                "succeeded": [r["device_name"] for r in results if r.get("success")],
+                "failed": failed,
+                "marked_deleted": reason is None,
+                "reason": reason,
+            }
+
+            if reason is None:
                 # mirror the deletion locally too, so Users/Delete dropdowns stop
                 # showing this person as Working right away
                 db.execute(
@@ -637,7 +816,7 @@ def delete_user_page():
     ).fetchall()
 
     return render_template(
-        "delete_user.html", devices=devices, results=results,
+        "delete_user.html", devices=devices, results=results, summary=summary,
         form_values=form_values, employees=employees,
         selected_employee=selected_employee, active="delete_user",
     )

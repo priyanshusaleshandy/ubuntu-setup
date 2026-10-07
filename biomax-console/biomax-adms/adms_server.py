@@ -30,8 +30,10 @@ import struct
 import sqlite3
 import json
 import os
+import threading
 
-PORT = 7005
+PORT = 7005          # existing FK /hdata.aspx push devices are already configured here
+ICLOCK_PORT = 5005   # Mantra 604 / standard iclock ADMS devices push here
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RAW_LOG = os.path.join(BASE_DIR, "raw_requests.log")
 ATTLOG_FILE = os.path.join(BASE_DIR, "attendance.jsonl")
@@ -137,6 +139,116 @@ def store_attendance_punch(device_id: str, user_id: str, io_time: str, io_mode, 
         conn.close()
 
 
+# --- Outbound command queue (user create/delete on iclock/ADMS pull devices) ---
+# The FK623 devices are pushed to directly (console -> device). A Mantra/iclock
+# device can't be pushed to - it only ever reaches out to us - so user
+# create/delete is done by queueing a command here and handing it over on the
+# device's next /iclock/getrequest poll, then recording its /iclock/devicecmd
+# result. The console writes into adms_commands; this listener drains it.
+
+def ensure_command_schema():
+    """Make sure the command queue + device_type flag exist. Idempotent - the
+    console ensures the same objects; whichever process opens the DB first wins,
+    the other no-ops. Runs once at startup."""
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS adms_commands (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   device_id TEXT NOT NULL,
+                   op TEXT,
+                   enroll_number TEXT,
+                   name TEXT,
+                   cmd_text TEXT NOT NULL,
+                   status TEXT NOT NULL DEFAULT 'pending',
+                   return_code TEXT,
+                   created_at TEXT,
+                   sent_at TEXT,
+                   acked_at TEXT
+               )"""
+        )
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(devices)")}
+        if "device_type" not in cols:
+            conn.execute("ALTER TABLE devices ADD COLUMN device_type TEXT DEFAULT 'fk623'")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def bind_unknown_sn(sn: str):
+    """First time a real iclock unit checks in, its SN isn't in the devices
+    table yet (we register the unit with a blank serial_number until we see what
+    it actually reports). If EXACTLY ONE adms device is still waiting for its SN,
+    bind this one to it automatically - that's the 'point the device at us and it
+    self-registers' flow, no manual SQL. If it's ambiguous (0 or >1 blank adms
+    rows), don't guess; just log it. Returns the device_id if bound, else None."""
+    if not sn or sn == "unknown":
+        return None
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    try:
+        rows = conn.execute(
+            "SELECT device_id FROM devices WHERE device_type='adms' "
+            "AND (serial_number IS NULL OR serial_number='')"
+        ).fetchall()
+        if len(rows) == 1:
+            device_id = rows[0][0]
+            conn.execute(
+                "UPDATE devices SET serial_number=?, updated_at=? WHERE device_id=?",
+                (sn, datetime.datetime.now().isoformat(), device_id),
+            )
+            conn.commit()
+            log_raw(f"AUTO-BOUND new iclock SN={sn} -> device_id={device_id}")
+            return device_id
+        log_raw(f"iclock SN={sn} not registered; {len(rows)} adms device(s) awaiting an SN - not auto-binding")
+        return None
+    finally:
+        conn.close()
+
+
+def take_pending_commands(device_id, limit: int = 10):
+    """Pull a device's not-yet-delivered commands and mark them 'sent'. Returns
+    a list of (id, cmd_text). Handed out once; the device confirms via
+    /iclock/devicecmd which flips it to done/failed. DATA UPDATE/DELETE USERINFO
+    are idempotent, so a rare missed ack is safe to re-issue by re-queuing from
+    the console - we don't auto-spam the same command every poll."""
+    if device_id is None:
+        return []
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        rows = conn.execute(
+            "SELECT id, cmd_text FROM adms_commands WHERE device_id=? AND status='pending' "
+            "ORDER BY id LIMIT ?",
+            (str(device_id), limit),
+        ).fetchall()
+        if rows:
+            now = datetime.datetime.now().isoformat()
+            conn.executemany(
+                "UPDATE adms_commands SET status='sent', sent_at=? WHERE id=?",
+                [(now, r[0]) for r in rows],
+            )
+            conn.commit()
+        return [(r[0], r[1]) for r in rows]
+    finally:
+        conn.close()
+
+
+def ack_command(cmd_id, return_code):
+    """Record a device's result for a handed-out command. Return=0 -> applied."""
+    conn = sqlite3.connect(DB_FILE, timeout=10.0)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        status = "done" if str(return_code) == "0" else "failed"
+        conn.execute(
+            "UPDATE adms_commands SET status=?, return_code=?, acked_at=? WHERE id=?",
+            (status, str(return_code), datetime.datetime.now().isoformat(), str(cmd_id)),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     server_version = "BioMaxADMS/1.0"
 
@@ -168,7 +280,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             )
             self._send(resp)
         elif path == "/iclock/getrequest":
-            self._send("OK")  # no pending commands - not logged, this is a frequent heartbeat
+            # device polls here for work to do; hand over any queued user
+            # create/delete commands, else "OK" (a frequent heartbeat - not logged)
+            device_id = _resolve_device_id(sn)
+            if device_id is None:
+                device_id = bind_unknown_sn(sn)
+            cmds = take_pending_commands(device_id)
+            if cmds:
+                body = "\r\n".join(f"C:{cid}:{ctext}" for cid, ctext in cmds)
+                log_raw(f"getrequest SN={sn} dev={device_id} handed {len(cmds)} cmd(s) ids={[c[0] for c in cmds]}")
+                self._send(body)
+            else:
+                self._send("OK")
         else:
             self._send("OK")
 
@@ -215,13 +338,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/iclock/cdata":
             log_raw(f"  body[{table}]: {body[:500]}")
         elif path == "/iclock/devicecmd":
-            log_raw(f"  devicecmd body: {body[:500]}")
+            self._handle_devicecmd(body)
         elif path == "/iclock/fdata":
             log_raw(f"  fdata (biometric blob) bytes={length}, not stored")
         else:
             log_raw(f"  UNKNOWN PATH bytes={length}")
 
         self._send("OK")
+
+    def _handle_devicecmd(self, body: str):
+        """Device reports the result of a command we handed it. Standard shape is
+        'ID=<cmdid>&Return=<code>&CMD=DATA', one per line. Return=0 = applied OK;
+        anything else is a device-side failure."""
+        for line in body.splitlines():
+            line = line.strip()
+            if not line or "ID=" not in line:
+                continue
+            fields = urllib.parse.parse_qs(line)
+            cmd_id = (fields.get("ID") or [None])[0]
+            ret = (fields.get("Return") or fields.get("return") or ["?"])[0]
+            if not cmd_id:
+                continue
+            try:
+                ack_command(cmd_id, ret)
+                log_raw(f"devicecmd ack id={cmd_id} return={ret}")
+            except Exception as e:
+                log_raw(f"  ERROR acking devicecmd id={cmd_id}: {e}")
 
     def _send_hdata_ack(self):
         # Trial response for the proprietary FK push protocol: empty 200 body.
@@ -280,6 +422,12 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 if __name__ == "__main__":
+    ensure_command_schema()
+    # Same handler on both ports: the existing FK /hdata.aspx push devices are
+    # already configured to reach us on 7005; the Mantra 604 pushes on 5005.
+    extra = ThreadingHTTPServer(("0.0.0.0", ICLOCK_PORT), Handler)
+    threading.Thread(target=extra.serve_forever, daemon=True).start()
+    print(f"BioMax ADMS listener also running on 0.0.0.0:{ICLOCK_PORT}")
     with ThreadingHTTPServer(("0.0.0.0", PORT), Handler) as httpd:
         print(f"BioMax ADMS listener running on 0.0.0.0:{PORT}")
         httpd.serve_forever()

@@ -5,9 +5,24 @@
 </div>
 <p class="subtitle">Permanently removes an employee's fingerprint/enrollment data from the device. This is irreversible — they'll need to physically re-enroll if done by mistake.</p>
 
+{% if summary %}
+  {% if summary.marked_deleted %}
+  <div class="alert success">🗑️ Removed from {{ summary.succeeded|join(', ') }}. Employee marked <strong>Deleted</strong> in the console.</div>
+  {% else %}
+  <div class="alert error">
+    ⚠️ <strong>Not fully deleted.</strong>
+    {% if summary.succeeded %}Removed from {{ summary.succeeded|join(', ') }}.{% else %}Nothing was removed.{% endif %}
+    {{ summary.reason }}
+    <br>Until then they can still punch where they remain enrolled — you don't need to re-run this.
+  </div>
+  {% endif %}
+{% endif %}
+
 {% if results %}
   {% for r in results %}
-  {% if r.success %}
+  {% if r.queued %}
+  <div class="alert success">📤 {{ r.device_name }}: delete queued — the device removes this user on its next check-in.</div>
+  {% elif r.success %}
   <div class="alert success">✅ {{ r.device_name }}: deleted successfully.</div>
   {% else %}
   <div class="alert error">❌ {{ r.device_name }}: {{ r.error if r.error else "delete failed" }}</div>

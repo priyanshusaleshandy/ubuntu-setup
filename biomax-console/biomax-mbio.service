@@ -1,0 +1,17 @@
+[Unit]
+Description=BioMax mBio-M18 listener (device 604 EBKN push channel -> biomax.db)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=saleshandy
+WorkingDirectory=/home/saleshandy/biomax-mbio
+# --foreground: systemd supervises the process itself, so the script must not
+# double-fork away from it the way the manual start does.
+ExecStart=/home/saleshandy/biomax-sync/venv/bin/python3 /home/saleshandy/biomax-mbio/mbio_listener.py --foreground
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
