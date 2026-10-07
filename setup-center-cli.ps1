@@ -892,6 +892,99 @@ function Install-BitwardenPinned {
 }
 
 # =============================================================================
+# [13] CONTINUE AI SETUP - VS Code extension + Company GPT (gpt-6.1-sol) config
+# =============================================================================
+function Install-ContinueAI {
+    Show-Header; Write-Host "  [13] CONTINUE AI SETUP" -ForegroundColor Yellow; Write-Host ""
+
+    if (-not (Get-Command code -ErrorAction SilentlyContinue)) {
+        Write-INFO "VS Code not found - installing via winget..."
+        try {
+            winget install --id Microsoft.VisualStudioCode --silent --accept-source-agreements --accept-package-agreements
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        } catch { Write-ERR "VS Code install failed: $($_.Exception.Message)" }
+    }
+
+    if (Get-Command code -ErrorAction SilentlyContinue) {
+        Write-INFO "Installing Continue extension..."
+        code --install-extension Continue.continue --force | Out-Null
+        Write-OK "Continue extension installed."
+    } else {
+        Write-ERR "VS Code 'code' command still not on PATH - reboot and retry this option."
+        Pause-Menu; return
+    }
+
+    $apiKey = Read-Host "  Open WebUI API key (sk-...)"
+    if (-not $apiKey) { Write-WARN "No key entered - cancelled."; Pause-Menu; return }
+
+    $continueDir = Join-Path $env:USERPROFILE ".continue"
+    $rulesDir    = Join-Path $continueDir "rules"
+    New-Item -ItemType Directory -Force -Path $rulesDir | Out-Null
+
+    $configYaml = @'
+name: Company AI Workspace
+version: 1.0.0
+schema: v1
+
+models:
+  - name: Company GPT
+    provider: openai
+    model: gpt-6.1-sol
+    apiBase: https://openweb.saleshandy.dev/api
+    apiKey: __API_KEY__
+    useResponsesApi: false
+    roles: [chat, edit, apply]
+    capabilities: [tool_use, image_input]
+'@
+    $configYaml = $configYaml -replace '__API_KEY__', $apiKey
+    Set-Content -Path (Join-Path $continueDir "config.yaml") -Value $configYaml -Encoding UTF8
+
+    # Skip the Anthropic-key onboarding prompt `cn` shows on first interactive run
+    Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ" |
+        Set-Content -Path (Join-Path $continueDir ".onboarding_complete") -Encoding UTF8
+
+    # Behavioral rules, auto-loaded by both VS Code Continue and the `cn` terminal CLI
+    $rules = @'
+# Behavioral guidelines
+
+Guidelines to reduce common LLM coding mistakes. Merge with any project-specific
+instructions (e.g. a repo's CLAUDE.md/AGENTS.md) as needed.
+
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+Before implementing: state assumptions explicitly, surface multiple interpretations
+instead of picking silently, point out simpler approaches, and stop/ask when something
+is genuinely unclear.
+
+## 2. Simplicity First
+Minimum code that solves the problem - no speculative features, no unused
+abstractions/flexibility, no error handling for impossible scenarios.
+
+## 3. Surgical Changes
+Touch only what the request requires. Do not refactor or "improve" unrelated code.
+Remove only the imports/vars your own change made unused - do not delete pre-existing
+dead code unless asked.
+
+## 4. Goal-Driven Execution
+Turn tasks into verifiable goals (e.g. "fix the bug" -> reproduce with a test, then
+make it pass). State a brief step -> verify plan for multi-step work.
+
+## 5. Executing actions with care
+Local reversible actions (edit files, run tests) proceed freely. Hard-to-reverse or
+shared-system actions (force-push, deleting branches/tables, sending messages,
+pushing code) need confirmation first. Never write credentials into tracked files.
+Check git status before anything that could discard uncommitted work.
+'@
+    Set-Content -Path (Join-Path $rulesDir "global-guidelines.md") -Value $rules -Encoding UTF8
+
+    Write-OK "Continue config written to $continueDir\config.yaml"
+    Write-Host ""
+    Write-Host "  Open VS Code - Continue + 'Company GPT' (gpt-6.1-sol) is ready to use." -ForegroundColor Green
+    Pause-Menu
+}
+
+# =============================================================================
 # MAIN MENU LOOP
 # =============================================================================
 Ensure-PackageManagers
@@ -912,6 +1005,7 @@ while ($true) {
         @{K="10";L="Blockchain Dev Toolkit";    D="Ganache CLI, Truffle, Geth & Node.js"},
         @{K="11";L="Win 11 Setup & OOBE Bypass";D="BypassNRO & Microsoft Account bypass tips"},
         @{K="12";L="Bitwarden Pinned Ext";      D="2026.6.1 to Downloads + block store auto-update"},
+        @{K="13";L="Continue AI Setup";         D="VS Code extension + Company GPT (gpt-6.1-sol) config"},
         @{K="0";L="Exit";                       D=""}
     ) | ForEach-Object {
         Write-Host "  [" -NoNewline -ForegroundColor DarkGray
@@ -922,7 +1016,7 @@ while ($true) {
     }
     Write-Host ""; Write-Sep "-"
 
-    $opt = (Read-Host "`n  Enter choice [0-12]").Trim()
+    $opt = (Read-Host "`n  Enter choice [0-13]").Trim()
     switch ($opt) {
         '1' { Install-NormalSoftware }
         '2' { Install-MSOffice }
@@ -936,7 +1030,8 @@ while ($true) {
         '10' { Show-BlockchainMenu }
         '11' { Show-Win11BypassMenu }
         '12' { Install-BitwardenPinned }
+        '13' { Install-ContinueAI }
         '0' { Write-Host "`n  Goodbye!`n" -ForegroundColor Cyan; exit 0 }
-        default { Write-WARN "Invalid choice - enter 0-12."; Start-Sleep -Seconds 1 }
+        default { Write-WARN "Invalid choice - enter 0-13."; Start-Sleep -Seconds 1 }
     }
 }
