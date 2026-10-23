@@ -20,7 +20,7 @@ mobile data without VPN.
 | Field | Value |
 | :--- | :--- |
 | **Bot Handle** | [@Ikigai_Alerts_bot](https://t.me/Ikigai_Alerts_bot) |
-| **Bot Token** | `8607599767:AAEOO6ZhYc3ccl1OfFgi6-jAqhneWB6u01I` |
+| **Bot Token** | `set via TELEGRAM_BOT_TOKEN env var, not in git` |
 | **Host** | Mac Mini M2 — `192.168.126.101` (macOS/Darwin) |
 | **SSH Access** | `ssh IKI-MAC-27` (alias, key-based) or `ssh admin@192.168.126.101` |
 | **Source File (host)** | `~/telegram-bot/bot.py` (i.e. `/Users/admin/telegram-bot/bot.py`) |
