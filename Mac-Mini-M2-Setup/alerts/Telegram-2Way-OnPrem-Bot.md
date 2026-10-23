@@ -32,7 +32,7 @@
 | Field | Value |
 | :--- | :--- |
 | **Bot Handle** | [@Ikigai_Alerts_bot](https://t.me/Ikigai_Alerts_bot) |
-| **Bot Token** | `8607599767:AAEOO6ZhYc3ccl1OfFgi6-jAqhneWB6u01I` |
+| **Bot Token** | `set via TELEGRAM_BOT_TOKEN env var, not in git` |
 | **Host** | Mac Mini M2 (`192.168.126.101`) |
 | **Container** | `onprem-telegram-bot` (Docker, `--restart always`) |
 | **Alert Threshold** | 60 seconds (10 retries × 5s) |

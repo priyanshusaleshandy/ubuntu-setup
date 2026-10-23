@@ -3,7 +3,7 @@
 **Server IP:** `192.168.126.101`  
 **OS:** macOS / Darwin  
 **Primary Host:** `admin@192.168.126.101`  
-**Telegram Bot:** `@Ikigai_Alerts_bot` (`8607599767:AAEOO6ZhYc3ccl1OfFgi6-jAqhneWB6u01I`)  
+**Telegram Bot:** `@Ikigai_Alerts_bot` (`set via TELEGRAM_BOT_TOKEN env var, not in git`)  
 
 ---
 
@@ -117,7 +117,7 @@ mkdir -p ~/telegram-bot
 cat << 'EOF' > ~/telegram-bot/bot.py
 import os, time, subprocess, json, urllib.request, urllib.parse, threading, datetime, socket
 
-BOT_TOKEN = "8607599767:AAEOO6ZhYc3ccl1OfFgi6-jAqhneWB6u01I"
+BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/"
 CHAT_FILE = "/tmp/telegram_chats.json"
 

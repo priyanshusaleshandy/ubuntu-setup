@@ -1,6 +1,6 @@
 import os, time, subprocess, json, urllib.request, urllib.parse, threading, datetime, socket
 
-BOT_TOKEN = "8607599767:AAEOO6ZhYc3ccl1OfFgi6-jAqhneWB6u01I"
+BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/"
 CHAT_FILE = "/tmp/telegram_chats.json"
 
