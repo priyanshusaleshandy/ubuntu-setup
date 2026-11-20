@@ -4,16 +4,18 @@
 # file (with the real password) exists only on the NAS and is never committed:
 #   http://192.168.126.21:8000/ubuntu-autoinstall.yaml
 #
-# How to use: boot the Ubuntu 24.04 ISO, connect to Wi-Fi (or plug a cable) on
-# the installer's network page, choose "Automated installation" and paste the
-# URL above.
+# How to use (either):
+#  - Pendrive: the Ikigai Ubuntu ISO has this file at its root and a boot entry
+#    "Install Ubuntu - Ikigai automated" with the `autoinstall` kernel argument.
+#  - Stock ISO: connect to Wi-Fi on the installer's network page, choose
+#    "Automated installation" and paste the URL above.
 #
 # Asked in the installer: disk / partitioning (pick "LVM + encryption" and set
 # its passphrase there) and the user account + hostname.
-# Automatic: locale, keyboard, IST timezone, OpenSSH server, office Wi-Fi as a
-# system connection (joins at boot, before login), 14-minute screen blank, and a
-# first-boot service that installs the standard apps from the NAS with
-# setup-center-cli.sh --install. Log: /var/log/ikigai-firstboot.log
+# Automatic: locale, keyboard, IST timezone, office Wi-Fi as a system
+# connection (joins at boot, before login), 14-minute screen blank, and a
+# first-boot service that installs OpenSSH server and the standard apps from the
+# NAS with setup-center-cli.sh --install. Log: /var/log/ikigai-firstboot.log
 autoinstall:
   version: 1
   interactive-sections:
@@ -23,8 +25,6 @@ autoinstall:
   keyboard:
     layout: us
   timezone: Asia/Kolkata
-  packages:
-    - openssh-server
   late-commands:
     # Office Wi-Fi as a system-wide NetworkManager profile.
     - |
@@ -88,9 +88,12 @@ autoinstall:
           curl -fsS --max-time 15 -o /root/setup-center-cli.sh http://192.168.126.21:8000/setup-center-cli.sh && break
           echo "NAS not reachable yet ($i/60)"; sleep 10
       done
-      [ -s /root/setup-center-cli.sh ] || curl -fsSL --max-time 60 -o /root/setup-center-cli.sh \
+      # A NAS copy older than the --install mode would refuse to run as root.
+      grep -q -- '--install' /root/setup-center-cli.sh 2>/dev/null || curl -fsSL --max-time 60 -o /root/setup-center-cli.sh \
           https://raw.githubusercontent.com/priyanshusaleshandy/ubuntu-setup/main/setup-center-cli.sh
-      [ -s /root/setup-center-cli.sh ] || { echo "Could not download setup-center-cli.sh"; exit 1; }
+      grep -q -- '--install' /root/setup-center-cli.sh 2>/dev/null || { echo "No setup-center-cli.sh with --install available"; exit 1; }
+      # SSH server here rather than in the installer: the install may run offline.
+      apt-get install -y openssh-server || echo "openssh-server install failed"
       bash /root/setup-center-cli.sh --install "$ITEMS"
       rc=$?
       echo "=== exit $rc ==="
