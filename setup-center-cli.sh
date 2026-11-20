@@ -53,7 +53,9 @@ log_section() { echo -e "\n${CYAN}${BOLD}=== $1 ===${NC}"; }
 press_enter() { echo ""; read -rp "  Press Enter to return to menu..." _ < /dev/tty; }
 
 # ── Root guard ────────────────────────────────────────────────────────────────
-if [[ "$EUID" -eq 0 ]]; then
+# --install (non-interactive, see bottom of file) is allowed as root: the Ubuntu
+# autoinstall first-boot service runs it before any normal user exists.
+if [[ "$EUID" -eq 0 && "${1:-}" != "--install" ]]; then
     log_error "Do NOT run this script as root. Run as a normal user."
     log_error "The script will ask for sudo when needed."
     exit 1
@@ -937,6 +939,11 @@ install_eset() {
     fi
 
     local mokpass=""
+    if [ "$secureboot" = "on" ] && [[ "${NONINTERACTIVE:-0}" == 1 ]]; then
+        log_error "Secure Boot is ENABLED: ESET needs a MOK password typed at the console."
+        log_error "Skipped in --install mode. Disable Secure Boot, or run ESET from the menu."
+        return 1
+    fi
     if [ "$secureboot" = "on" ]; then
         log_warn "Secure Boot is ENABLED on this machine."
         echo ""
@@ -1676,6 +1683,7 @@ install_with_retry() {
         set +e; install_component "$idx"; local rc=$?; set -e
         if [[ $rc -eq 0 ]]; then log_ok "$name installed."; break; fi
         log_error "Failed to install $name."
+        if [[ "${NONINTERACTIVE:-0}" == 1 ]]; then log_warn "Skipping $name (non-interactive)."; return 1; fi
         echo -e "  ${BOLD}r)${NC} Retry   ${BOLD}s)${NC} Skip   ${BOLD}a)${NC} Abort"
         read -rp "  Choice [r/s/a]: " ch < /dev/tty
         case "$ch" in
@@ -2659,6 +2667,26 @@ XAMPP_EOF
         esac
     done
 }
+
+# ── Non-interactive install ───────────────────────────────────────────────────
+# ./setup-center-cli.sh --install 1,3,4   installs those Install-menu items and
+# exits. Used by the Ubuntu autoinstall first-boot service (runs as root). A
+# failed item is logged and skipped instead of prompting; exit 1 if any failed.
+if [[ "${1:-}" == "--install" ]]; then
+    NONINTERACTIVE=1
+    IFS=',' read -ra _items <<< "${2:-}"
+    [[ ${#_items[@]} -gt 0 ]] || { log_error "Usage: $0 --install 1,3,4  (Install-menu numbers)"; exit 1; }
+    _failed=()
+    for _n in "${_items[@]}"; do
+        if ! [[ "$_n" =~ ^[0-9]+$ ]] || (( _n < 1 || _n > ${#OPTIONS[@]} )); then
+            log_error "Invalid item '$_n' (valid: 1-${#OPTIONS[@]})"; _failed+=("$_n"); continue
+        fi
+        install_with_retry $(( _n - 1 )) || _failed+=("$_n")
+    done
+    if [[ ${#_failed[@]} -gt 0 ]]; then log_error "Failed items: ${_failed[*]}"; exit 1; fi
+    log_ok "All requested items installed."
+    exit 0
+fi
 
 # ── MAIN MENU ─────────────────────────────────────────────────────────────────
 while true; do

@@ -1,0 +1,117 @@
+# Ubuntu Desktop 24.04 autoinstall for Ikigai fleet laptops.
+#
+# TEMPLATE: the office Wi-Fi password is the placeholder __WIFI_PSK__. The live
+# file (with the real password) exists only on the NAS and is never committed:
+#   http://192.168.126.21:8000/ubuntu-autoinstall.yaml
+#
+# How to use: boot the Ubuntu 24.04 ISO, connect to Wi-Fi (or plug a cable) on
+# the installer's network page, choose "Automated installation" and paste the
+# URL above.
+#
+# Asked in the installer: disk / partitioning (pick "LVM + encryption" and set
+# its passphrase there) and the user account + hostname.
+# Automatic: locale, keyboard, IST timezone, OpenSSH server, office Wi-Fi as a
+# system connection (joins at boot, before login), 14-minute screen blank, and a
+# first-boot service that installs the standard apps from the NAS with
+# setup-center-cli.sh --install. Log: /var/log/ikigai-firstboot.log
+autoinstall:
+  version: 1
+  interactive-sections:
+    - storage
+    - identity
+  locale: en_IN.UTF-8
+  keyboard:
+    layout: us
+  timezone: Asia/Kolkata
+  packages:
+    - openssh-server
+  late-commands:
+    # Office Wi-Fi as a system-wide NetworkManager profile.
+    - |
+      install -d -m 700 /target/etc/NetworkManager/system-connections
+      cat > /target/etc/NetworkManager/system-connections/saleshandy.nmconnection <<'EOF'
+      [connection]
+      id=saleshandy
+      type=wifi
+      autoconnect=true
+
+      [wifi]
+      mode=infrastructure
+      ssid=saleshandy
+
+      [wifi-security]
+      key-mgmt=wpa-psk
+      psk=__WIFI_PSK__
+
+      [ipv4]
+      method=auto
+
+      [ipv6]
+      method=auto
+      EOF
+      chmod 600 /target/etc/NetworkManager/system-connections/saleshandy.nmconnection
+
+    # 14-minute screen blank for every user (system dconf default; gsettings in
+    # setup-center-cli only reaches the user who runs it).
+    - |
+      install -d /target/etc/dconf/profile /target/etc/dconf/db/local.d
+      f=/target/etc/dconf/profile/user
+      [ -f "$f" ] || echo 'user-db:user' > "$f"
+      grep -q '^system-db:local' "$f" || echo 'system-db:local' >> "$f"
+      cat > /target/etc/dconf/db/local.d/00-screen-timeout <<'EOF'
+      [org/gnome/desktop/session]
+      idle-delay=uint32 840
+
+      [org/gnome/desktop/screensaver]
+      lock-delay=uint32 0
+      lock-enabled=true
+      EOF
+      curtin in-target --target=/target -- dconf update
+
+    # apt waits for the lock instead of failing while first-boot updates run.
+    - printf 'DPkg::Lock::Timeout "600";\n' > /target/etc/apt/apt.conf.d/90ikigai-lock-timeout
+
+    # First-boot app install. Retries on the next boot if anything failed, at most 3 boots.
+    - |
+      cat > /target/usr/local/sbin/ikigai-firstboot.sh <<'EOF'
+      #!/bin/bash
+      # Installs the standard app set via setup-center-cli.sh --install.
+      # Written by the Ubuntu autoinstall (linux/ubuntu-autoinstall.template.yaml).
+      ITEMS=1,3,4,5,6,7,8,9,10,11,12,16,17,18
+      STATE=/var/lib/ikigai-firstboot
+      mkdir -p "$STATE"
+      exec >>/var/log/ikigai-firstboot.log 2>&1
+      n=$(( $(cat "$STATE/attempts" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$STATE/attempts"
+      echo "=== $(date '+%F %T') attempt $n ==="
+      snap wait system seed.loaded || true
+      for i in $(seq 1 60); do
+          curl -fsS --max-time 15 -o /root/setup-center-cli.sh http://192.168.126.21:8000/setup-center-cli.sh && break
+          echo "NAS not reachable yet ($i/60)"; sleep 10
+      done
+      [ -s /root/setup-center-cli.sh ] || curl -fsSL --max-time 60 -o /root/setup-center-cli.sh \
+          https://raw.githubusercontent.com/priyanshusaleshandy/ubuntu-setup/main/setup-center-cli.sh
+      [ -s /root/setup-center-cli.sh ] || { echo "Could not download setup-center-cli.sh"; exit 1; }
+      bash /root/setup-center-cli.sh --install "$ITEMS"
+      rc=$?
+      echo "=== exit $rc ==="
+      if [ $rc -eq 0 ] || [ "$n" -ge 3 ]; then touch "$STATE/done"; fi
+      exit $rc
+      EOF
+      chmod 755 /target/usr/local/sbin/ikigai-firstboot.sh
+      cat > /target/etc/systemd/system/ikigai-firstboot.service <<'EOF'
+      [Unit]
+      Description=Ikigai first-boot app install (setup-center-cli --install)
+      Wants=network-online.target
+      After=network-online.target
+      ConditionPathExists=!/var/lib/ikigai-firstboot/done
+
+      [Service]
+      Type=oneshot
+      Environment=HOME=/root
+      ExecStart=/usr/local/sbin/ikigai-firstboot.sh
+      TimeoutStartSec=0
+
+      [Install]
+      WantedBy=multi-user.target
+      EOF
+      curtin in-target --target=/target -- systemctl enable ikigai-firstboot.service
